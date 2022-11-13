@@ -374,8 +374,11 @@ void Lexer::decimal_digits() {
 }
 
 bool Lexer::single_quoted_string() {
+  if (first() == '\n' || first() == '\r') {
+    return false;
+  }
   // one symbol
-  if (second() == '\'' && first() != '\\') {
+  if (second() == '\'' && first() != '\\' && first() != '\'') {
     bump(), bump();
     return true;
   }
@@ -400,7 +403,12 @@ bool Lexer::double_quoted_string() {
     case '\\':
       if (is_escape_sequnce_char(first()))
         bump();
+      else
+        return false;
       break;
+    case '\n':
+    case '\r':
+      return false;
     }
     first_char_opt = bump();
   }
