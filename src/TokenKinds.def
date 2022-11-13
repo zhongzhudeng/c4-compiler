@@ -1,0 +1,74 @@
+// This file includes possible token kinds in a form suitable for usage via
+// preprocessor. Include this header after defining the following macro:
+//   #define KIND_ACTION(KD, STR) ...
+
+#define KEYWORD_ACTION(KND, STR) KIND_ACTION(KND, "keyword")
+
+#include "KeyWords.def"
+
+#undef KEYWORD_ACTION
+
+// Identifier
+KIND_ACTION(TK_IDENTIFIER, "identifier")
+
+// punctuator
+KIND_ACTION(TK_EXCLAIM, "punctuator")                  // "!"
+KIND_ACTION(TK_EXCLAIMEQUAL, "punctuator")             // "!="
+KIND_ACTION(TK_HASH, "punctuator")                     // "#"
+KIND_ACTION(TK_HASHHASH, "punctuator")                 // "##"
+KIND_ACTION(TK_PERCENT, "punctuator")                  // "%"
+KIND_ACTION(TK_PERCENTCOLON, "punctuator")             // "%:"
+KIND_ACTION(TK_PERCENTCOLONPERCENTCOLON, "punctuator") // "%:%:"
+KIND_ACTION(TK_PERCENTEQUAL, "punctuator")             // "%="
+KIND_ACTION(TK_PERCENTGREATER, "punctuator")           // "%>"
+KIND_ACTION(TK_AMP, "punctuator")                      // "&"
+KIND_ACTION(TK_AMPAMP, "punctuator")                   // "&&"
+KIND_ACTION(TK_AMPEQUAL, "punctuator")                 // "&="
+KIND_ACTION(TK_LPAREN, "punctuator")                   // "("
+KIND_ACTION(TK_RPAREN, "punctuator")                   // ")"
+KIND_ACTION(TK_STAR, "punctuator")                     // "*"
+KIND_ACTION(TK_STAREQUAL, "punctuator")                // "*="
+KIND_ACTION(TK_PLUS, "punctuator")                     // "+"
+KIND_ACTION(TK_PLUSPLUS, "punctuator")                 // "++"
+KIND_ACTION(TK_PLUSEQUAL, "punctuator")                // "+="
+KIND_ACTION(TK_COMMA, "punctuator")                    // ","
+KIND_ACTION(TK_MINUS, "punctuator")                    // "-"
+KIND_ACTION(TK_MINUSMINUS, "punctuator")               // "--"
+KIND_ACTION(TK_MINUSEQUAL, "punctuator")               // "-="
+KIND_ACTION(TK_ARROW, "punctuator")                    // "->"
+KIND_ACTION(TK_PERIOD, "punctuator")                   // "."
+KIND_ACTION(TK_ELLIPSIS, "punctuator")                 // "..."
+KIND_ACTION(TK_SLASH, "punctuator")                    // "/"
+KIND_ACTION(TK_SLASHEQUAL, "punctuator")               // "/="
+KIND_ACTION(TK_COLON, "punctuator")                    // ":"
+KIND_ACTION(TK_COLONGREATER, "punctuator")             // ":>"
+KIND_ACTION(TK_SEMICOLON, "punctuator")                // ";"
+KIND_ACTION(TK_LESS, "punctuator")                     // "<"
+KIND_ACTION(TK_LESSPERCENT, "punctuator")              // "<%"
+KIND_ACTION(TK_LESSCOLON, "punctuator")                // "<:"
+KIND_ACTION(TK_LESSLESS, "punctuator")                 // "<<"
+KIND_ACTION(TK_LESSLESSEQUAL, "punctuator")            // "<<="
+KIND_ACTION(TK_LESSEQUAL, "punctuator")                // "<="
+KIND_ACTION(TK_EQUAL, "punctuator")                    // "="
+KIND_ACTION(TK_EQUALEQUAL, "punctuator")               // "=="
+KIND_ACTION(TK_GREATER, "punctuator")                  // ">"
+KIND_ACTION(TK_GREATEREQUAL, "punctuator")             // ">="
+KIND_ACTION(TK_GREATERGREATER, "punctuator")           // ">>"
+KIND_ACTION(TK_GREATERGREATEREQUAL, "punctuator")      // ">>="
+KIND_ACTION(TK_QUESTION, "punctuator")                 // "?"
+KIND_ACTION(TK_LSQUARE, "punctuator")                  // "["
+KIND_ACTION(TK_RSQUARE, "punctuator")                  // "]"
+KIND_ACTION(TK_CARET, "punctuator")                    // "^"
+KIND_ACTION(TK_CARETEQUAL, "punctuator")               // "^="
+KIND_ACTION(TK_LBRACE, "punctuator")                   // "{"
+KIND_ACTION(TK_PIPE, "punctuator")                     // "|"
+KIND_ACTION(TK_PIPEEQUAL, "punctuator")                // "|="
+KIND_ACTION(TK_PIPEPIPE, "punctuator")                 // "||"
+KIND_ACTION(TK_RBRACE, "punctuator")                   // "}"
+KIND_ACTION(TK_TILD, "punctuator")                     // "~"
+
+// decimal-constants,0 and character-constants
+KIND_ACTION(TK_CONSTANT, "constant")
+KIND_ACTION(TK_STRING_LITERAL, "string-literal")
+
+KIND_ACTION(TK_EOI, "end-of-input")
