@@ -45,6 +45,8 @@ AdvanceToken:
 
   /// whitespace
   case '\t':
+  case '':
+  case '':
   case ' ':
     eat_while([](char c) { return c == '\t' || c == ' '; });
     reset_pos_within_token();
@@ -339,6 +341,9 @@ AdvanceToken:
     break;
   case '}':
     kind = TK_RBRACE; // ""
+    break;
+  case ';':
+    kind = TK_SEMICOLON; // ";"
     break;
   case '~':
     kind = TK_TILD; // "~"
