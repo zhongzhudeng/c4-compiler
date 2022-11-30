@@ -19,8 +19,14 @@ Lexer::~Lexer() {}
 void Lexer::tokenize() {
   for (;;) {
     auto tok = advance_token();
-    if (tok.Kind == TokenKind::TK_EOI)
+    if (tok.Kind == TokenKind::TK_EOI){
       break;
+    } 
+    if (first()==eof_char) {
+      Locatable location(file_name, line, column);
+      std::cerr << location << " error: Unexpected EOF\n";
+      break;
+    }
     std::cout << tok << "\n";
   }
 }
@@ -219,6 +225,10 @@ AdvanceToken:
       bump();
       eat_line_comment();
       reset_pos_within_token();
+      if (first()==eof_char) {
+        std::cerr << location << " error: Unexpected EOF\n";
+        exit(1);
+      }
       goto AdvanceToken;
       break;
     case '*':
@@ -228,7 +238,12 @@ AdvanceToken:
       if (not success)
         goto NotSuccess;
       reset_pos_within_token();
+      if (first()==eof_char) {
+        std::cerr << location << " error: Unexpected EOF\n";
+        exit(1);
+      }
       goto AdvanceToken;
+      
     default:
       kind = TK_SLASH; // "/"
     }
