@@ -363,7 +363,9 @@ AdvanceToken:
   case '~':
     kind = TK_TILD; // "~"
     break;
-    // default:
+  default:
+    std::cerr << location << " error: invaild token\n";
+    exit(1);
   }
   // TODO: implementation
   if (not success) {
