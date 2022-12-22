@@ -31,6 +31,23 @@ void Lexer::tokenize() {
   }
 }
 
+std::queue<Token*> Lexer::lex() { 
+  std::queue<Token*> tokens;
+  
+  for (;;) {
+    auto tok = advance_token();
+    if (tok.Kind == TokenKind::TK_EOI){
+      return tokens; 
+    } 
+    if (first()==eof_char) {
+      Locatable location(file_name, line, column);
+      std::cerr << location << " error: Unexpected EOF\n";
+      return tokens;
+    }
+    tokens.push(&tok);
+  };
+}
+
 Token Lexer::advance_token() {
   TokenKind kind;
   std::optional<char> first_char_opt;

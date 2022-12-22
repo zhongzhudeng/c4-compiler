@@ -2,6 +2,7 @@
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
+#include <queue>
 
 #include "Token.hpp"
 
@@ -11,6 +12,7 @@ public:
   ~Lexer();
 
   void tokenize();
+  std::queue<Token*> lex();
   Token advance_token();
 
 private:
