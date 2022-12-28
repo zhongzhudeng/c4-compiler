@@ -1,6 +1,7 @@
 #pragma once
 
 #include <queue>
+#include <typeinfo>
 
 #include "Diagnostic.hpp"
 #include "Token.hpp"
@@ -11,118 +12,6 @@
 // (by giving one of the below `DeclKind`s), we need to check separately whether
 // the declarator satisfies this requirement.
 enum class DeclKind { ANY, ABSTRACT, CONCRETE };
-
-class AST : public Locatable {
-    public:
-    private:
-    
-};
-
-class ExternalDeclaration : public Locatable {
-    public:
-    ExternalDeclaration(Locatable loc);
-    private:
-};
-
-class Statement : public Locatable {
-    public:
-    Statement(Locatable loc);
-    private:
-};
-
-class CompoundStatement : public Statement {
-    public:
-    CompoundStatement(Locatable loc);
-    private:
-};
-
-class IfStatement : public Statement {
-    public:
-    IfStatement(Locatable loc);
-    private:
-};
-
-class WhileStatement : public Statement {
-    public:
-    WhileStatement(Locatable loc);
-    private:
-};
-
-class GoToStatement : public Statement {
-    public:
-    GoToStatement(Locatable loc);
-    private:
-};
-
-class ExpressionStatement : public Statement {
-    public:
-    ExpressionStatement(Locatable loc);
-    private:
-};
-
-class IdentifierStatement : public Statement {
-    public:
-    IdentifierStatement(Locatable loc);
-    private:
-};
-
-class SimpleStatement : public Statement {
-    public:
-    SimpleStatement(Locatable loc);
-    private:
-};
-
-enum class StatementType {CONTINUE, BREAK};
-
-class BlockItemList : Locatable {
-    public:
-    BlockItemList(Locatable loc);
-    private:
-};
-
-class Expression : public Locatable {
-    public:
-    Expression(Locatable loc);
-    private:
-};
-
-class ConditionalExpression : public Expression {
-    public:
-    ConditionalExpression(Locatable loc);
-    private:
-};
-
-class BinaryExpression : public Expression {
-    public:
-    BinaryExpression(Locatable loc);
-    private:
-};
-
-class UnaryExpression : public Expression {
-    public:
-    UnaryExpression(Locatable loc);
-    private:
-};
-
-class PostFixExpression : public Expression {
-    public:
-    PostFixExpression(Locatable loc);
-    private:
-};
-
-class PrimaryExpression : public Expression {
-    public:
-    PrimaryExpression(Locatable loc);
-    private:
-};
-
-enum class BinaryOperator {STAR,PLUS,MINUS,LESS,EQUALEQUAL,EXCLAIMEQUAL,AMPAMP,PIPEPIPE};
-
-enum class UnaryOperator {AMP,STAR,MINUS,EXCLAIM,SIZEOF};
-
-enum class PostFixOperator {SQUARE,PAREN,ARROW,DOT};
-
-enum class PrimaryOperator {PAREN,CONSTANT,STRING_LITERAL,IDENTIFIER};
 
 class Declarator : public Locatable{
     public:
@@ -141,11 +30,11 @@ class Specifier : public Locatable {
     private:
 };
 
-class SpecDecl{
+class SpecDecl : public Locatable {
     public:
     Specifier* spec;
     Declarator* decl;
-    SpecDecl(Specifier *spec, Declarator *decl);
+    SpecDecl(Locatable loc, Specifier *spec, Declarator *decl);
     private:
 };
 
@@ -200,6 +89,154 @@ class StructSpecifier : public Specifier {
     private:
 };
 
+class Expression : public Locatable {
+    public:
+    Expression* conEx;
+    Expression* Expr;
+    Expression(Locatable loc);
+    Expression(Locatable loc, Expression* c);
+    Expression(Locatable loc, Expression* c, Expression* e);
+    private:
+};
+
+class ConditionalExpression : public Expression {
+    public:
+    ConditionalExpression* conEx;
+    ConditionalExpression* biExpr;
+    ConditionalExpression(Locatable loc);
+    ConditionalExpression(Locatable loc, ConditionalExpression* c, ConditionalExpression* b);
+    private:
+};
+
+class BinaryExpression : public ConditionalExpression {
+    public:
+    BinaryExpression* unExpr;
+    BinaryExpression* biExpr;
+    TokenKind op;
+    BinaryExpression(Locatable loc);
+    BinaryExpression(Locatable loc,BinaryExpression* u, BinaryExpression* b, TokenKind o);
+    private:
+};
+
+class UnaryExpression : public BinaryExpression {
+    public:
+    UnaryExpression* unExpr;
+    TokenKind op;
+    UnaryExpression(Locatable loc);
+    UnaryExpression(Locatable loc, UnaryExpression* u);
+    UnaryExpression(Locatable loc, UnaryExpression* u, TokenKind tok);
+    private:
+};
+
+class AssignmentExpression : public Expression {
+    public:
+    UnaryExpression* unExpr;
+    ConditionalExpression* condExpr;
+    AssignmentExpression(Locatable loc, UnaryExpression* u, ConditionalExpression* c);
+    private:
+};
+
+class PostFixExpression : public UnaryExpression {
+    public:
+    Expression* expr;
+    AssignmentExpression* ass;
+    const Token* token;
+    PostFixExpression(Locatable loc);
+    PostFixExpression(Locatable loc, Expression* e);
+    PostFixExpression(Locatable loc, AssignmentExpression* ass);
+    PostFixExpression(Locatable loc, const Token* tok);
+    private:
+};
+
+class PrimaryExpression : public PostFixExpression {
+    public:
+    const Token* token = nullptr;
+    Expression* expr;
+    PrimaryExpression(Locatable loc, Expression* e);
+    PrimaryExpression(Locatable loc, const Token* tok);
+    private:
+};
+
+class Statement : public Locatable {
+    public:
+    Statement(Locatable loc);
+    private:
+};
+
+class CompoundStatement : public Statement {
+    public:
+    std::queue<Locatable*> blockItemList;
+    CompoundStatement(Locatable loc);
+    void addBlockItem(Locatable* loc);
+    private:
+};
+
+class IfStatement : public Statement {
+    public:
+    Expression* exp;
+    Statement* ifStatement;
+    Statement* elseStatement;
+    IfStatement(Locatable loc, Expression* expr, Statement* ifSt, Statement* elseSt);
+    private:
+};
+
+class WhileStatement : public Statement {
+    public:
+    Expression* expression;
+    Statement* statement;
+    WhileStatement(Locatable loc, Expression* expr, Statement* stat);
+    private:
+};
+
+class GoToStatement : public Statement {
+    public:
+    const Token* token;
+    GoToStatement(Locatable loc, const Token* tok);
+    private:
+};
+
+class ExpressionStatement : public Statement {
+    public:
+    Expression* expr;
+    ExpressionStatement(Locatable loc);
+    ExpressionStatement(Locatable loc, Expression* e);
+    private:
+};
+
+class IdentifierStatement : public Statement {
+    public:
+    PrimaryExpression* id;
+    Statement* statement;
+    IdentifierStatement(Locatable loc, PrimaryExpression* e, Statement* s);
+    private:
+};
+
+enum class StatementType {CONTINUE, BREAK};
+
+class SimpleStatement : public Statement {
+    public:
+    StatementType type;
+    SimpleStatement(Locatable loc, StatementType t);
+    private:
+};
+
+class ExternalDeclaration : public Locatable {
+    public:
+    SpecDecl* specDecl;
+    CompoundStatement* CompState;
+    ExternalDeclaration(Locatable loc, SpecDecl* sD);
+    ExternalDeclaration(Locatable loc, SpecDecl* sD, CompoundStatement* c);
+    private:
+};
+
+class AST : public Locatable {
+    public:
+    std::queue<ExternalDeclaration*> externalDeclarationList;
+    AST(Locatable loc);
+    void addExternalDeclaration(ExternalDeclaration* exDecl);
+    private:
+    
+};
 
 /// This class should implement the parser that translates a stream of tokens
 /// into an abstract syntax tree.
@@ -260,8 +297,6 @@ class Parser {
     ExternalDeclaration* parseExternalDeclaration();
 
     CompoundStatement* parseCompoundStatement();
-
-    BlockItemList* parseBlockItemList();
 
     Statement* parseStatement();
 
