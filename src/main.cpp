@@ -5,6 +5,8 @@
 #include <sstream>
 
 #include "Lexer.hpp"
+#include "parser.h"
+#include "PrettyPrinter.hpp"
 
 using namespace std;
 
@@ -27,7 +29,27 @@ int main(int argc, char **argv) {
       break;
     }
     if (std::strcmp(long_options[option_index].name, "parse") == 0) {
-      // TODO: parser
+      if (!optarg) return 1;
+      std::ifstream t(optarg);
+      std::stringstream buffer;
+      buffer << t.rdbuf();
+      string str(buffer.str());
+      Lexer lexer(optarg, str);
+      Parser parser(lexer.lex());
+      parser.parse();
+      break;
+    }
+    if (std::strcmp(long_options[option_index].name, "print-ast") == 0) {
+      if (!optarg) return 1;
+      std::ifstream t(optarg);
+      std::stringstream buffer;
+      buffer << t.rdbuf();
+      string str(buffer.str());
+      Lexer lexer(optarg, str);
+      Parser parser(lexer.lex());
+      PrettyPrinter pp(parser.parse());
+      pp.printAST();
+      break;
     }
   default:
     break;

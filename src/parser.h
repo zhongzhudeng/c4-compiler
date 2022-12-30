@@ -151,7 +151,7 @@ class PostFixExpression : public UnaryExpression {
 class PrimaryExpression : public PostFixExpression {
     public:
     const Token* token = nullptr;
-    Expression* expr;
+    Expression* expr = nullptr;
     PrimaryExpression(Locatable loc, Expression* e);
     PrimaryExpression(Locatable loc, const Token* tok);
     private:
@@ -244,6 +244,8 @@ class Parser {
    public:
    Parser(std::queue<Token*> tokens);
 
+    AST* parse();
+
    private:
     Token* currTok;
     std::queue<Token*> tokens;
@@ -291,8 +293,6 @@ class Parser {
     /// valid non-abstract declarator.
     /// If `dKind` is `DeclKind::ANY`: do not verify abstractness.
     SpecDecl* parseSpecDecl(DeclKind dKind);
-
-    AST* parse();
 
     ExternalDeclaration* parseExternalDeclaration();
 
