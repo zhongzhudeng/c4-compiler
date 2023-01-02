@@ -1,4 +1,4 @@
-add_library(compiler Diagnostic.cpp Lexer.cpp SymbolInternalizer.cpp Token.cpp)
+add_library(compiler Diagnostic.cpp Lexer.cpp SymbolInternalizer.cpp Token.cpp Parser.cpp PrettyPrinter.cpp)
 target_compile_features(compiler PUBLIC cxx_std_17)
 
 add_executable(main main.cpp)
