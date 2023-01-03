@@ -1,4 +1,4 @@
-#include "Parser.hpp"
+#include "parser.h"
 
 #include "Diagnostic.hpp"
 #include "Token.hpp"

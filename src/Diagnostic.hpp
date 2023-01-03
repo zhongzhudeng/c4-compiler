@@ -9,13 +9,10 @@ public:
   size_t Line;
   size_t Column;
 
-  Locatable(std::string_view FileName);
   Locatable(std::string_view FileName, size_t Line, size_t Column);
   Locatable(const Locatable &loc);
   Locatable &operator=(const Locatable &loc);
   virtual ~Locatable(void);
-
-  void set_position(size_t Line, size_t Column);
 
   friend std::ostream &operator<<(std::ostream &stream, const Locatable &loc);
 };

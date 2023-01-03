@@ -1,4 +1,4 @@
-#include "Parser.hpp"
+#include "parser.h"
 #include "PrettyPrinter.hpp"
 
 PrettyPrinter::PrettyPrinter(AST *ast) {

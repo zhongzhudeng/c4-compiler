@@ -1,57 +1,57 @@
+#include <cstring>
+#include <fstream>
 #include <getopt.h>
+#include <iostream>
+#include <sstream>
 
-#include "Diagnostic.hpp"
 #include "Lexer.hpp"
-#include "Parser.hpp"
+#include "parser.h"
 #include "PrettyPrinter.hpp"
 
 using namespace std;
 
 int main(int argc, char **argv) {
-
-  const char *optstring = "";
-  static struct option long_options[] = {
-      {"tokenize", required_argument, 0, 0},
-      {"parse", required_argument, 0, 0},
-      {"print-ast", required_argument, 0, 0}};
+  int c;
   int option_index;
-
-  switch (getopt_long(argc, argv, optstring, long_options, &option_index)) {
-  case 0: {
-    const char *filename = optarg;
-    if (filename == nullptr) {
-      error("Invalid command line arguments\n");
-      return 1;
-    }
-    switch (option_index) {
-    case 0: {
-      /// --tokenize
-      Lexer lexer(filename);
+  static struct option long_options[] = {{"tokenize", required_argument, 0, 0},
+                                         {"parse", required_argument, 0, 0}};
+  c = getopt_long(argc, argv, "", long_options, &option_index);
+  switch (c) {
+  case 0:
+    if (std::strcmp(long_options[option_index].name, "tokenize") == 0) {
+      if (!optarg) return 1;
+      std::ifstream t(optarg);
+      std::stringstream buffer;
+      buffer << t.rdbuf();
+      string str(buffer.str());
+      Lexer lexer(optarg, str);
       lexer.tokenize();
       break;
     }
-    case 1: {
-      /// --parse
-      Lexer lexer(filename);
+    if (std::strcmp(long_options[option_index].name, "parse") == 0) {
+      if (!optarg) return 1;
+      std::ifstream t(optarg);
+      std::stringstream buffer;
+      buffer << t.rdbuf();
+      string str(buffer.str());
+      Lexer lexer(optarg, str);
       Parser parser(lexer.lex());
       parser.parse();
       break;
     }
-    case 2: {
-      /// print-ast
-      Lexer lexer(filename);
+    if (std::strcmp(long_options[option_index].name, "print-ast") == 0) {
+      if (!optarg) return 1;
+      std::ifstream t(optarg);
+      std::stringstream buffer;
+      buffer << t.rdbuf();
+      string str(buffer.str());
+      Lexer lexer(optarg, str);
       Parser parser(lexer.lex());
       PrettyPrinter pp(parser.parse());
       pp.printAST();
       break;
     }
-    default:
-      error("Invalid command line arguments\n");
-      return 1;
-    }
-  } break;
   default:
-    error("Invalid command line arguments\n");
-    return 1;
+    break;
   }
 }

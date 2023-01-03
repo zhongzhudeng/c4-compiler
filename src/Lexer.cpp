@@ -1,21 +1,16 @@
 #include "Lexer.hpp"
 
-#include <cstdlib>
-#include <fstream>
 #include <optional>
 #include <string_view>
 
-#include "Diagnostic.hpp"
 #include "Token.hpp"
 
-Lexer::Lexer(std::string_view file_name) {
+Lexer::Lexer(std::string_view file_name, std::string_view input) {
   line = 1;
   column = 1;
-  std::ifstream ifs(file_name);
-  input = std::string(std::istreambuf_iterator<char>{ifs}, {});
   len_remaining = input.length();
-  chars = std::string_view(input).begin();
-  end = std::string_view(input).cend();
+  chars = input.begin();
+  end = input.cend();
   this->file_name = file_name;
 }
 
@@ -24,29 +19,29 @@ Lexer::~Lexer() {}
 void Lexer::tokenize() {
   for (;;) {
     auto tok = advance_token();
-    if (tok.Kind == TokenKind::TK_EOI) {
+    if (tok.Kind == TokenKind::TK_EOI){
       break;
-    }
-    if (first() == eof_char) {
+    } 
+    if (first()==eof_char) {
       Locatable location(file_name, line, column);
-      errorloc(location, "Unexpected EOF\n");
+      std::cerr << location << " error: Unexpected EOF\n";
       break;
     }
     std::cout << tok << "\n";
   }
 }
 
-std::queue<Token *> Lexer::lex() {
-  std::queue<Token *> tokens;
-
+std::queue<Token*> Lexer::lex() { 
+  std::queue<Token*> tokens;
+  
   for (;;) {
     auto tok = advance_token();
-    if (tok.Kind == TokenKind::TK_EOI) {
-      return tokens;
-    }
-    if (first() == eof_char) {
+    if (tok.Kind == TokenKind::TK_EOI){
+      return tokens; 
+    } 
+    if (first()==eof_char) {
       Locatable location(file_name, line, column);
-      errorloc(location, "Unexpected EOF\n");
+      std::cerr << location << " error: Unexpected EOF\n";
       return tokens;
     }
     tokens.push(&tok);
@@ -54,27 +49,29 @@ std::queue<Token *> Lexer::lex() {
 }
 
 Token Lexer::advance_token() {
-  char cur;
   TokenKind kind;
-  Locatable location(file_name);
+  std::optional<char> first_char_opt;
+  char first_char;
+  bool success = true;
 
 AdvanceToken:
-  location.set_position(line, column);
-  if (first() == eof_char) {
+  Locatable location(file_name, line, column);
+  first_char_opt = bump();
+  if (not first_char_opt.has_value()) {
     Symbol symbol = symbols.internalize("");
     kind = TK_EOI;
     return Token(location, kind, symbol);
   }
-  cur = first(), bump();
-  switch (cur) {
+
+  first_char = first_char_opt.value();
+  switch (first_char) {
 
   /// whitespace
-  case ' ':  // space
-  case '\t': // horizontal tab
-  case '\v': // vertical tab
-  case '\f': // form-feed
-    eat_while(
-        [](char c) { return c == ' ' || c == '\t' || c == '\v' || c == '\f'; });
+  case '\t':
+  case '':
+  case '':
+  case ' ':
+    eat_while([](char c) { return c == '\t' || c == ' '; });
     reset_pos_within_token();
     goto AdvanceToken;
 
@@ -110,14 +107,12 @@ AdvanceToken:
     break;
   /// character-constant
   case '\'':
-    if (not single_quoted_string(location))
-      exit(1);
+    success = single_quoted_string();
     kind = TK_CONSTANT;
     break;
 
   case '\"':
-    if (not double_quoted_string(location))
-      exit(1);
+    success = double_quoted_string();
     kind = TK_STRING_LITERAL;
     break;
 
@@ -245,27 +240,27 @@ AdvanceToken:
     case '/':
       // line comment
       bump();
-      line_comment();
-      if (first() == eof_char) {
-        // TODO: error msg
-        errorloc(location, "\n");
+      eat_line_comment();
+      reset_pos_within_token();
+      if (first()==eof_char) {
+        std::cerr << location << " error: Unexpected EOF\n";
         exit(1);
       }
-      reset_pos_within_token();
       goto AdvanceToken;
       break;
     case '*':
       // block comment
       bump();
-      if (not block_comment(location))
-        exit(1);
-      if (first() == eof_char) {
-        // TODO: error msg
-        errorloc(location, "\n");
+      success = eat_block_comment();
+      if (not success)
+        goto NotSuccess;
+      reset_pos_within_token();
+      if (first()==eof_char) {
+        std::cerr << location << " error: Unexpected EOF\n";
         exit(1);
       }
-      reset_pos_within_token();
       goto AdvanceToken;
+      
     default:
       kind = TK_SLASH; // "/"
     }
@@ -386,7 +381,13 @@ AdvanceToken:
     kind = TK_TILD; // "~"
     break;
   default:
-    errorloc(location, " error: invaild charactor\n");
+    std::cerr << location << " error: invaild token\n";
+    exit(1);
+  }
+  // TODO: implementation
+  if (not success) {
+  NotSuccess:
+    std::cerr << location << " error\n";
     exit(1);
   }
 
@@ -411,67 +412,51 @@ void Lexer::decimal_digits() {
   eat_while([](char c) { return '0' <= c && c <= '9'; });
 }
 
-bool Lexer::single_quoted_string(const Locatable &loc) {
-  if (first() == eof_char or first() == '\n' or first() == '\r') {
-    errorloc(loc, "Missing terminating ' character\n");
+bool Lexer::single_quoted_string() {
+  if (first() == '\n' || first() == '\r') {
     return false;
   }
-  if (first() == '\'') {
-    errorloc(loc, "Empty character constant\n");
-    return false;
+  // one symbol
+  if (second() == '\'' && first() != '\\' && first() != '\'') {
+    bump(), bump();
+    return true;
   }
-  // escape sequence
+  // two symbols
   if (first() == '\\') {
     bump();
-    if (first() == eof_char) {
-      errorloc(loc, "Missing terminating ' character\n");
-      return false;
-    }
-    if (not is_escape_sequence_char(first())) {
-      errorloc(loc, "Unexpected escape sequence: \\", first(), '\n');
-      return false;
-    }
-  }
-  if (second() == eof_char) {
-    errorloc(loc, "Missing terminating ' character\n");
-    return false;
-  }
-  if (second() != '\'') {
-    errorloc(loc, "Multi-character character constant\n");
-    return false;
-  }
-  bump(), bump();
-  return true;
-}
-
-bool Lexer::double_quoted_string(const Locatable &loc) {
-  while (first() != eof_char) {
-    switch (first()) {
-    case '"':
-      bump();
+    if (second() == '\'' && is_escape_sequnce_char(first())) {
+      bump(), bump();
       return true;
-    case '\\':
-      if (second() != eof_char && not is_escape_sequence_char(second())) {
-        errorloc(loc, "Unexpected escape sequence: \\", first(), '\n');
-        return false;
-      }
-      bump();
-      break;
-    case '\n':
-    case '\r':
-      errorloc(loc, "Missing terminating '\"' character\n");
-      return false;
     }
-    bump();
   }
-  errorloc(loc, "Unexpected escape sequence: \\", first(), '\n');
   return false;
 }
 
-void Lexer::bump() {
+bool Lexer::double_quoted_string() {
+  auto first_char_opt = bump();
+  while (first_char_opt.has_value()) {
+    char first_char = first_char_opt.value();
+    switch (first_char) {
+    case '"':
+      return true;
+    case '\\':
+      if (is_escape_sequnce_char(first()))
+        bump();
+      else
+        return false;
+      break;
+    case '\n':
+    case '\r':
+      return false;
+    }
+    first_char_opt = bump();
+  }
+  return false;
+}
+
+std::optional<char> Lexer::bump() {
   column++;
-  if (chars != end)
-    chars++;
+  return chars != end ? std::optional<char>{*chars++} : std::nullopt;
 }
 
 void Lexer::new_line() {
@@ -496,7 +481,7 @@ void Lexer::eat_while(bool (*predicate)(char)) {
 }
 
 void Lexer::eat_while(bool (*predicate)(char, char)) {
-  while (predicate(first(), second()) && !is_eof())
+  while (predicate(first(), second()) && chars + 1 != end)
     bump();
 }
 
@@ -506,17 +491,18 @@ bool Lexer::is_keyword(std::string_view s) {
   return keyword_map.find(s) != keyword_map.end();
 }
 
-bool Lexer::is_escape_sequence_char(char c) {
+bool Lexer::is_escape_sequnce_char(char c) {
   return c == '\'' || c == '\"' || c == '?' || c == '\\' || c == 'a' ||
          c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v';
 }
 
-void Lexer::line_comment() {
+void Lexer::eat_line_comment() {
   eat_while([](char c) { return c != '\r' && c != '\n'; });
 }
 
-bool Lexer::block_comment(const Locatable &loc) {
-  char cur;
+bool Lexer::eat_block_comment() {
+  std::optional<char> first_char_opt;
+  char first_char;
 EatBlockComment:
   eat_while([](char first, char second) {
     return // */
@@ -524,18 +510,13 @@ EatBlockComment:
         // new line
         (first != '\r' && first != '\n');
   });
-  if (first() == eof_char) {
-    errorloc(loc, "Unterminated /* comment\n");
+
+  first_char_opt = bump();
+  if (not first_char_opt.has_value())
     return false;
-  }
-  cur = first(), bump();
-  switch (cur) {
-  case '*':
-    if (first() == '/') {
-      bump();
-      return true;
-    }
-    break;
+  first_char = first_char_opt.value();
+
+  switch (first_char) {
   case '\r':
     switch (first()) {
     case '\n':
@@ -549,8 +530,10 @@ EatBlockComment:
   case '\n':
     new_line();
     goto EatBlockComment;
-  default:
-    goto EatBlockComment;
+  }
+  if (first_char == '*' && first() == '/') {
+    bump();
+    return true;
   }
   return false;
 }
