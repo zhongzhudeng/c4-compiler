@@ -1,18 +1,18 @@
 #include <optional>
+#include <queue>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
-#include <queue>
 
 #include "Token.hpp"
 
 class Lexer {
 public:
-  Lexer(std::string_view file_name, std::string_view input);
+  Lexer(std::string_view file_name);
   ~Lexer();
 
   void tokenize();
-  std::queue<Token*> lex();
+  std::queue<Token *> lex();
   Token advance_token();
 
 private:
@@ -20,9 +20,10 @@ private:
   size_t column;
   size_t len_remaining;
 
-  const char eof_char = '\0';
+  static const char eof_char = '\0';
 
   std::string_view file_name;
+  std::string input;
   std::string_view::iterator chars;
   std::string_view::const_iterator end;
   SymbolInternalizer symbols;
@@ -37,11 +38,11 @@ private:
 
   TokenKind identifier_or_keywords();
   void decimal_digits();
-  bool single_quoted_string();
-  bool double_quoted_string();
+  bool single_quoted_string(const Locatable &loc);
+  bool double_quoted_string(const Locatable &loc);
 
   /// Moves to the next character.
-  std::optional<char> bump();
+  void bump();
   /// Moves to the next line.
   void new_line();
   /// Peeks the next symbol from the input stream without consuming it.
@@ -64,8 +65,8 @@ private:
   /// True if `c` is valid as a non-first character of an identifier.
   static bool is_id_continue(char c);
   bool is_keyword(std::string_view s);
-  bool is_escape_sequnce_char(char c);
-  void eat_line_comment();
-  bool eat_block_comment();
+  bool is_escape_sequence_char(char c);
+  void line_comment();
+  bool block_comment(const Locatable &loc);
   TokenKind keyword_kind(std::string_view s);
 };
