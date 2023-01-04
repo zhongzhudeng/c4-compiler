@@ -8,7 +8,7 @@
 
 class Lexer {
 public:
-  Lexer(std::string_view file_name);
+  Lexer(const char *file_name);
   ~Lexer();
 
   void tokenize();

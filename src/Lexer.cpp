@@ -8,7 +8,7 @@
 #include "Diagnostic.hpp"
 #include "Token.hpp"
 
-Lexer::Lexer(std::string_view file_name) {
+Lexer::Lexer(const char * file_name) {
   line = 1;
   column = 1;
   std::ifstream ifs(file_name);
