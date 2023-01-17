@@ -1,67 +1,57 @@
 #include "Lexer.hpp"
-
-#include <cstdlib>
-#include <fstream>
-#include <optional>
-#include <string_view>
-
 #include "Diagnostic.hpp"
 #include "Token.hpp"
+#include <fstream>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <vector>
 
-Lexer::Lexer(const char * file_name) {
+Lexer::Lexer(const char *filename, SymbolInternalizer &symbolInternalizer)
+    : filename(filename), symbolInternalizer(symbolInternalizer) {
+  std::ifstream ifs(filename);
+  src = std::string(std::istreambuf_iterator<char>{ifs}, {});
+  chars = std::string_view(src).begin();
+  end = std::string_view(src).cend();
   line = 1;
   column = 1;
-  std::ifstream ifs(file_name);
-  input = std::string(std::istreambuf_iterator<char>{ifs}, {});
-  len_remaining = input.length();
-  chars = std::string_view(input).begin();
-  end = std::string_view(input).cend();
-  this->file_name = file_name;
+  len_remaining = src.length();
+}
+
+Lexer::Lexer(const char *filename, std::string input,
+             SymbolInternalizer &symbolInternalizer)
+    : filename(filename), src(std::move(input)),
+      symbolInternalizer(symbolInternalizer) {
+  chars = std::string_view(src).begin();
+  end = std::string_view(src).cend();
+  line = 1;
+  column = 1;
+  len_remaining = src.length();
 }
 
 Lexer::~Lexer() {}
 
-void Lexer::tokenize() {
-  for (;;) {
-    auto tok = advance_token();
-    if (tok.Kind == TokenKind::TK_EOI) {
-      break;
-    }
-    if (first() == eof_char) {
-      Locatable location(file_name, line, column);
-      errorloc(location, "Unexpected EOF\n");
-      break;
-    }
-    std::cout << tok << "\n";
-  }
+void Lexer::tokenize(std::function<void(Token)> f) {
+  for (auto tok = advance_token(); tok.Kind != TokenKind::TK_EOI;
+       tok = advance_token())
+    f(tok);
 }
 
-std::queue<Token *> Lexer::lex() {
-  std::queue<Token *> tokens;
-
-  for (;;) {
-    auto tok = advance_token();
-    if (tok.Kind == TokenKind::TK_EOI) {
-      return tokens;
-    }
-    if (first() == eof_char) {
-      Locatable location(file_name, line, column);
-      errorloc(location, "Unexpected EOF\n");
-      return tokens;
-    }
-    tokens.push(&tok);
-  };
+std::vector<Token> Lexer::tokenize() {
+  std::vector<Token> token_stream;
+  tokenize([&](Token tok) { token_stream.emplace_back(tok); });
+  return token_stream;
 }
 
 Token Lexer::advance_token() {
   char cur;
   TokenKind kind;
-  Locatable location(file_name);
+  Locatable location(filename);
 
 AdvanceToken:
   location.set_position(line, column);
   if (first() == eof_char) {
-    Symbol symbol = symbols.internalize("");
+    Symbol symbol = symbolInternalizer.internalize("");
     kind = TK_EOI;
     return Token(location, kind, symbol);
   }
@@ -391,7 +381,7 @@ AdvanceToken:
   }
 
   std::string_view str = token_string(pos_within_token());
-  Symbol symbol = symbols.internalize(str);
+  Symbol symbol = symbolInternalizer.internalize(str);
   Token tok(location, kind, symbol);
   reset_pos_within_token();
   return tok;
@@ -402,9 +392,14 @@ std::string_view Lexer::token_string(size_t len) {
 }
 
 TokenKind Lexer::identifier_or_keywords() {
-  eat_while(Lexer::is_id_continue);
+  eat_while([](char c) { return isalnum(c) || c == '_'; });
   std::string_view str = token_string(pos_within_token());
-  return is_keyword(str) ? keyword_kind(str) : TK_IDENTIFIER;
+#define KEYWORD_ACTION(KD, STR)                                                \
+  if (STR == str)                                                              \
+    return KD;
+#include "KeyWords.def"
+#undef KEYWORD_ACTION
+  return TK_IDENTIFIER;
 }
 
 void Lexer::decimal_digits() {
@@ -500,12 +495,6 @@ void Lexer::eat_while(bool (*predicate)(char, char)) {
     bump();
 }
 
-bool Lexer::is_id_continue(char c) { return isalnum(c) || c == '_'; }
-
-bool Lexer::is_keyword(std::string_view s) {
-  return keyword_map.find(s) != keyword_map.end();
-}
-
 bool Lexer::is_escape_sequence_char(char c) {
   return c == '\'' || c == '\"' || c == '?' || c == '\\' || c == 'a' ||
          c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v';
@@ -554,5 +543,3 @@ EatBlockComment:
   }
   return false;
 }
-
-TokenKind Lexer::keyword_kind(std::string_view s) { return keyword_map[s]; }

@@ -1,0 +1,15 @@
+statement -> 
+  | identifier : statement
+  | { block-item-list_opt } 
+  | expression_opt ;
+  | if ( expression ) statement
+  | if ( expression ) statement else statement
+  | while ( expression ) statement
+  | goto identifier
+  | continue ;
+  | break ;
+
+block-item-list ->
+  | block-item-list block-item
+  | declaration
+  | statement

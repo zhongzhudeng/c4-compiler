@@ -1,0 +1,351 @@
+declaration ->
+  | declaration-specifiers declarator.opt ;
+
+declaration-specifiers ->
+  | type-specifier declaration-specifiers.opt 
+
+type-specifier ->
+  | void
+  | char
+  | int
+  | struct-specifier
+
+struct-specifier ->
+  | struct identifier.opt { struct-declaration-list }
+  | struct identifier
+
+struct-declaration-list -> 
+  | struct-declaration struct-declaration-list'
+
+struct-declaration-list' ->
+  | struct-declaration struct-declaration-list'
+  | epsilon
+
+struct-declaration -> 
+  | specifier-qualifier-list struct-declarator-list.opt ; 
+
+specifier-qualifier-list ->
+  | type-specifier specifier-qualifier-list.opt 
+
+struct-declarator-list -> 
+  | struct-declarator struct-declarator-list'
+
+struct-declarator-list' ->
+  | , struct-declarator struct-declarator-list'
+  | epsilon
+
+struct-declarator ->
+  | declarator
+
+declarator ->
+  | pointer.opt direct-declarator
+
+direct-declarator -> 
+  | identifier direct-declarator'
+  | ( declarator ) direct-declarator'
+
+direct-declarator' ->
+  | ( parameter-list ) direct-declarator'
+  | epsilon
+
+pointer:
+  | *
+  | * pointer
+
+parameter-list -> 
+  | parameter-declaration parameter-list'
+
+parameter-list' ->
+  | , parameter-declaration parameter-list'
+  | epsilon
+
+parameter-declaration ->
+  | declaration-specifiers declarator 
+  | declaration-specifiers abstract-declarator.opt
+
+type-name ->
+  | specifier-qualifier-list abstract-declarator.opt
+
+abstract-declarator ->
+  | pointer
+  | pointer direct-abstract-declarator
+  | direct-abstract-declarator
+
+direct-abstract-declarator ->
+  | ( abstract-declarator ) direct-abstract-declarator'
+  | ( parameter-list.opt ) direct-abstract-declarator'
+
+direct-abstract-declarator' -> 
+  | ( parameter-list.opt ) direct-abstract-declarator'
+  | epsilon
+
+
+//------------------------------------------------------------------
+
+First
+declaration
+  = first declaration-specifiers
+  void char int struct
+
+declaration-specifiers
+  = first type-specifier
+  void char int struct
+
+type-specifier
+  = void char int || first struct-specifier
+  void char int struct
+
+struct-specifier
+  struct
+
+struct-declaration-list
+  = first struct-declaration
+  void char int struct
+
+struct-declaration
+  = first specifier-qualifier-list
+  void char int struct
+
+specifier-qualifier-list
+  = first type-specifier
+  void char int struct
+
+struct-declarator-list
+  = first struct-declarator
+  *
+  identifier
+  (
+
+struct-declarator-list'
+  ,
+  epsilon
+
+struct-declarator
+  = first declarator
+  *
+  identifier
+  (
+
+declarator
+  = first pointer || first direct-declarator
+  *
+  identifier
+  (
+
+direct-declarator
+  identifier
+  (
+
+direct-declarator'
+  (
+  epsilon
+
+pointer
+  *
+
+parameter-list
+  = first parameter-declaration 
+  void char int struct
+
+parameter-list'
+  ,
+  epsilon
+
+parameter-declaration
+  = first declaration-specifiers
+  void char int struct
+
+type-name
+  = first specifier-qualifier-list
+  void char int struct
+
+abstract-declarator
+  = first pointer || first direct-abstract-declarator
+  *
+  (
+
+direct-abstract-declarator
+  (
+
+//----------------------------------------------------------------------
+Follow
+
+declaration
+
+declaration-specifiers
+  = first declarator || ; || first abstract-declarator || follow parameter-declaration
+  *
+  identifier
+  (
+  ;
+  *
+  ,
+  )
+
+type-specifier
+  = first declaration-specifiers || follow declaration-specifiers
+  void char int struct
+  *
+  identifier
+  (
+  ;
+  *
+  ,
+  )
+
+struct-specifier
+  = follow type-specifier
+  void char int struct
+  *
+  identifier
+  (
+  ;
+  *
+  ,
+  )
+
+struct-declaration-list
+  }
+
+struct-declaration-list'
+  = follow struct-declaration-list
+  }
+
+struct-declaration
+  = follow struct-declaration-list
+  }
+
+specifier-qualifier-list
+  = ; || first struct-declarator-list || first abstract-declarator || follow type-name
+  ;
+  *
+  identifier
+  (
+  )
+
+
+struct-declarator-list
+  ; 
+
+struct-declarator-list'
+  = follow struct-declarator-list
+  ;
+
+
+struct-declarator
+  = first struct-declarator-list' || follow struct-declarator-list
+  ,
+  ;
+
+declarator
+  = follow struct-declarator || follow parameter-declaration
+  ,
+  )
+  ;
+
+direct-declarator
+  = follow declarator
+  ,
+  )
+  :
+
+direct-declarator'
+  = follow direct-declarator
+  ,
+  )
+  :
+
+pointer
+  = follow abstract-declarator || first direct-abstract-declarator || first direct-declarator
+  ,
+  )
+  (
+  identifier
+
+parameter-list'
+  = follow parameter-list
+  )
+
+parameter-declaration
+  = first parameter-list' || follow parameter-list
+  ,
+  )
+
+type-name
+  )
+
+abstract-declarator
+  = ) || follow type-name || follow parameter-declaration
+  ,
+  )
+
+direct-abstract-declarator
+  = follow abstract-declarator
+
+//-------------------------------------------------------------------------
+
+declaration ->
+  | declaration-specifiers declarator.opt ;
+
+declaration-specifiers ->
+  | type-specifier declaration-specifiers.opt 
+
+type-specifier ->
+  | void
+  | char
+  | int
+  | struct-specifier
+
+struct-specifier ->
+  | struct identifier.opt { struct-declaration-list }
+  | struct identifier
+
+struct-declaration-list ->
+  | struct-declaration
+  | struct-declaration-list struct-declaration
+
+struct-declaration -> 
+  | specifier-qualifier-list struct-declarator-list.opt ; 
+
+specifier-qualifier-list ->
+  | type-specifier specifier-qualifier-list.opt 
+
+// TODO: solve left recursion
+struct-declarator-list ->
+  | struct-declarator
+  | struct-declarator-list , struct-declarator
+
+struct-declarator ->
+  | declarator
+
+declarator ->
+  | pointer.opt direct-declarator
+
+direct-declarator ->
+  | identifier
+  | ( declarator )
+  | direct-declarator ( parameter-list )
+
+pointer:
+  | * 
+  | * pointer
+
+// TODO: solve left recursion
+parameter-list ->
+  | parameter-declaration
+  | parameter-list , parameter-declaration
+
+parameter-declaration ->
+  | declaration-specifiers declarator 
+  | declaration-specifiers abstract-declarator.opt
+
+type-name ->
+  | specifier-qualifier-list abstract-declarator.opt
+
+abstract-declarator ->
+  | pointer
+  | pointer.opt direct-abstract-declarator
+
+direct-abstract-declarator ->
+  | ( abstract-declarator )
+  | direct-abstract-declarator.opt ( parameter-list.opt )
