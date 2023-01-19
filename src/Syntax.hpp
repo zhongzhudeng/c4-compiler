@@ -52,14 +52,13 @@ class Stmt;
 class IdentifierStmt;
 class CompStmt;
 class ExprStmt;
-class IfStmt; 
+class IfStmt;
 class IfElseStmt;
 class WhileStmt;
 class GoToStmt;
 class ContinueStmt;
 class BreakStmt;
 using StmtPtr = std::unique_ptr<Stmt>;
-
 
 using ASTPtr = std::unique_ptr<AST>;
 
@@ -97,4 +96,11 @@ public:
 
   virtual void accept(ASTPrinter &visitor) = 0;
   const Locatable &getLoc();
+};
+
+class Expr : public AST {
+public:
+  Expr(Locatable loc);
+  virtual void accept(ASTPrinter &visitor) override;
+  virtual ~Expr(){};
 };

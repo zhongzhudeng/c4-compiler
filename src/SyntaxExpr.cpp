@@ -1,7 +1,5 @@
 #include "SyntaxExpr.hpp"
 #include "Printer.hpp"
-Expr::Expr(Locatable loc) : AST(loc) {}
-Expr::~Expr() {}
 
 IdentifierExpr::IdentifierExpr(Locatable loc, Symbol identifier)
     : Expr(loc), identifier(identifier) {}

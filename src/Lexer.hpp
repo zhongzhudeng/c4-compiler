@@ -9,16 +9,15 @@
 class Lexer {
 public:
   Lexer(const char *filename, SymbolInternalizer &symbolInternalizer);
+  /// For unittest usage
+  Lexer(const char *filename, std::string src,
+        SymbolInternalizer &symbolInternalizer);
   ~Lexer();
 
   void tokenize(std::function<void(Token)> f);
   std::vector<Token> tokenize();
 
 private:
-  /// For unittest usage
-  Lexer(const char *filename, std::string src,
-        SymbolInternalizer &symbolInternalizer);
-
   std::string_view filename;
   std::string src;
   std::string_view::iterator chars;

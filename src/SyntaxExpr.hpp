@@ -5,11 +5,7 @@
 #include "Syntax.hpp"
 #include <vector>
 
-class Expr : public AST {
-public:
-  Expr(Locatable loc);
-  virtual ~Expr() = 0;
-};
+
 
 class IdentifierExpr final : public Expr {
   Symbol identifier;

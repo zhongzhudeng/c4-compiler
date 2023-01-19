@@ -2,6 +2,7 @@
 #include "Diagnostic.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
 #include "SyntaxStmt.hpp"
 #include "Token.hpp"
 #include <algorithm>
@@ -18,7 +19,7 @@ StmtPtr Parser::impl::parseStmt(){
     stmt = std::make_unique<ExprStmt>(std::move(expr));
     break;}
   case TK_IDENTIFIER:{
-    if(checkFirst(TK_COLON)){
+    if(kind_first() == TK_COLON){
       Symbol identifier = cursor->Text;
       bump();
       bump();
@@ -83,7 +84,7 @@ StmtPtr Parser::impl::parseStmt(){
   case TK_SEMICOLON:{
     bump();
     // EMPTY EXPRESSION??
-    auto expr = std::make_unique<Expr>();
+    auto expr = std::make_unique<Expr>(location());
     stmt = std::make_unique<ExprStmt>(std::move(expr));
     break;}
   }
