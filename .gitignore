@@ -1,5 +1,7 @@
 build/
 llvm/
+Catch2/
+fmt/
 .vscode
 
 # macOS
