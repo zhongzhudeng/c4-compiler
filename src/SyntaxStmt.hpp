@@ -5,54 +5,43 @@
 #include "Syntax.hpp"
 #include <vector>
 
-class Stmt : public AST {
-public:
-  virtual ~Stmt() = 0;
-  virtual bool isIf() const{
-    return false;
-  }
-  virtual bool isComp() const{
-    return false;
-  }
-};
-
-class IdentifierStmt : public Stmt {
+class IdentifierStmt final : public Stmt {
   Symbol identifier;
   StmtPtr stmt;
 public:
-  IdentifierStmt(Symbol identifier, StmtPtr stmt);
+  IdentifierStmt(Locatable loc, Symbol identifier, StmtPtr stmt);
   ~IdentifierStmt() = default;
   void accept(ASTPrinter &visitor) override;
   Symbol getIdentifier() const;
   const Stmt &getStmt() const;
 };
-class CompStmt : public Stmt {
+class CompStmt final : public Stmt {
   //BlockItemList_opt Vector also Decl
-  std::vector<StmtPtr> blockItemList;
+  std::vector<ASTPtr> blockItemList;
 public:
-  CompStmt(
-  std::vector<StmtPtr> blockItemList);
+  CompStmt(Locatable loc, 
+  std::vector<ASTPtr> blockItemList);
   ~CompStmt() = default;
   void accept(ASTPrinter &visitor) override;
-  const std::vector<StmtPtr> &getBlockItemList() const;
+  const std::vector<ASTPtr> &getBlockItemList() const;
   bool isComp() const override {
     return true;
   }
 };
-class ExprStmt : public Stmt {
+class ExprStmt final : public Stmt {
   //Expression_opt
   ExprPtr expr;
 public:
-  ExprStmt(ExprPtr expr);
+  ExprStmt(Locatable loc, ExprPtr expr);
   ~ExprStmt() = default;
   void accept(ASTPrinter &visitor) override;
   const Expr &getExpr() const;
 };
-class IfStmt : public Stmt {
+class IfStmt final : public Stmt {
   ExprPtr cond;
   StmtPtr ifSt;
 public:
-  IfStmt(ExprPtr cond, StmtPtr ifSt);
+  IfStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt);
   ~IfStmt() = default;
   void accept(ASTPrinter &visitor) override;
   const Expr &getCond() const;
@@ -61,12 +50,12 @@ public:
     return true;
   }
 }; 
-class IfElseStmt : public Stmt {
+class IfElseStmt final : public Stmt {
   ExprPtr cond;
   StmtPtr ifSt;
   StmtPtr elseSt;
 public:
-  IfElseStmt(ExprPtr cond, StmtPtr ifSt, StmtPtr elseSt);
+  IfElseStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt, StmtPtr elseSt);
   ~IfElseStmt() = default;
   void accept(ASTPrinter &visitor) override;
   const Expr &getCond() const;
@@ -76,33 +65,32 @@ public:
     return true;
   }
 };
-class WhileStmt : public Stmt {
+class WhileStmt final : public Stmt {
   ExprPtr cond;
   StmtPtr doSt;
 public:
-  WhileStmt(ExprPtr cond, StmtPtr doSt);
+  WhileStmt(Locatable loc, ExprPtr cond, StmtPtr doSt);
   ~WhileStmt() = default;
   void accept(ASTPrinter &visitor) override;
   const Expr &getCond() const;
   const Stmt &getDo() const;
 };
-class GoToStmt : public Stmt {
+class GoToStmt final : public Stmt {
   Symbol identifier;
 public:
-  GoToStmt(Symbol identifier);
+  GoToStmt(Locatable loc, Symbol identifier);
   ~GoToStmt() = default;
   void accept(ASTPrinter &visitor) override;
   Symbol getIdentifier() const;
 };
-class ContinueStmt : public Stmt {
+class ContinueStmt final : public Stmt {
 public:
-  ContinueStmt();
+  ContinueStmt(Locatable loc);
   ~ContinueStmt() = default;
   void accept(ASTPrinter &visitor) override;
 };
-class BreakStmt : public Stmt {
+class BreakStmt final : public Stmt {
 public:
-  BreakStmt();
-  ~BreakStmt() = default;
+  BreakStmt(Locatable loc);
   void accept(ASTPrinter &visitor) override;
 };

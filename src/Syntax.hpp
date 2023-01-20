@@ -104,3 +104,16 @@ public:
   virtual void accept(ASTPrinter &visitor) override;
   virtual ~Expr(){};
 };
+
+class Stmt : public AST {
+public:
+  Stmt(Locatable loc);
+  virtual void accept(ASTPrinter &visitor) override;
+  virtual bool isIf() const{
+    return false;
+  }
+  virtual bool isComp() const{
+    return false;
+  }
+  virtual ~Stmt(){};
+};

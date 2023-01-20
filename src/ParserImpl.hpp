@@ -55,5 +55,5 @@ private:
   DeclaratorPtr parseNonFunDeclarator();
   
   StmtPtr parseStmt();
-  std::vector<StmtPtr> parseBlockItemList();
+  std::vector<ASTPtr> parseBlockItemList();
 };

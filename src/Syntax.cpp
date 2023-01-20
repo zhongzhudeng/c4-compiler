@@ -7,3 +7,6 @@ const Locatable &AST::getLoc() { return loc; }
 
 Expr::Expr(Locatable loc) : AST(loc) {}
 void Expr::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
+
+Stmt::Stmt(Locatable loc) : AST(loc) {}
+void Stmt::accept(ASTPrinter &visitor) { visitor.Visit(*this); }

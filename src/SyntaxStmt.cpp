@@ -1,26 +1,24 @@
 #include "SymbolInternalizer.hpp"
-#include "Syntax.hpp"
+#include "SyntaxStmt.hpp"
 #include <ostream>
 #include <sstream>
 #include <utility>
 
-Stmt::~Stmt() {}
-
-IdentifierStmt::IdentifierStmt(Symbol identifier, StmtPtr stmt) 
-    : identifier(identifier), stmt(std::move(stmt)) {}
-CompStmt::CompStmt(std::vector<StmtPtr> blockItemList) 
-    : blockItemList(std::move(blockItemList)) {};
-ExprStmt::ExprStmt(ExprPtr expr) : expr(std::move(expr)) {};
-IfStmt::IfStmt(ExprPtr cond, StmtPtr ifSt) 
-    : cond(std::move(cond)), ifSt(std::move(ifSt)) {};
-IfElseStmt::IfElseStmt(ExprPtr cond, StmtPtr ifSt, StmtPtr elseSt) 
-    : cond(std::move(cond)), ifSt(std::move(ifSt)), elseSt(std::move(elseSt)) {};
-WhileStmt::WhileStmt(ExprPtr cond, StmtPtr doSt) 
-    : cond(std::move(cond)), doSt(std::move(doSt)) {};
-GoToStmt::GoToStmt(Symbol identifier) 
-    : identifier(identifier) {};
-ContinueStmt::ContinueStmt(){};
-BreakStmt::BreakStmt(){};
+IdentifierStmt::IdentifierStmt(Locatable loc, Symbol identifier, StmtPtr stmt) 
+    : Stmt(loc), identifier(identifier), stmt(std::move(stmt)) {}
+CompStmt::CompStmt(Locatable loc, std::vector<ASTPtr> blockItemList) 
+    : Stmt(loc), blockItemList(std::move(blockItemList)) {};
+ExprStmt::ExprStmt(Locatable loc, ExprPtr expr) : Stmt(loc), expr(std::move(expr)) {};
+IfStmt::IfStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt) 
+    : Stmt(loc), cond(std::move(cond)), ifSt(std::move(ifSt)) {};
+IfElseStmt::IfElseStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt, StmtPtr elseSt) 
+    : Stmt(loc), cond(std::move(cond)), ifSt(std::move(ifSt)), elseSt(std::move(elseSt)) {};
+WhileStmt::WhileStmt(Locatable loc, ExprPtr cond, StmtPtr doSt) 
+    : Stmt(loc), cond(std::move(cond)), doSt(std::move(doSt)) {};
+GoToStmt::GoToStmt(Locatable loc, Symbol identifier) 
+    : Stmt(loc), identifier(identifier) {};
+ContinueStmt::ContinueStmt(Locatable loc): Stmt(loc){};
+BreakStmt::BreakStmt(Locatable loc): Stmt(loc){};
 
 void IdentifierStmt::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
 void CompStmt::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
@@ -34,7 +32,7 @@ void BreakStmt::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
 
 Symbol IdentifierStmt::getIdentifier() const { return identifier; };
 const Stmt &IdentifierStmt::getStmt() const { return const_cast<Stmt &>(*stmt); };
-const std::vector<StmtPtr> &CompStmt::getBlockItemList() const { return const_cast<std::vector<StmtPtr> &>(blockItemList); };
+const std::vector<ASTPtr> &CompStmt::getBlockItemList() const { return const_cast<std::vector<ASTPtr> &>(blockItemList); };
 const Expr &ExprStmt::getExpr() const { return const_cast<Expr &>(*expr); };
 const Expr &IfStmt::getCond() const { return const_cast<Expr &>(*cond); };
 const Stmt &IfStmt::getIf() const { return const_cast<Stmt &>(*ifSt); };
