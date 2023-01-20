@@ -1,4 +1,20 @@
-add_library(compiler SHARED Compiler.cpp Diagnostic.cpp Lexer.cpp Parser.cpp ParseExpr.cpp ParseDecl.cpp ParserImpl.cpp Printer.cpp SymbolInternalizer.cpp Syntax.cpp SyntaxDecl.cpp SyntaxExpr.cpp Token.cpp)
+add_library(compiler SHARED
+  Compiler.cpp
+  Diagnostic.cpp
+  Lexer.cpp
+  Parser.cpp
+  ParseExpr.cpp
+  ParseDecl.cpp
+  ParseStmt.cpp
+  ParserImpl.cpp
+  Printer.cpp
+  SymbolInternalizer.cpp
+  Syntax.cpp
+  SyntaxDecl.cpp
+  SyntaxExpr.cpp
+  SyntaxStmt.cpp
+  Token.cpp
+)
 target_compile_features(compiler PRIVATE cxx_std_20)
 
 if(EXISTS "llvm/install/bin/llvm-config")
