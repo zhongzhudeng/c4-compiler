@@ -1,8 +1,13 @@
 #pragma once
 #include "Diagnostic.hpp"
 #include <memory>
+#include <vector>
 
 class AST;
+class TranslationUnit;
+
+class ExternalDecl;
+
 class Expr;
 class IdentifierExpr;
 class ConstantExpr;
@@ -46,8 +51,6 @@ using SpecifierQualifier = TypeSpecifier;
 class Pointer;
 class DirectDeclarator;
 
-class ExternalDeclaration;
-
 class Stmt;
 class IdentifierStmt;
 class CompStmt;
@@ -85,6 +88,9 @@ using FunctionDeclaratorPtr = std::unique_ptr<FunctionDeclarator>;
 
 using PointerPtr = std::unique_ptr<Pointer>;
 using DirectDeclaratorPtr = std::unique_ptr<DirectDeclarator>;
+
+using TranslationUnitPtr = std::unique_ptr<TranslationUnit>;
+using ExternalDeclPtr = std::unique_ptr<ExternalDecl>;
 
 class ASTPrinter;
 class AST {

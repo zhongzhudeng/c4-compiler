@@ -3,6 +3,7 @@ add_library(compiler SHARED
   Diagnostic.cpp
   Lexer.cpp
   Parser.cpp
+  ParseExternalDecl.cpp
   ParseExpr.cpp
   ParseDecl.cpp
   ParseStmt.cpp
@@ -10,6 +11,7 @@ add_library(compiler SHARED
   Printer.cpp
   SymbolInternalizer.cpp
   Syntax.cpp
+  SyntaxExternalDecl.cpp
   SyntaxDecl.cpp
   SyntaxExpr.cpp
   SyntaxStmt.cpp

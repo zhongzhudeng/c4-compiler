@@ -1,5 +1,7 @@
 #include "ParserImpl.hpp"
 #include "SyntaxExpr.hpp"
+#include "SyntaxDecl.hpp"
+#include "SyntaxExternalDecl.hpp"
 #include <utility>
 
 Parser::impl::impl(std::vector<Token> token_stream)
@@ -8,7 +10,7 @@ Parser::impl::impl(std::vector<Token> token_stream)
   end = this->token_stream.cend();
 }
 
-ASTPtr Parser::impl::parse() { return parseExpr(); }
+ASTPtr Parser::impl::parse() { return parseTranslationUnit(); }
 
 const Locatable &Parser::impl::location(void) { return *cursor; }
 void Parser::impl::bump(void) { cursor++; }

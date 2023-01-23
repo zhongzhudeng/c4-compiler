@@ -14,6 +14,7 @@ public:
               std::vector<DeclarationSpecifierPtr> declarationSpecifiers,
               DeclaratorPtr declarator);
   void accept(ASTPrinter &visitor) override;
+  const DeclaratorPtr &getDecl() const;
 };
 
 class StructDeclaration final : public AST {

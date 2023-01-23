@@ -28,6 +28,9 @@ private:
 
   int precedence(TokenKind tk);
 
+  TranslationUnitPtr parseTranslationUnit();
+  ExternalDeclPtr parseExternalDecl();
+
   ExprPtr parsePrimaryExpr();
   ExprPtr parseIdentifierExpr();
   ExprPtr parseConstantExpr();

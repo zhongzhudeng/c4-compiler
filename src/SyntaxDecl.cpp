@@ -56,3 +56,5 @@ void StructSpecifier::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
 void PointerDeclarator::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
 void FunctionDeclarator::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
 void PrimitiveDeclarator::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
+
+const DeclaratorPtr &Declaration::getDecl() const { return const_cast<DeclaratorPtr &>(declarator); };
