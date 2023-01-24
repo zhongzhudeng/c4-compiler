@@ -83,9 +83,7 @@ StmtPtr Parser::impl::parseStmt(){
     break;}
   case TK_SEMICOLON:{
     bump();
-    // EMPTY EXPRESSION??
-    auto expr = std::make_unique<Expr>(location());
-    stmt = std::make_unique<ExprStmt>(location(), std::move(expr));
+    stmt = std::make_unique<ExprStmt>(location());
     break;}
   }
   return stmt;

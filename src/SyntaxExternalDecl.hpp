@@ -4,6 +4,7 @@
 class ExternalDecl : public AST {
   DeclarationPtr decl;
   StmtPtr comp;
+  bool hasStmt;
 public:
   ExternalDecl(Locatable loc, DeclarationPtr decl, StmtPtr comp);
   ExternalDecl(Locatable loc, DeclarationPtr decl);
@@ -11,6 +12,7 @@ public:
   virtual ~ExternalDecl() = default;
   const Declaration &getDecl() const;
   const Stmt &getStmt() const;
+  bool hasComp() const;
 };
 
 class TranslationUnit : public AST {

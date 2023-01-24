@@ -1,4 +1,5 @@
 #include "SymbolInternalizer.hpp"
+#include "Syntax.hpp"
 #include "SyntaxStmt.hpp"
 #include <ostream>
 #include <sstream>
@@ -8,7 +9,8 @@ IdentifierStmt::IdentifierStmt(Locatable loc, Symbol identifier, StmtPtr stmt)
     : Stmt(loc), identifier(identifier), stmt(std::move(stmt)) {}
 CompStmt::CompStmt(Locatable loc, std::vector<ASTPtr> blockItemList) 
     : Stmt(loc), blockItemList(std::move(blockItemList)) {};
-ExprStmt::ExprStmt(Locatable loc, ExprPtr expr) : Stmt(loc), expr(std::move(expr)) {};
+ExprStmt::ExprStmt(Locatable loc) : Stmt(loc), hasExpr(false) {};
+ExprStmt::ExprStmt(Locatable loc, ExprPtr expr) : Stmt(loc), expr(std::move(expr)), hasExpr(true) {};
 IfStmt::IfStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt) 
     : Stmt(loc), cond(std::move(cond)), ifSt(std::move(ifSt)) {};
 IfElseStmt::IfElseStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt, StmtPtr elseSt) 
@@ -42,3 +44,5 @@ const Stmt &IfElseStmt::getElse() const { return const_cast<Stmt &>(*elseSt); };
 const Expr &WhileStmt::getCond() const { return const_cast<Expr &>(*cond); };
 const Stmt &WhileStmt::getDo() const { return const_cast<Stmt &>(*doSt); };
 Symbol GoToStmt::getIdentifier() const { return identifier; };
+
+bool ExprStmt::getHasExpr() const { return hasExpr; }

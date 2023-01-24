@@ -15,7 +15,7 @@
 TranslationUnitPtr Parser::impl::parseTranslationUnit(){
   std::vector<ExternalDeclPtr> exDeclList; 
   while (!check(TK_EOI)) {
-    exDeclList.push_back(parseExternalDecl());
+    exDeclList.emplace_back(parseExternalDecl());
   }
   return std::make_unique<TranslationUnit>(location(), std::move(exDeclList));
 }

@@ -31,11 +31,14 @@ public:
 class ExprStmt final : public Stmt {
   //Expression_opt
   ExprPtr expr;
+  bool hasExpr;
 public:
+  ExprStmt(Locatable loc);
   ExprStmt(Locatable loc, ExprPtr expr);
   ~ExprStmt() = default;
   void accept(ASTPrinter &visitor) override;
   const Expr &getExpr() const;
+  bool getHasExpr() const;
 };
 class IfStmt final : public Stmt {
   ExprPtr cond;
