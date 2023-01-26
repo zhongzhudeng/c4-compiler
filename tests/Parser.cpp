@@ -3,7 +3,7 @@
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
-#include "SyntaxExternalDecl.hpp"
+#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
 #include "fmt/core.h"
 #include <catch2/catch_test_macros.hpp>

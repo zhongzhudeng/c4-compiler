@@ -6,18 +6,6 @@
 #include <utility>
 #include <vector>
 
-Decl::Decl(Locatable loc, DeclSpecPtr declSpec, DeclaratorPtr declarator)
-    : ExternDecl(loc, Kind::Decl), declSpec(std::move(declSpec)),
-      declarator(std::move(declarator)) {}
-
-const DeclSpec &Decl::getDeclSpec() const {
-  return const_cast<DeclSpec &>(*declSpec);
-}
-bool Decl::isNullDeclarator() const { return declarator == nullptr; }
-const Declarator &Decl::getDeclarator() const {
-  return const_cast<Declarator &>(*declarator);
-}
-
 DeclSpec::DeclSpec(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
 Declarator::Declarator(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
 

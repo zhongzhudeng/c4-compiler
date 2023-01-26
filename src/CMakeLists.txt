@@ -11,7 +11,7 @@ add_library(compiler SHARED
   SymbolInternalizer.cpp
   SyntaxDecl.cpp
   SyntaxExpr.cpp
-  SyntaxExternalDecl.cpp
+  SyntaxExternDecl.cpp
   SyntaxStmt.cpp
   TypeChecker.cpp
   Token.cpp

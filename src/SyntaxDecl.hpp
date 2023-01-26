@@ -3,20 +3,8 @@
 #include "Diagnostic.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
-#include "SyntaxExternalDecl.hpp"
+#include "SyntaxExternDecl.hpp"
 #include <vector>
-
-class Decl : public ExternDecl {
-  DeclSpecPtr declSpec;
-  DeclaratorPtr declarator;
-
-public:
-  Decl(Locatable loc, DeclSpecPtr declSpec, DeclaratorPtr declarator);
-  const DeclSpec &getDeclSpec() const;
-  bool isNullDeclarator() const;
-  const Declarator &getDeclarator() const;
-  void print(std::ostream &os, unsigned indentation = 0) const;
-};
 
 class DeclSpec {
 public:

@@ -1,6 +1,7 @@
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
+#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
 
 template <typename Derived> class ExprVisitor {
@@ -68,4 +69,18 @@ public:
     }
   }
 #undef DISPATCH
+};
+
+template <typename Derived> class ExternDeclVisitor {
+public:
+  void visit(const ExternDecl &externDecl) {
+    switch (externDecl.getKind()) {
+    case ExternDecl::FuncDef:
+      return static_cast<Derived &>(*this).VisitFuncDef(
+          static_cast<const FuncDef &>(externDecl));
+    case ExternDecl::Decl:
+      return static_cast<Derived &>(*this).VisitDecl(
+          static_cast<const Decl &>(externDecl));
+    }
+  }
 };

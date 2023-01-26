@@ -3,7 +3,7 @@
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
-#include "SyntaxExternalDecl.hpp"
+#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
 #include <ostream>
 
@@ -238,6 +238,20 @@ public:
   }
 };
 
+class ExternDeclPrinter : public ExternDeclVisitor<ExternDeclPrinter> {
+  std::ostream &os;
+
+public:
+  ExternDeclPrinter(std::ostream &os) : os(os) {}
+  void VisitFuncDef(const FuncDef &externDecl) {
+    externDecl.getDecl().print(os);
+    os << "\n{";
+    externDecl.getCompStmt().print(os, 1);
+    os << "\n}\n";
+  }
+  void VisitDecl(const Decl &externDecl) { externDecl.print(os); }
+};
+
 // TODO: add indentation
 void Expr::print(std::ostream &os) const {
   ExprPrinter printer(os);
@@ -254,18 +268,7 @@ void Stmt::print(std::ostream &os, unsigned identation) const {
   printer.visit(const_cast<Stmt &>(*this));
 }
 
-// void ASTPrinter::Visit(const ExternalDecl &externalDecl) {
-//   // Visit(externalDecl.getDecl());
-//   if (externalDecl.hasComp()) {
-//     os << " ";
-//     Visit(externalDecl.getStmt());
-//   }
-// }
-
-// void ASTPrinter::Visit(const TranslationUnit &tu) {
-/*std::vector<ExternalDeclPtr> bil = tu.getExternalDecl();
-for (size_t i = 0; i < bil.size(); i++) {
-    os<<'\n';
-    Visit(*(bil[i]));
-}*/
-// }
+void ExternDecl::print(std::ostream &os) const {
+  ExternDeclPrinter printer(os);
+  printer.visit(const_cast<ExternDecl &>(*this));
+}

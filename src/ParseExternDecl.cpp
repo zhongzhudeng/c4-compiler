@@ -1,7 +1,7 @@
 #include "Diagnostic.hpp"
 #include "Parser.hpp"
 #include "SyntaxDecl.hpp"
-#include "SyntaxExternalDecl.hpp"
+#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
 #include <memory>
 
