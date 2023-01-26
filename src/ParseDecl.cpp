@@ -4,10 +4,7 @@
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "Token.hpp"
-#include <algorithm>
-#include <cstddef>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include "FirstFollow.def"
@@ -93,6 +90,7 @@ DeclaratorPtr Parser::parseNonFunDeclarator() {
 }
 
 DeclaratorPtr Parser::parseDeclarator() {
+  Locatable loc(location());
   auto res = parseNonFunDeclarator();
   if (accept(TK_LPAREN)) {
     std::vector<DeclPtr> params;
@@ -100,7 +98,7 @@ DeclaratorPtr Parser::parseDeclarator() {
       params.push_back(parseDecl(DeclKind::ANY));
     } while (accept(TK_COMMA));
     expect(TK_RPAREN, "')'");
-    res = std::make_unique<FunctionDeclarator>(location(), std::move(res),
+    res = std::make_unique<FunctionDeclarator>(loc, std::move(res),
                                                std::move(params));
   }
   return res;

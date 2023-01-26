@@ -6,7 +6,7 @@
 #include <functional>
 #include <vector>
 
-class UnitTestParser;
+template <typename AST> class UnitTestParser;
 
 class Parser {
 public:
@@ -17,8 +17,10 @@ private:
   std::vector<Token> token_stream;
   std::vector<Token>::iterator cursor;
   std::vector<Token>::const_iterator end;
-
-  friend UnitTestParser;
+  friend UnitTestParser<Expr>;
+  friend UnitTestParser<Decl>;
+  friend UnitTestParser<Stmt>;
+  friend UnitTestParser<ExternDecl>;
 
   const Locatable &location(void);
   void bump(void);

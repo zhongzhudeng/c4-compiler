@@ -107,3 +107,11 @@ class BreakStmt final : public Stmt {
 public:
   BreakStmt(Locatable loc);
 };
+class ReturnStmt final : public Stmt {
+  ExprPtr expr;
+
+public:
+  ReturnStmt(Locatable loc, ExprPtr expr);
+  const class Expr &getExpr() const;
+  bool isEmpty() const;
+};

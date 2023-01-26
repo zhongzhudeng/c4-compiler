@@ -83,10 +83,13 @@ StmtPtr Parser::parseStmt() {
     ExprPtr expr = nullptr;
     if (kind() != TK_SEMICOLON)
       expr = parseExpr();
-    StmtPtr stmt = std::make_unique<ExprStmt>(loc, std::move(expr));
+    StmtPtr stmt = std::make_unique<ReturnStmt>(loc, std::move(expr));
     expect(TK_SEMICOLON, "';'");
     return stmt;
   }
+  case TK_SEMICOLON:
+    bump();
+    return std::make_unique<ExprStmt>(loc, nullptr);
   }
 }
 
@@ -100,7 +103,9 @@ CompStmtPtr Parser::parseCompoundStmt() {
       bil.push_back(parseStmt());
       break;
       DECLARATION
-      bil.push_back(std::make_unique<DeclStmt>(location(), parseDecl()));
+      Locatable l(location());
+      bil.push_back(std::make_unique<DeclStmt>(l, parseDecl()));
+      expect(TK_SEMICOLON, "';' after declaration");
       break;
     }
   }

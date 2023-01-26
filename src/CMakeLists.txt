@@ -13,7 +13,7 @@ add_library(compiler SHARED
   SyntaxExpr.cpp
   SyntaxExternDecl.cpp
   SyntaxStmt.cpp
-  TypeChecker.cpp
+  # TypeChecker.cpp
   Token.cpp
 )
 target_compile_features(compiler PRIVATE cxx_std_20)

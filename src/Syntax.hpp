@@ -41,6 +41,7 @@ class WhileStmt;
 class GoToStmt;
 class ContinueStmt;
 class BreakStmt;
+class ReturnStmt;
 
 class ExternDecl;
 class FuncDef;

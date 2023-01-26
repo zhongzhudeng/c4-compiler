@@ -166,35 +166,37 @@ public:
       os << '\t';
     return os;
   }
-
   void VisitIdentifierStmt(const IdentifierStmt &stmt) {
+    indent();
     os << stmt.getIdentifier();
     os << " : ";
     visit(stmt.getStmt());
   }
   void VisitCompStmt(const CompStmt &stmt) {
-    os << "{";
+    indent();
+    os << "{\n";
     indentation++;
     for (auto item : stmt.getBlockItemList()) {
       visit(item);
+      os << '\n';
     }
     indentation--;
-    os << "\n}";
+    indent();
+    os << "}\n";
   }
   void VisitDeclStmt(const DeclStmt &stmt) {
-    os << "{";
-    indentation++;
+    indent();
     stmt.getDeclaration().print(os);
-    indentation--;
-    os << '\n';
-    os << "}";
+    os << ";";
   }
   void VisitExprStmt(const ExprStmt &stmt) {
+    indent();
     if (!stmt.isEmpty())
       stmt.getExpr().print(os);
     os << ";";
   }
   void VisitIfStmt(const IfStmt &stmt) {
+    indent();
     os << "if (";
     stmt.getCond().print(os);
     os << ") ";
@@ -236,6 +238,13 @@ public:
   void VisitBreakStmt([[maybe_unused]] const BreakStmt &stmt) {
     os << "break;";
   }
+  void VisitReturnStmt(const ReturnStmt &stmt) {
+    indent();
+    os << "return ";
+    if (!stmt.isEmpty())
+      stmt.getExpr().print(os);
+    os << ";";
+  }
 };
 
 class ExternDeclPrinter : public ExternDeclVisitor<ExternDeclPrinter> {
@@ -245,9 +254,9 @@ public:
   ExternDeclPrinter(std::ostream &os) : os(os) {}
   void VisitFuncDef(const FuncDef &externDecl) {
     externDecl.getDecl().print(os);
-    os << "\n{";
-    externDecl.getCompStmt().print(os, 1);
-    os << "\n}\n";
+    os << "\n";
+    externDecl.getCompStmt().print(os);
+    os << "\n";
   }
   void VisitDecl(const Decl &externDecl) { externDecl.print(os); }
 };

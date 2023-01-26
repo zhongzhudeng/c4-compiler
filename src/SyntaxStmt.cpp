@@ -30,6 +30,8 @@ GoToStmt::GoToStmt(Locatable loc, Symbol identifier)
     : Stmt(loc, Kind::GoTo), identifier(identifier){};
 ContinueStmt::ContinueStmt(Locatable loc) : Stmt(loc, Kind::Continue){};
 BreakStmt::BreakStmt(Locatable loc) : Stmt(loc, Kind::Break){};
+ReturnStmt::ReturnStmt(Locatable loc, ExprPtr expr)
+    : Stmt(loc, Kind::Return), expr(std::move(expr)){};
 
 Symbol IdentifierStmt::getIdentifier() const { return identifier; };
 const Stmt &IdentifierStmt::getStmt() const {
@@ -61,3 +63,7 @@ const Expr &WhileStmt::getCond() const {
 };
 const Stmt &WhileStmt::getDo() const { return const_cast<Stmt &>(*doSt); };
 Symbol GoToStmt::getIdentifier() const { return identifier; };
+const class Expr &ReturnStmt::getExpr() const {
+  return const_cast<class Expr &>(*expr);
+}
+bool ReturnStmt::isEmpty() const { return expr == nullptr; }
