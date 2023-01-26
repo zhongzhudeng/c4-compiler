@@ -261,7 +261,6 @@ public:
   void VisitDecl(const Decl &externDecl) { externDecl.print(os); }
 };
 
-// TODO: add indentation
 void Expr::print(std::ostream &os) const {
   ExprPrinter printer(os);
   printer.visit(const_cast<Expr &>(*this));

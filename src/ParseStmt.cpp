@@ -6,10 +6,7 @@
 #include "SyntaxExpr.hpp"
 #include "SyntaxStmt.hpp"
 #include "Token.hpp"
-#include <algorithm>
-#include <cstddef>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include "FirstFollow.def"

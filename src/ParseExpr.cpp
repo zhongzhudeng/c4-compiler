@@ -4,9 +4,7 @@
 #include "Syntax.hpp"
 #include "SyntaxExpr.hpp"
 #include "Token.hpp"
-#include <cstddef>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include "FirstFollow.def"
@@ -122,7 +120,7 @@ ExprPtr Parser::parseUnaryExpr() {
     break;
   }
   case TK_SIZEOF: {
-    //TODO: parse type-name
+    // TODO: parse type-name
     Locatable loc(location());
     bump();
     if (is_paren_type_name()) {

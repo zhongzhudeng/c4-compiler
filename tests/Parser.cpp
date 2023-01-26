@@ -168,6 +168,15 @@ end:
 	return 0;
 }
 )";
-  std::string res = src;
-  // REQUIRE(parser.parse(0, src) == res);
+  std::string ans = src;
+
+  std::string filename = "dummy.c";
+  SymbolInternalizer symbolInternalizer;
+  Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
+  std::vector<Token> token_stream;
+  lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
+  Parser parser(std::move(token_stream));
+  std::ostringstream os;
+  parser.parse([&](ExternDeclPtr ast) { ast->print(os); });
+  REQUIRE(os.str() == ans);
 }

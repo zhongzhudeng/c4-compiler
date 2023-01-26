@@ -28,11 +28,11 @@ int main(int argc, char **argv) {
       break;
     }
     case 1: {
-      // compiler.parse();
+      compiler.parse();
       break;
     }
     case 2: {
-      // compiler.print_ast();
+      compiler.print_ast();
       break;
     }
     default:

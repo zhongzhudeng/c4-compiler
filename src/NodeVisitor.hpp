@@ -1,3 +1,4 @@
+#pragma once
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
