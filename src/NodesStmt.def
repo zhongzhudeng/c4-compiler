@@ -1,0 +1,79 @@
+#ifndef ABSTRACT_STMT
+#  define ABSTRACT_STMT(Type) Type
+#endif
+
+#ifndef STMT_RANGE
+#  define STMT_RANGE(Base, First, Last)
+#endif
+
+#ifndef LAST_STMT_RANGE
+#  define LAST_STMT_RANGE(Base, First, Last) STMT_RANGE(Base, First, Last)
+#endif
+
+#ifndef IDENTIFIER
+#  define IDENTIFIER(Type, Base) STMT(Type, Base)
+#endif
+IDENTIFIER(Identifier, Stmt)
+#undef IDENTIFIER
+
+#ifndef COMP
+#  define COMP(Type, Base) STMT(Type, Base)
+#endif
+COMP(Comp, Stmt)
+#undef COMP
+
+#ifndef DECL
+#  define DECL(Type, Base) STMT(Type, Base)
+#endif
+DECL(Decl, Stmt)
+#undef DECL
+
+#ifndef EXPR
+#  define EXPR(Type, Base) STMT(Type, Base)
+#endif
+EXPR(Expr, Stmt)
+#undef EXPR
+
+#ifndef IF
+#  define IF(Type, Base) STMT(Type, Base)
+#endif
+IF(If, Stmt)
+#undef IF
+
+#ifndef IFELSE
+#  define IFELSE(Type, Base) STMT(Type, Base)
+#endif
+IFELSE(IfElse, Stmt)
+#undef IFELSE
+
+#ifndef WHILE
+#  define WHILE(Type, Base) STMT(Type, Base)
+#endif
+WHILE(While, Stmt)
+#undef WHILE
+
+#ifndef GOTO
+#  define GOTO(Type, Base) STMT(Type, Base)
+#endif
+GOTO(GoTo, Stmt)
+#undef GOTO
+
+#ifndef CONTINUE
+#  define CONTINUE(Type, Base) STMT(Type, Base)
+#endif
+CONTINUE(Continue, Stmt)
+#undef CONTINUE
+
+#ifndef BREAK
+#  define BREAK(Type, Base) STMT(Type, Base)
+#endif
+BREAK(Break, Stmt)
+#undef BREAK
+
+
+LAST_STMT_RANGE(Stmt, Identifier, Break)
+
+#undef STMT
+#undef STMT_RANGE
+#undef LAST_STMT_RANGE
+#undef ABSTRACT_STMT

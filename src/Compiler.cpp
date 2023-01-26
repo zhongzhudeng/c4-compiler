@@ -2,7 +2,6 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Syntax.hpp"
-#include "Printer.hpp"
 
 Compiler::Compiler(const char *filename) : filename(filename) {}
 
@@ -14,11 +13,11 @@ void Compiler::tokenize() {
 void Compiler::parse() {
   Lexer lexer(filename, symbolInternalizer);
   Parser parser(lexer.tokenize());
+  // parser.parse([](ASTPtr) {});
 }
 
 void Compiler::print_ast() {
   Lexer lexer(filename, symbolInternalizer);
   Parser parser(lexer.tokenize());
-  auto ast = parser.parse();
-  std::cout << *ast;
+  // parser.parse([](ASTPtr ast) { std::cout << *ast; });
 }

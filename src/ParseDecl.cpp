@@ -1,5 +1,5 @@
 #include "Diagnostic.hpp"
-#include "ParserImpl.hpp"
+#include "Parser.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
@@ -12,229 +12,96 @@
 
 #include "FirstFollow.def"
 
-DeclarationPtr Parser::impl::parseDeclaration() {
+DeclPtr Parser::parseDecl(DeclKind dKind) {
+  DeclSpecPtr spec = nullptr;
   Locatable loc(location());
-  std::vector<DeclarationSpecifierPtr> declSpecs;
-  DeclaratorPtr decl = nullptr;
-
-  for (;;) {
-    switch (kind()) {
-    default:
-      errorloc(location(), "Expected struct declaration but got '",
-               cursor->Text, "'");
-      DECLARATION_SPECIFIER {
-        declSpecs.push_back(parseDeclarationSpecifier());
-        break;
-      }
-      DECLARATOR
-      goto declarator;
-      break;
-    case TK_SEMICOLON:
-      goto finish;
-    }
-  }
-
-declarator:
-  switch (kind()) {
-  default:
-    errorloc(location(), "Expected declaration but got '", cursor->Text, "'");
-    DECLARATOR
-    decl = parseDeclarator(DeclKind::CONCRETE);
-  case TK_SEMICOLON:
-    goto finish;
-  }
-finish:
-  expect(TK_COLON, "';'");
-  return std::make_unique<Declaration>(loc, std::move(declSpecs),
-                                       std::move(decl));
-}
-
-StructDeclarationPtr Parser::impl::parseStructDeclaration() {
-  Locatable loc(location());
-  std::vector<SpecifierQualifierPtr> specQuals;
-  std::vector<StructDeclaratorPtr> structDeclarators;
-
-  for (;;) {
-    switch (kind()) {
-    default:
-      errorloc(location(), "Expected struct declaration but got '",
-               cursor->Text, "'");
-      TYPE_SPECIFIER {
-        specQuals.push_back(parseSpecifierQualifier());
-        break;
-      }
-      STRUCT_DECLARATOR
-      goto declarators;
-    case TK_SEMICOLON:
-      goto finish;
-    }
-  }
-declarators:
-  for (;;) {
-    switch (kind()) {
-    default:
-      errorloc(location(), "Expected struct declarator but got '", cursor->Text,
-               "'");
-      DECLARATOR {
-        structDeclarators.push_back(parseStructDeclarator());
-        break;
-      }
-    case TK_SEMICOLON:
-      goto finish;
-    }
-  }
-finish:
-  expect(TK_SEMICOLON, "';' in struct declarator");
-  return std::make_unique<StructDeclaration>(loc, std::move(specQuals),
-                                             std::move(structDeclarators));
-}
-
-ParameterDeclarationPtr Parser::impl::parseParameterDeclaration() {
-  Locatable loc(location());
-  std::vector<DeclarationSpecifierPtr> declSpecs;
-  DeclaratorPtr decl = nullptr;
-
-  for (;;) {
-    switch (kind()) {
-    default:
-      errorloc(location(), "Expected struct declaration but got '",
-               cursor->Text, "'");
-      DECLARATION_SPECIFIER {
-        declSpecs.push_back(parseDeclarationSpecifier());
-        break;
-      }
-      DECLARATOR
-      goto declarator;
-    case TK_COMMA:
-    case TK_RPAREN:
-      goto finish;
-    }
-  }
-
-declarator:
-  decl = parseDeclarator(DeclKind::ANY);
-finish:
-  return std::make_unique<ParameterDeclaration>(loc, std::move(declSpecs),
-                                                std::move(decl));
-}
-
-DeclarationSpecifierPtr Parser::impl::parseSpecifierQualifier() {
-  return parseTypeSpecifier();
-}
-
-DeclarationSpecifierPtr Parser::impl::parseDeclarationSpecifier() {
-  return parseTypeSpecifier();
-}
-
-TypeSpecifierPtr Parser::impl::parseTypeSpecifier() {
-  Locatable loc(location());
-  switch (kind()) {
-  default:
-    errorloc(location(), "Expected struct declaration list but got '",
-             cursor->Text, "'");
-  case TK_VOID:
-    bump();
-    return std::make_unique<VoidSpecifier>(loc);
-  case TK_CHAR:
-    bump();
-    return std::make_unique<CharSpecifier>(loc);
-  case TK_INT:
-    bump();
-    return std::make_unique<IntSpecifier>(loc);
-  case TK_STRUCT:
-    return parseStructSpecifier();
-  }
-}
-
-StructSpecifierPtr Parser::impl::parseStructSpecifier() {
-  Locatable loc(location());
+  TokenKind tk = kind();
   bump();
-  Symbol tag = nullptr;
-  switch (kind()) {
+  switch (tk) {
   default:
-    errorloc(location(), "Expected struct declaration list but got '",
-             cursor->Text, "'");
-  case TK_IDENTIFIER:
-    tag = cursor->Text;
-    bump();
+    errorloc(loc, "Expected type specifier but got `", *cursor->Text, "'");
+  case TK_VOID:
+    spec = std::make_unique<VoidSpec>(loc);
     break;
-  case TK_LBRACE:
+  case TK_CHAR:
+    spec = std::make_unique<CharSpec>(loc);
     break;
-  }
-
-  std::vector<StructDeclarationPtr> structDeclarations;
-  switch (kind()) {
-  default:
-    errorloc(location(), "Expected struct declaration list but got '",
-             cursor->Text, "'");
-  case TK_LBRACE: {
-    bump();
-    while (!accept(TK_RBRACE)) {
-      structDeclarations.push_back(parseStructDeclaration());
+  case TK_INT:
+    spec = std::make_unique<IntSpec>(loc);
+    break;
+  case TK_STRUCT: {
+    Symbol iden = nullptr;
+    if (check(TK_IDENTIFIER)) {
+      iden = cursor->Text;
+      bump();
+    } else if (!check(TK_LBRACE)) {
+      errorloc(location(), "Expected struct declaration list but got `",
+               *cursor->Text, "'");
     }
+    std::vector<DeclPtr> decls;
+    bool is_bracketed = false;
+    if (accept(TK_LBRACE)) {
+      is_bracketed = true;
+      do {
+        decls.push_back(parseDecl(DeclKind::CONCRETE));
+        expect(TK_SEMICOLON, ";");
+      } while (!accept(TK_RBRACE));
+    }
+    spec =
+        std::make_unique<StructSpec>(loc, iden, is_bracketed, std::move(decls));
     break;
   }
-    STRUCT_SPECIFIER_FOLLOW
-    break;
   }
-  return std::make_unique<StructSpecifier>(loc, tag,
-                                           std::move(structDeclarations));
+  auto decl = parseDeclarator();
+  if (decl == nullptr) {
+    // TODO check if decl is a valid declarator or abstract declarator
+  }
+  return std::make_unique<Decl>(loc, std::move(spec), std::move(decl));
 }
 
-StructDeclaratorPtr Parser::impl::parseStructDeclarator() {
-  return parseDeclarator(DeclKind::CONCRETE);
-}
-
-DeclaratorPtr Parser::impl::parseDeclarator(DeclKind dKind) {
+DeclaratorPtr Parser::parseNonFunDeclarator() {
   Locatable loc(location());
-  DeclaratorPtr res = nullptr;
   switch (kind()) {
-  default:
-    errorloc(location(), "Expected declarator but got '", cursor->Text,
-             "'");
+  case TK_LPAREN: {
+    switch (kind_first()) {
+    case TK_RPAREN:
+    case TK_VOID:
+    case TK_CHAR:
+    case TK_INT:
+    case TK_STRUCT:
+      return nullptr;
+    default:
+      bump();
+      auto res = parseDeclarator();
+      expect(TK_RPAREN, "')'");
+      return res;
+    }
+  }
   case TK_STAR: {
     bump();
-    res = std::make_unique<PointerDeclarator>(loc, parseDeclarator(dKind));
+    auto inner = parseDeclarator();
+    return std::make_unique<PointerDeclarator>(loc, std::move(inner));
   }
-  case TK_LPAREN:
-    bump();
-    if (dKind != DeclKind::ABSTRACT) {
-      res = parseDeclarator(dKind);
-    } else {
-      switch (kind()) {
-      default:
-        errorloc(location(), "Expected abstract declarator but got '",
-                 cursor->Text, "'");
-        ABSTRACT_DECLARATOR
-        res = parseDeclarator(dKind);
-        break;
-        DECLARATION_SPECIFIER {
-          res = std::make_unique<PrimitiveDeclarator>(loc, nullptr);
-          goto param;
-        }
-      }
-    }
-    expect(TK_RPAREN, "')'");
   case TK_IDENTIFIER: {
-    if (dKind != DeclKind::ABSTRACT) {
-      Symbol iden = cursor->Text;
-      bump();
-      res = std::make_unique<PrimitiveDeclarator>(loc, iden);
-    } else {
-      errorloc(location(), "Expected declarator but got identifier '",
-               cursor->Text, "'");
-    }
+    auto res = std::make_unique<PrimitiveDeclarator>(loc, cursor->Text);
+    bump();
+    return res;
   }
+  default:
+    return nullptr;
   }
-param:
-  if (check(TK_LPAREN)) {
-    std::vector<ParameterDeclarationPtr> params;
+}
+
+DeclaratorPtr Parser::parseDeclarator() {
+  auto res = parseNonFunDeclarator();
+  if (accept(TK_LPAREN)) {
+    std::vector<DeclPtr> params;
     do {
-      params.push_back(parseParameterDeclaration());
-    } while (!check(TK_COMMA));
+      params.push_back(parseDecl(DeclKind::ANY));
+    } while (accept(TK_COMMA));
     expect(TK_RPAREN, "')'");
-    return std::make_unique<FunctionDeclarator>(loc, std::move(res),
-                                                std::move(params));
+    res = std::make_unique<FunctionDeclarator>(location(), std::move(res),
+                                               std::move(params));
   }
   return res;
 }

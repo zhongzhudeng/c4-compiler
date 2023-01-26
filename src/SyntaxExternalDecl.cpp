@@ -1,16 +1,11 @@
-#include "Diagnostic.hpp"
-#include "Printer.hpp"
 #include "SyntaxExternalDecl.hpp"
-#include "Syntax.hpp"
-#include "SyntaxDecl.hpp"
+#include "Diagnostic.hpp"
+#include "SyntaxStmt.hpp"
 
-ExternalDecl::ExternalDecl(Locatable loc, DeclarationPtr Decl) : AST(loc), decl(std::move(Decl)), hasStmt(false) {};
-ExternalDecl::ExternalDecl(Locatable loc, DeclarationPtr Decl, StmtPtr Comp) : AST(loc), decl(std::move(Decl)), comp(std::move(Comp)), hasStmt(true) {};
-void ExternalDecl::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
-const Declaration &ExternalDecl::getDecl() const {return const_cast<Declaration &>(*decl);};
-const Stmt &ExternalDecl::getStmt() const {return const_cast<Stmt &>(*comp);};
-bool ExternalDecl::hasComp() const {return hasStmt;};
+ExternDecl::ExternDecl(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
+const Locatable &ExternDecl::getLoc() { return loc; }
+ExternDecl::Kind ExternDecl::getKind() const { return kind; }
 
-TranslationUnit::TranslationUnit(Locatable loc, std::vector<ExternalDeclPtr> exDecl) : AST(loc), exDecl(std::move(exDecl)) {};
-void TranslationUnit::accept(ASTPrinter &visitor) { visitor.Visit(*this); }
-const std::vector<ExternalDeclPtr> &TranslationUnit::getExternalDecl() const { return const_cast<std::vector<ExternalDeclPtr> &>(exDecl); };
+FuncDef::FuncDef(Locatable loc, DeclPtr decl, CompStmtPtr compoundStmt)
+    : ExternDecl(loc, Kind::FuncDef), decl(std::move(decl)),
+      compoundStmt(std::move(compoundStmt)) {}

@@ -1,8 +1,9 @@
-#include "ParserImpl.hpp"
 #include "Diagnostic.hpp"
+#include "Parser.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
+#include "SyntaxExpr.hpp"
 #include "SyntaxStmt.hpp"
 #include "Token.hpp"
 #include <algorithm>
@@ -11,95 +12,97 @@
 #include <utility>
 #include <vector>
 
-StmtPtr Parser::impl::parseStmt(){
-  StmtPtr stmt;
-  switch (cursor->Kind) {
-  default:{
-    auto expr = parseExpr();
-    stmt = std::make_unique<ExprStmt>(location(), std::move(expr));
-    break;}
-  case TK_IDENTIFIER:{
-    if(kind_first() == TK_COLON){
-      Symbol identifier = cursor->Text;
-      bump();
-      bump();
-      StmtPtr RHS = parseStmt();
-      stmt = std::make_unique<IdentifierStmt>(location(), identifier, std::move(stmt));
-    } else {
-      auto identifier = parseIdentifierExpr();
-      stmt = std::make_unique<ExprStmt>(location(), std::move(identifier));
-      expect(TK_SEMICOLON,"';'");
+#include "FirstFollow.def"
+
+StmtPtr Parser::parseStmt() {
+  Locatable loc(location());
+  switch (kind()) {
+  default:
+    errorloc(loc, "Unexpected Token '", *cursor->Text,
+             "' when expecting statement");
+  case TK_IDENTIFIER: {
+
+    Symbol iden = cursor->Text;
+    switch (kind_first()) {
+    default: {
+      auto expr = parseExpr();
+      expect(TK_SEMICOLON, "';' after expression in statement");
+      return std::make_unique<ExprStmt>(loc, std::move(expr));
     }
-    break;}    
-  case (TK_LBRACE):{
-    bump();
-    std::vector<ASTPtr> bil;
-    if (!check(TK_RBRACE)){
-      bil = parseBlockItemList();
+    case TK_COLON:
+      bump(), bump();
+      StmtPtr stmt = parseStmt();
+      return std::make_unique<IdentifierStmt>(loc, iden, parseStmt());
     }
-    expect(TK_RBRACE, "'}'");
-    stmt = std::make_unique<CompStmt>(location(), std::move(bil));
-    break;}
-  case (TK_IF):{
-    bump();
-    expect(TK_LPAREN,"'('");
-    auto expr = parseExpr();
-    expect(TK_RPAREN,"')'");
-    auto ifStmt = parseStmt();
-    if(check(TK_ELSE)){
-      bump();
-      auto elseStmt = parseStmt();
-      stmt = std::make_unique<IfElseStmt>(location(), std::move(expr),std::move(ifStmt),std::move(elseStmt));
-    } else {
-      stmt = std::make_unique<IfStmt>(location(), std::move(expr),std::move(ifStmt));
-    }
-    break;}
-  case (TK_WHILE):{
-    bump();
-    expect(TK_LPAREN,"'('");
-    auto expr = parseExpr();
-    expect(TK_RPAREN,"')'");
-    auto doStmt = parseStmt();
-    stmt = std::make_unique<WhileStmt>(location(), std::move(expr),std::move(doStmt));
-    break;}
-  case TK_GOTO:{
-    bump();
-    if (check(TK_IDENTIFIER)){
-      Symbol identifier = cursor->Text;
-      bump();
-      stmt = std::make_unique<GoToStmt>(location(), identifier);
-    } else {
-      errorloc(location(), "Unknown token ", cursor->Text,
-         " when expecting identifier\n");
-    }
-    break;}
-  case TK_CONTINUE:{
-    stmt = std::make_unique<ContinueStmt>(location());
-    expect(TK_SEMICOLON,"';'");
-    break;}
-  case TK_BREAK:{
-    stmt = std::make_unique<BreakStmt>(location());
-    expect(TK_SEMICOLON,"';'");
-    break;}
-  case TK_SEMICOLON:{
-    bump();
-    stmt = std::make_unique<ExprStmt>(location());
-    break;}
   }
-  return stmt;
-};
-std::vector<ASTPtr> Parser::impl::parseBlockItemList(){
-  std::vector<ASTPtr> bil;
-  switch (cursor->Kind) {
+  case TK_LBRACE: {
+    return parseCompoundStmt();
+  }
+  case TK_IF: {
+    bump();
+    expect(TK_LPAREN, "'('");
+    auto expr = parseExpr();
+    expect(TK_RPAREN, "')'");
+    auto stmt = parseStmt();
+    if (accept(TK_ELSE)) {
+      auto elseStmt = parseStmt();
+      return std::make_unique<IfElseStmt>(loc, std::move(expr), std::move(stmt),
+                                          std::move(elseStmt));
+    } else
+      return std::make_unique<IfStmt>(loc, std::move(expr), std::move(stmt));
+  }
+  case TK_WHILE: {
+    bump();
+    expect(TK_LPAREN, "'(' after while");
+    ExprPtr expr = parseExpr();
+    expect(TK_RPAREN, "')' after expression in while statement");
+    StmtPtr stmt = parseStmt();
+    return std::make_unique<WhileStmt>(loc, std::move(expr), std::move(stmt));
+  }
+  case TK_GOTO: {
+    bump();
+    Symbol iden = cursor->Text;
+    expect(TK_IDENTIFIER, "identifier after goto");
+    expect(TK_SEMICOLON, "';'");
+    return std::make_unique<GoToStmt>(loc, iden);
+  }
+  case TK_CONTINUE: {
+    bump();
+    StmtPtr stmt = std::make_unique<ContinueStmt>(loc);
+    expect(TK_SEMICOLON, "';'");
+    return stmt;
+  }
+  case TK_BREAK: {
+    bump();
+    StmtPtr stmt = std::make_unique<BreakStmt>(loc);
+    expect(TK_SEMICOLON, "';'");
+    return stmt;
+  }
+  case TK_RETURN: {
+    bump();
+    ExprPtr expr = nullptr;
+    if (kind() != TK_SEMICOLON)
+      expr = parseExpr();
+    StmtPtr stmt = std::make_unique<ExprStmt>(loc, std::move(expr));
+    expect(TK_SEMICOLON, "';'");
+    return stmt;
+  }
+  }
+}
+
+CompStmtPtr Parser::parseCompoundStmt() {
+  Locatable loc(location());
+  expect(TK_LBRACE, "'{' in compound statement");
+  std::vector<StmtPtr> bil;
+  while (!accept(TK_RBRACE)) {
+    switch (kind()) {
     default:
       bil.push_back(parseStmt());
       break;
-    case TK_INT:
-    case TK_VOID:
-    case TK_CHAR:
-    case TK_STRUCT:{
-      bil.push_back(parseDeclaration());
-      break;}
+      DECLARATION
+      bil.push_back(std::make_unique<DeclStmt>(location(), parseDecl()));
+      break;
+    }
   }
-  return bil;
-};
+  return std::make_unique<CompStmt>(loc, std::move(bil));
+}

@@ -1,25 +1,27 @@
 #pragma once
 #include "Syntax.hpp"
+#include <vector>
 
-class ExternalDecl : public AST {
-  DeclarationPtr decl;
-  StmtPtr comp;
-  bool hasStmt;
+class ExternDecl {
 public:
-  ExternalDecl(Locatable loc, DeclarationPtr decl, StmtPtr comp);
-  ExternalDecl(Locatable loc, DeclarationPtr decl);
-  virtual void accept(ASTPrinter &visitor) override;
-  virtual ~ExternalDecl() = default;
-  const Declaration &getDecl() const;
-  const Stmt &getStmt() const;
-  bool hasComp() const;
+  enum Kind { FuncDef, Decl };
+
+private:
+  Locatable loc;
+  Kind kind;
+
+public:
+  ExternDecl(Locatable loc, Kind kind);
+  virtual ~ExternDecl() {}
+  const Locatable &getLoc();
+  Kind getKind() const;
 };
 
-class TranslationUnit : public AST {
-  std::vector<ExternalDeclPtr> exDecl;
+class FuncDef : public ExternDecl {
+  DeclPtr decl;
+  CompStmtPtr compoundStmt;
+
 public:
-  TranslationUnit(Locatable loc, std::vector<ExternalDeclPtr> exDecl);
-  virtual void accept(ASTPrinter &visitor) override;
-  virtual ~TranslationUnit() = default;
-  const std::vector<ExternalDeclPtr> &getExternalDecl() const;
+  FuncDef(Locatable loc, DeclPtr decl, CompStmtPtr compoundStmt);
+  // TODO: getters
 };

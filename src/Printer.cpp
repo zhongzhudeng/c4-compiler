@@ -1,195 +1,271 @@
-#include "Printer.hpp"
+#include "NodeVisitor.hpp"
 #include "SymbolInternalizer.hpp"
-#include "SyntaxExpr.hpp"
+#include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
-#include "SyntaxStmt.hpp"
+#include "SyntaxExpr.hpp"
 #include "SyntaxExternalDecl.hpp"
-#include <cstddef>
-#include <sstream>
-#include <vector>
+#include "SyntaxStmt.hpp"
+#include <ostream>
 
-std::ostream &operator<<(std::ostream &os, const AST &ast) {
-  ASTPrinter printer(os);
-  printer.Visit(ast);
-  return os;
-}
+class ExprPrinter : public ExprVisitor<ExprPrinter> {
+  std::ostream &os;
 
-std::ostream &operator<<(std::ostream &os, Symbol symbol) {
-  os << *symbol;
-  return os;
-}
-
-ASTPrinter::ASTPrinter(std::ostream &os) : os(os) {}
-
-void ASTPrinter::increaseIndent(){
-  indent++;
-}
-void ASTPrinter::decreaseIndent(){
-  indent--;
-}
-void ASTPrinter::nextLine(){
-  os << "\n";
-  for (int i = 0; i < indent; i++) {
-    os << "\t";
+public:
+  ExprPrinter(std::ostream &os) : os(os) {}
+  void VisitIdentifierExpr(const IdentifierExpr &expr) {
+    os << *expr.getIdentifier();
   }
-}
-
-void ASTPrinter::Visit(const AST &ast) { const_cast<AST &>(ast).accept(*this); }
-
-
-void ASTPrinter::Visit(const IdentifierExpr &expr) {
-  os << expr.getIdentifier();
-}
-void ASTPrinter::Visit(const ConstantExpr &expr) { os << expr.getConstant(); }
-void ASTPrinter::Visit(const StringLiteralExpr &expr) {
-  os << expr.getStringLiteral();
-}
-void ASTPrinter::Visit(const ParenExpr &expr) { Visit(expr.getExpr()); }
-void ASTPrinter::Visit(const AssignmentExpr &expr) {
-  os << "(";
-  Visit(expr.getLHS());
-  os << " = ";
-  Visit(expr.getRHS());
-  os << ")";
-}
-void ASTPrinter::Visit(const ConditionalExpr &expr) {
-  os<<"(";
-  Visit(expr.getFirst());
-  os << " ? ";
-  Visit(expr.getSecond());
-  os << " : ";
-  Visit(expr.getThird());
-  os<<")";
-}
-void ASTPrinter::Visit(const BinaryExpr &expr) {
-  os << "(";
-  Visit(expr.getLHS());
-  os << ' ' << expr.getOperator() << ' ';
-  Visit(expr.getRhS());
-  os << ")";
-}
-void ASTPrinter::Visit(const UnaryExpr &expr) {
-  os << "(";
-  os << expr.getOperator();
-  Visit(expr.getExpr());
-  os << ")";
-}
-void ASTPrinter::Visit(const SizeofExpr &expr) {
-  os << "(sizeof ";
-  Visit(expr.getExpr());
-  os << ")";
-}
-void ASTPrinter::Visit(const SizeofTypeExpr &expr) {
-  os << "(sizeof(" << expr.getTypeName() << "))";
-}
-void ASTPrinter::Visit(const ArraySubscriptExpr &expr) {
-  os << "(";
-  Visit(expr.getExpr());
-  os << "[";
-  Visit(expr.getSquaredExpr());
-  os << "])";
-}
-void ASTPrinter::Visit(const FunctionCallExpr &expr) {
-  os << "(";
-  Visit(expr.getCallee());
-  os << "(";
-  const std::vector<ExprPtr> &args = expr.getArgs();
-  for (auto it = args.begin(); it != args.end() - 1; it++) {
-    const Expr &arg = const_cast<Expr &>(**it);
-    Visit(arg);
-    os << ", ";
+  void VisitConstantExpr(const ConstantExpr &expr) {
+    os << *expr.getConstant();
   }
-  const Expr &arg = const_cast<Expr &>(**(args.end() - 1));
-  Visit(arg);
-  os << "))";
-}
-void ASTPrinter::Visit(const MemberExpr &expr) {
-  os << "(";
-  Visit(expr.getExpr());
-  os << expr.getAccessOp();
-  Visit(expr.getMember());
-  os << ")";
-}
-void ASTPrinter::Visit(const Stmt &stmt){
-};
-void ASTPrinter::Visit(const IdentifierStmt &stmt){
-  os << stmt.getIdentifier();
-  os << " : ";
-  Visit(stmt.getStmt());
-};
-void ASTPrinter::Visit(const CompStmt &stmt){
-  os << "{";
-  increaseIndent();
-  /*auto bil = stmt.getBlockItemList();
-  for (size_t i = 0; i < bil.size(); i++) {
-      nextLine();
-      Visit(*(bil[i]));
-  }*/
-  decreaseIndent();
-  nextLine();
-  os << "}";
-};
-void ASTPrinter::Visit(const ExprStmt &stmt){
-  if (stmt.getHasExpr()){
-    Visit(stmt.getExpr());
+  void VisitStringLiteralExpr(const StringLiteralExpr &expr) {
+    os << *expr.getStringLiteral();
   }
-  os << ";";
-};
-void ASTPrinter::Visit(const IfStmt &stmt){
-  os << "if (";
-  Visit(stmt.getCond());
-  os << ") ";
-  increaseIndent();
-  Visit(stmt.getIf());
-  decreaseIndent();
-  nextLine();
-};
-void ASTPrinter::Visit(const IfElseStmt &stmt){
-  os << "if (";
-  Visit(stmt.getCond());
-  os << ") ";
-  increaseIndent();
-  Visit(stmt.getIf());
-  decreaseIndent();
-  nextLine();
-  os << "else ";
-  increaseIndent();
-  Visit(stmt.getElse());
-  decreaseIndent();
-  nextLine();
-};
-void ASTPrinter::Visit(const WhileStmt &stmt){
-  os << "while (";
-  Visit(stmt.getCond());
-  os << ") ";
-  increaseIndent();
-  Visit(stmt.getDo());
-  decreaseIndent();
-  nextLine();
-};
-void ASTPrinter::Visit(const GoToStmt &stmt){
-  os << "goto ";
-  os << stmt.getIdentifier();
-};
-void ASTPrinter::Visit(const ContinueStmt &stmt){
-  os << "continue;";
-};
-void ASTPrinter::Visit(const BreakStmt &stmt){
-  os << "break;";
+  void VisitParenExpr(const ParenExpr &expr) { visit(expr.getExpr()); }
+  void VisitConditionalExpr(const ConditionalExpr &expr) {
+    os << "(";
+    visit(expr.getFirst());
+    os << " ? ";
+    visit(expr.getSecond());
+    os << " : ";
+    visit(expr.getThird());
+    os << ")";
+  }
+  void VisitBinaryExpr(const BinaryExpr &expr) {
+    os << "(";
+    visit(expr.getLHS());
+    os << ' ' << *expr.getOperator() << ' ';
+    visit(expr.getRhS());
+    os << ")";
+  }
+  void VisitUnaryExpr(const UnaryExpr &expr) {
+    os << "(";
+    os << *expr.getOperator();
+    visit(expr.getExpr());
+    os << ")";
+  }
+  void VisitSizeofExpr(const SizeofExpr &expr) {
+    os << "(sizeof ";
+    visit(expr.getExpr());
+    os << ")";
+  }
+  void VisitSizeofTypeExpr(const SizeofTypeExpr &expr) {
+    os << "(sizeof(" << *expr.getTypeName() << "))";
+  }
+  void VisitArraySubscriptExpr(const ArraySubscriptExpr &expr) {
+    os << "(";
+    visit(expr.getExpr());
+    os << "[";
+    visit(expr.getSquaredExpr());
+    os << "])";
+  }
+  void VisitFunctionCallExpr(const FunctionCallExpr &expr) {
+    os << "(";
+    visit(expr.getCallee());
+    os << "(";
+    const std::vector<ExprPtr> &args = expr.getArgs();
+    for (auto it = args.begin(); it != args.end() - 1; it++) {
+      const Expr &arg = const_cast<Expr &>(**it);
+      visit(arg);
+      os << ", ";
+    }
+    const Expr &arg = const_cast<Expr &>(**(args.end() - 1));
+    visit(arg);
+    os << "))";
+  }
+  void VisitMemberExpr(const MemberExpr &expr) {
+    os << "(";
+    visit(expr.getExpr());
+    os << *expr.getAccessOp();
+    visit(expr.getMember());
+    os << ")";
+  }
 };
 
-void ASTPrinter::Visit(const ExternalDecl &externalDecl){
-  //Visit(externalDecl.getDecl());
-  if (externalDecl.hasComp()){
-    os << " ";
-    Visit(externalDecl.getStmt());
+class DeclPrinter : public DeclVisitor<DeclPrinter> {
+  std::ostream &os;
+  unsigned indentation;
+
+  std::ostream &indent() { return indent(indentation); }
+
+public:
+  DeclPrinter(std::ostream &os, unsigned indentation = 0)
+      : os(os), indentation(indentation) {}
+  std::ostream &indent(unsigned indentation) {
+    for (unsigned i = 0; i != indentation; ++i)
+      os << '\t';
+    return os;
   }
+  void visit(const Decl &decl) {
+    this->indent();
+    VisitDeclSpec(decl.getDeclSpec());
+    if (!decl.isNullDeclarator()) {
+      os << " ";
+      VisitDeclarator(decl.getDeclarator());
+    }
+  }
+  void VisitVoidSpec([[maybe_unused]] const VoidSpec &declSpec) {
+    os << "void";
+  }
+  void VisitCharSpec([[maybe_unused]] const CharSpec &declSpec) {
+    os << "char";
+  }
+  void VisitIntSpec([[maybe_unused]] const IntSpec &declSpec) { os << "int"; }
+  void VisitStructSpec(const StructSpec &declSpec) {
+    os << "struct ";
+    if (!declSpec.isAnoymous()) {
+      os << *declSpec.getIdentifier();
+    }
+    if (declSpec.isBracketed()) {
+      os << "\n";
+      this->indent();
+      os << "{\n";
+      indentation++;
+      for (auto decl : declSpec.getDecls()) {
+        visit(decl);
+        os << ";";
+      }
+      os << '\n';
+      indentation--;
+      this->indent();
+      os << "}";
+    }
+  }
+  void VisitPrimitiveDeclarator(const PrimitiveDeclarator &declarator) {
+    os << *declarator.getIdentifier();
+  }
+  void VisitPointerDeclarator(const PointerDeclarator &declarator) {
+    os << "(*";
+    VisitDeclarator(declarator.getDeclarator());
+    os << ")";
+  }
+  void VisitFunctionDeclarator(const FunctionDeclarator &declarator) {
+    os << "(";
+    VisitDeclarator(declarator.getDeclarator());
+    os << "(";
+    auto params = declarator.getParams();
+    visit(params.front());
+    for (auto it = params.begin() + 1; it != params.end(); it++) {
+      os << ", ";
+      visit(*it);
+    }
+    os << "))";
+  }
+};
+
+class StmtPrinter : public StmtVisitor<StmtPrinter> {
+  std::ostream &os;
+  unsigned indentation;
+  std::ostream &indent() { return indent(indentation); }
+
+public:
+  StmtPrinter(std::ostream &os, unsigned indentation = 0)
+      : os(os), indentation(indentation) {}
+  std::ostream &indent(unsigned indentation) {
+    for (unsigned i = 0; i != indentation; ++i)
+      os << '\t';
+    return os;
+  }
+
+  void VisitIdentifierStmt(const IdentifierStmt &stmt) {
+    os << stmt.getIdentifier();
+    os << " : ";
+    visit(stmt.getStmt());
+  }
+  void VisitCompStmt(const CompStmt &stmt) {
+    os << "{";
+    indentation++;
+    for (auto item : stmt.getBlockItemList()) {
+      visit(item);
+    }
+    indentation--;
+    os << "\n}";
+  }
+  void VisitDeclStmt(const DeclStmt &stmt) {
+    os << "{";
+    indentation++;
+    stmt.getDeclaration().print(os);
+    indentation--;
+    os << '\n';
+    os << "}";
+  }
+  void VisitExprStmt(const ExprStmt &stmt) {
+    if (!stmt.isEmpty())
+      stmt.getExpr().print(os);
+    os << ";";
+  }
+  void VisitIfStmt(const IfStmt &stmt) {
+    os << "if (";
+    stmt.getCond().print(os);
+    os << ") ";
+    indentation++;
+    visit(stmt.getIf());
+    indentation--;
+    os << '\n';
+  }
+  void VisitIfElseStmt(const IfElseStmt &stmt) {
+    os << "if (";
+    stmt.getCond().print(os);
+    os << ") ";
+    indentation++;
+    visit(stmt.getIf());
+    indentation--;
+    os << '\n';
+    os << "else ";
+    indentation++;
+    visit(stmt.getElse());
+    indentation--;
+    os << '\n';
+  }
+  void VisitWhileStmt(const WhileStmt &stmt) {
+    os << "while (";
+    stmt.getCond().print(os);
+    os << ") ";
+    indentation++;
+    visit(stmt.getDo());
+    indentation--;
+    os << '\n';
+  }
+  void VisitGoToStmt(const GoToStmt &stmt) {
+    os << "goto ";
+    os << stmt.getIdentifier();
+  }
+  void VisitContinueStmt([[maybe_unused]] const ContinueStmt &stmt) {
+    os << "continue;";
+  }
+  void VisitBreakStmt([[maybe_unused]] const BreakStmt &stmt) {
+    os << "break;";
+  }
+};
+
+// TODO: add indentation
+void Expr::print(std::ostream &os) const {
+  ExprPrinter printer(os);
+  printer.visit(const_cast<Expr &>(*this));
 }
 
-void ASTPrinter::Visit(const TranslationUnit &tu){
-  /*std::vector<ExternalDeclPtr> bil = tu.getExternalDecl();
-  for (size_t i = 0; i < bil.size(); i++) {
-      nextLine();
-      Visit(*(bil[i]));
-  }*/
+void Decl::print(std::ostream &os, unsigned identation) const {
+  DeclPrinter printer(os, identation);
+  printer.visit(const_cast<Decl &>(*this));
 }
+
+void Stmt::print(std::ostream &os, unsigned identation) const {
+  StmtPrinter printer(os, identation);
+  printer.visit(const_cast<Stmt &>(*this));
+}
+
+// void ASTPrinter::Visit(const ExternalDecl &externalDecl) {
+//   // Visit(externalDecl.getDecl());
+//   if (externalDecl.hasComp()) {
+//     os << " ";
+//     Visit(externalDecl.getStmt());
+//   }
+// }
+
+// void ASTPrinter::Visit(const TranslationUnit &tu) {
+/*std::vector<ExternalDeclPtr> bil = tu.getExternalDecl();
+for (size_t i = 0; i < bil.size(); i++) {
+    os<<'\n';
+    Visit(*(bil[i]));
+}*/
+// }

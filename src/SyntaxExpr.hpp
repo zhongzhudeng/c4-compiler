@@ -5,14 +5,32 @@
 #include "Syntax.hpp"
 #include <vector>
 
+class Expr {
+public:
+  enum Kind {
+#define EXPR(DERIVED, BASE) DERIVED,
+#define ABSTRACT_EXPR(EXPR)
+#define EXPR_RANGE(BASE, START, END) first##BASE = START, last##BASE = END,
+#define LAST_EXPR_RANGE(BASE, START, END) first##BASE = START, last##BASE = END
+#include "NodesExpr.def"
+  };
+private:
+  Locatable loc;
+  Kind kind;
 
+public:
+  Expr(Locatable loc, Kind kind);
+  virtual ~Expr(){}
+  const Locatable &getLoc();
+  Kind getKind() const;
+  void print(std::ostream &os) const;
+};
 
 class IdentifierExpr final : public Expr {
   Symbol identifier;
 
 public:
   IdentifierExpr(Locatable loc, Symbol identifier);
-  void accept(ASTPrinter &visitor) override;
   Symbol getIdentifier() const;
 };
 class ConstantExpr final : public Expr {
@@ -20,7 +38,6 @@ class ConstantExpr final : public Expr {
 
 public:
   ConstantExpr(Locatable loc, Symbol val);
-  void accept(ASTPrinter &visitor) override;
   Symbol getConstant() const;
 };
 class StringLiteralExpr final : public Expr {
@@ -28,7 +45,6 @@ class StringLiteralExpr final : public Expr {
 
 public:
   StringLiteralExpr(Locatable loc, Symbol val);
-  void accept(ASTPrinter &visitor) override;
   Symbol getStringLiteral() const;
 };
 
@@ -37,18 +53,7 @@ class ParenExpr final : public Expr {
 
 public:
   ParenExpr(Locatable loc, ExprPtr expr);
-  void accept(ASTPrinter &visitor) override;
   const Expr &getExpr() const;
-};
-
-class AssignmentExpr final : public Expr {
-  ExprPtr LHS, RHS;
-
-public:
-  AssignmentExpr(Locatable loc, ExprPtr LHS, ExprPtr RHS);
-  void accept(ASTPrinter &visitor) override;
-  const Expr &getLHS() const;
-  const Expr &getRHS() const;
 };
 
 class ConditionalExpr final : public Expr {
@@ -56,7 +61,6 @@ class ConditionalExpr final : public Expr {
 
 public:
   ConditionalExpr(Locatable loc, ExprPtr first, ExprPtr second, ExprPtr third);
-  void accept(ASTPrinter &visitor) override;
   const Expr &getFirst() const;
   const Expr &getSecond() const;
   const Expr &getThird() const;
@@ -68,7 +72,6 @@ class BinaryExpr final : public Expr {
 
 public:
   BinaryExpr(Locatable loc, Symbol Op, ExprPtr LHS, ExprPtr RHS);
-  void accept(ASTPrinter &visitor) override;
   const Expr &getLHS() const;
   Symbol getOperator() const;
   const Expr &getRhS() const;
@@ -80,7 +83,6 @@ class UnaryExpr final : public Expr {
 
 public:
   UnaryExpr(Locatable loc, Symbol UnaryOp, ExprPtr expr);
-  void accept(ASTPrinter &visitor) override;
   Symbol getOperator() const;
   const Expr &getExpr() const;
 };
@@ -90,7 +92,6 @@ class SizeofExpr final : public Expr {
 
 public:
   SizeofExpr(Locatable loc, ExprPtr expr);
-  void accept(ASTPrinter &visitor) override;
   const Expr &getExpr() const;
 };
 class SizeofTypeExpr final : public Expr {
@@ -98,25 +99,14 @@ class SizeofTypeExpr final : public Expr {
 
 public:
   SizeofTypeExpr(Locatable loc, Symbol type_name);
-  void accept(ASTPrinter &visitor) override;
   Symbol getTypeName() const;
 };
-class CastExpr final : public Expr {
-  Symbol type_name;
-  ExprPtr expr;
 
-public:
-  CastExpr(Locatable loc, Symbol type_name, ExprPtr expr);
-  void accept(ASTPrinter &visitor) override;
-  Symbol getTypeName() const;
-  const Expr &getExpr() const;
-};
 class ArraySubscriptExpr final : public Expr {
   ExprPtr expr, squaredExpr;
 
 public:
   ArraySubscriptExpr(Locatable loc, ExprPtr expr, ExprPtr squaredExpr);
-  void accept(ASTPrinter &visitor) override;
   const Expr &getExpr() const;
   const Expr &getSquaredExpr() const;
 };
@@ -126,7 +116,6 @@ class FunctionCallExpr final : public Expr {
 
 public:
   FunctionCallExpr(Locatable loc, ExprPtr callee, std::vector<ExprPtr> args);
-  void accept(ASTPrinter &visitor) override;
   const Expr &getCallee() const;
   const std::vector<ExprPtr> &getArgs() const;
 };
@@ -137,7 +126,6 @@ class MemberExpr final : public Expr {
 
 public:
   MemberExpr(Locatable loc, ExprPtr expr, ExprPtr member, Symbol acccesOp);
-  void accept(ASTPrinter &visitor) override;
   const Expr &getExpr() const;
   Symbol getAccessOp() const;
   const Expr &getMember() const;

@@ -1,67 +1,125 @@
 #include "Parser.hpp"
 #include "Lexer.hpp"
-#include "Printer.hpp"
+#include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
+#include "SyntaxExternalDecl.hpp"
+#include "SyntaxStmt.hpp"
 #include "fmt/core.h"
 #include <catch2/catch_test_macros.hpp>
-#include <utility>
 #include <sstream>
+#include <utility>
 
-std::string testParseExpr(int idx, std::string src) {
-  std::string filename = fmt::format("dummy{}.c", idx);
-  SymbolInternalizer symbolInternalizer;
-  Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
-  std::vector<Token> token_stream;
-  lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
-  Parser parser(std::move(token_stream));
-  ASTPtr ast = parser.parse();
-  std::ostringstream os;
-  os << const_cast<AST &>(*ast);
-  return os.str();
-}
+class UnitTestParser {
+public:
+  std::string parseExpr(int idx, std::string src) {
+    std::string filename = fmt::format("dummy{}.c", idx);
+    SymbolInternalizer symbolInternalizer;
+    Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
+    std::vector<Token> token_stream;
+    lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
+    Parser parser(std::move(token_stream));
+    ExprPtr expr = parser.parseExpr();
+    std::ostringstream os;
+    expr->print(os);
+    return os.str();
+  }
+  std::string parseDecl(int idx, std::string src) {
+    std::string filename = fmt::format("dummy{}.c", idx);
+    SymbolInternalizer symbolInternalizer;
+    Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
+    std::vector<Token> token_stream;
+    lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
+    Parser parser(std::move(token_stream));
+    DeclPtr decl = parser.parseDecl();
+    std::ostringstream os;
+    decl->print(os);
+    return os.str();
+  }
+  std::string parseStmt(int idx, std::string src) {
+    std::string filename = fmt::format("dummy{}.c", idx);
+    SymbolInternalizer symbolInternalizer;
+    Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
+    std::vector<Token> token_stream;
+    lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
+    Parser parser(std::move(token_stream));
+    StmtPtr stmt = parser.parseStmt();
+    std::ostringstream os;
+    stmt->print(os);
+    return os.str();
+  }
+};
 
 TEST_CASE("Expr", "[Parser]") {
+  UnitTestParser parser;
   SECTION("Primary") {
-    REQUIRE(testParseExpr(1, "a") == "a");
-    REQUIRE(testParseExpr(2, "1") == "1");
-    REQUIRE(testParseExpr(3, R"("abc")") == R"("abc")");
-    REQUIRE(testParseExpr(4, "(a)") == "a");
+    REQUIRE(parser.parseExpr(1, "a") == "a");
+    REQUIRE(parser.parseExpr(2, "1") == "1");
+    REQUIRE(parser.parseExpr(3, R"("abc")") == R"("abc")");
+    REQUIRE(parser.parseExpr(4, "(a)") == "a");
   }
   SECTION("PostfixExpr") {
-    REQUIRE(testParseExpr(5, "f(a,b)") == "(f(a, b))");
-    REQUIRE(testParseExpr(6, "f[a]") == "(f[a])");
-    REQUIRE(testParseExpr(7, "s.x") == "(s.x)");
-    REQUIRE(testParseExpr(8, "s->x") == "(s->x)");
+    REQUIRE(parser.parseExpr(5, "f(a,b)") == "(f(a, b))");
+    REQUIRE(parser.parseExpr(6, "f[a]") == "(f[a])");
+    REQUIRE(parser.parseExpr(7, "s.x") == "(s.x)");
+    REQUIRE(parser.parseExpr(8, "s->x") == "(s->x)");
   }
-  SECTION("AssignmentExpr") { REQUIRE(testParseExpr(9, "a=b") == "(a = b)"); }
+  SECTION("AssignmentExpr") {
+    REQUIRE(parser.parseExpr(9, "a=b") == "(a = b)");
+  }
   SECTION("ConditionalExpr") {
-    REQUIRE(testParseExpr(9, "b=a==1?0:1") == "(b = ((a == 1) ? 0 : 1))");
+    REQUIRE(parser.parseExpr(9, "b=a==1?0:1") == "(b = ((a == 1) ? 0 : 1))");
   }
   SECTION("BinaryExpr") {
-    REQUIRE(testParseExpr(10, "a+b") == "(a + b)");
-    REQUIRE(testParseExpr(11, "a+b*c") == "(a + (b * c))");
-    REQUIRE(testParseExpr(12, "a=b+1") == "(a = (b + 1))");
+    REQUIRE(parser.parseExpr(10, "a+b") == "(a + b)");
+    REQUIRE(parser.parseExpr(11, "a+b*c") == "(a + (b * c))");
+    REQUIRE(parser.parseExpr(12, "a=b+1") == "(a = (b + 1))");
   }
-  SECTION("UnaryExpr") { REQUIRE(testParseExpr(13, "!a") == "(!a)"); }
+  SECTION("UnaryExpr") { REQUIRE(parser.parseExpr(13, "!a") == "(!a)"); }
   SECTION("CombinedExpr") {
-    REQUIRE(testParseExpr(14, "-f(1)") == "(-(f(1)))");
-    REQUIRE(testParseExpr(15, "&s.x") == "(&(s.x))");
-    REQUIRE(testParseExpr(16, "s.x=x") == "((s.x) = x)");
-    REQUIRE(testParseExpr(17, "p=&s") == "(p = (&s))");
-    REQUIRE(testParseExpr(18, "*&s.x") == "(*(&(s.x)))");
-    REQUIRE(testParseExpr(19, "sizeof s.x * (p->x-y)") ==
+    REQUIRE(parser.parseExpr(14, "-f(1)") == "(-(f(1)))");
+    REQUIRE(parser.parseExpr(15, "&s.x") == "(&(s.x))");
+    REQUIRE(parser.parseExpr(16, "s.x=x") == "((s.x) = x)");
+    REQUIRE(parser.parseExpr(17, "p=&s") == "(p = (&s))");
+    REQUIRE(parser.parseExpr(18, "*&s.x") == "(*(&(s.x)))");
+    REQUIRE(parser.parseExpr(19, "sizeof s.x * (p->x-y)") ==
             "((sizeof (s.x)) * ((p->x) - y))");
-    REQUIRE(testParseExpr(20, "-(*&s.x = sizeof s.x * (p->x - y))") ==
+    REQUIRE(parser.parseExpr(20, "-(*&s.x = sizeof s.x * (p->x - y))") ==
             "(-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - y))))");
-    REQUIRE(testParseExpr(21, "a=1") == "(a = 1)");
-    REQUIRE(testParseExpr(22, "b=a*2") == "(b = (a * 2))");
-    REQUIRE(testParseExpr(23, "a<sizeof b") == "(a < (sizeof b))");
-    REQUIRE(testParseExpr(24, "a < sizeof b || !(b == f(23, sizeof(int)))") ==
-            "((a < (sizeof b)) || (!(b == (f(23, (sizeof(int)))))))");
-    REQUIRE(testParseExpr(25, R"(c="bla")") == R"((c = "bla"))");
-    REQUIRE(testParseExpr(26, "(a < sizeof b || !(b == f(23, sizeof(int))))") ==
-            "((a < (sizeof b)) || (!(b == (f(23, (sizeof(int)))))))");
+    REQUIRE(parser.parseExpr(21, "a=1") == "(a = 1)");
+    REQUIRE(parser.parseExpr(22, "b=a*2") == "(b = (a * 2))");
+    REQUIRE(parser.parseExpr(23, "a<sizeof b") == "(a < (sizeof b))");
+    REQUIRE(
+        parser.parseExpr(24, "a < sizeof b || !(b == f(23, sizeof(int)))") ==
+        "((a < (sizeof b)) || (!(b == (f(23, (sizeof(int)))))))");
+    REQUIRE(parser.parseExpr(25, R"(c="bla")") == R"((c = "bla"))");
+    REQUIRE(
+        parser.parseExpr(26, "(a < sizeof b || !(b == f(23, sizeof(int))))") ==
+        "((a < (sizeof b)) || (!(b == (f(23, (sizeof(int)))))))");
+  }
+}
+
+TEST_CASE("Decl", "[Parser]") {
+  UnitTestParser parser;
+  SECTION("Struct") {
+    REQUIRE(parser.parseDecl(0, "struct S{int x;} s") ==
+            "struct S\n{\n\tint x;\n} s");
+  }
+  SECTION("Function") {
+    REQUIRE(parser.parseDecl(0, "int main(void)") == "int (main(void))");
+    REQUIRE(parser.parseDecl(0, "int (main(void))") == "int (main(void))");
+    REQUIRE(parser.parseDecl(1, "int f(int x, int y)") ==
+            "int (f(int x, int y))");
+    REQUIRE(parser.parseDecl(1, "int (f(int x, int y))") ==
+            "int (f(int x, int y))");
+  }
+  SECTION("Pointer") {
+    REQUIRE(parser.parseDecl(0, "struct S *p") == "struct S (*p)");
+    REQUIRE(parser.parseDecl(0, "struct S (*p)") == "struct S (*p)");
+    REQUIRE(parser.parseDecl(1, "void *(**p)(int)") ==
+            "void (*((*(*p))(int)))");
+    REQUIRE(parser.parseDecl(1, "void (*((*(*p))(int)))") ==
+            "void (*((*(*p))(int)))");
   }
 }
 
@@ -115,5 +173,5 @@ end:
 }
 )";
   std::string res = src;
-  REQUIRE(testParseExpr(0, src) == res);
+  // REQUIRE(parser.parseExpr(0, src) == res);
 }

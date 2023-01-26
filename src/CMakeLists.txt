@@ -2,19 +2,18 @@ add_library(compiler SHARED
   Compiler.cpp
   Diagnostic.cpp
   Lexer.cpp
-  Parser.cpp
-  ParseExternalDecl.cpp
-  ParseExpr.cpp
   ParseDecl.cpp
+  ParseExpr.cpp
+  ParseExternDecl.cpp
+  Parser.cpp
   ParseStmt.cpp
-  ParserImpl.cpp
   Printer.cpp
   SymbolInternalizer.cpp
-  Syntax.cpp
-  SyntaxExternalDecl.cpp
   SyntaxDecl.cpp
   SyntaxExpr.cpp
+  SyntaxExternalDecl.cpp
   SyntaxStmt.cpp
+  TypeChecker.cpp
   Token.cpp
 )
 target_compile_features(compiler PRIVATE cxx_std_20)

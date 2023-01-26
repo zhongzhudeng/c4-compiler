@@ -3,99 +3,99 @@
 #include "Diagnostic.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
+#include "SyntaxExternalDecl.hpp"
 #include <vector>
 
-class Declaration final : public AST {
-  std::vector<DeclarationSpecifierPtr> declarationSpecifiers;
+class Decl : public ExternDecl {
+  DeclSpecPtr declSpec;
   DeclaratorPtr declarator;
 
 public:
-  Declaration(Locatable loc,
-              std::vector<DeclarationSpecifierPtr> declarationSpecifiers,
-              DeclaratorPtr declarator);
-  void accept(ASTPrinter &visitor) override;
-  const DeclaratorPtr &getDecl() const;
+  Decl(Locatable loc, DeclSpecPtr declSpec, DeclaratorPtr declarator);
+  const DeclSpec &getDeclSpec() const;
+  bool isNullDeclarator() const;
+  const Declarator &getDeclarator() const;
+  void print(std::ostream &os, unsigned indentation = 0) const;
 };
 
-class StructDeclaration final : public AST {
-  std::vector<TypeSpecifierPtr> specifierQualifierList;
-  std::vector<StructDeclaratorPtr> structDeclaratorList;
+class DeclSpec {
+public:
+  enum Kind { Void, Char, Int, Struct };
+
+private:
+  Locatable loc;
+  Kind kind;
 
 public:
-  StructDeclaration(Locatable loc,
-                    std::vector<TypeSpecifierPtr> specifierQualifierList,
-                    std::vector<StructDeclaratorPtr> structDeclaratorList);
-  void accept(ASTPrinter &visitor) override;
+  DeclSpec(Locatable loc, Kind kind);
+  virtual ~DeclSpec() {}
+  const Locatable &getLoc();
+  Kind getKind() const;
 };
 
-class ParameterDeclaration : public AST {
-  std::vector<DeclarationSpecifierPtr> declSpecifierList;
-  DeclaratorPtr decl;
-
+class VoidSpec final : public DeclSpec {
 public:
-  ParameterDeclaration(Locatable loc,
-                       std::vector<DeclarationSpecifierPtr> declSpecifierList,
-                       DeclaratorPtr decl);
-  void accept(ASTPrinter &visitor) override;
+  VoidSpec(Locatable loc);
+};
+class CharSpec final : public DeclSpec {
+public:
+  CharSpec(Locatable loc);
+};
+class IntSpec final : public DeclSpec {
+public:
+  IntSpec(Locatable loc);
 };
 
-class TypeSpecifier : public AST {
-public:
-  TypeSpecifier(Locatable loc);
-  virtual ~TypeSpecifier() = 0;
-};
-
-class VoidSpecifier final : public TypeSpecifier {
-
-public:
-  VoidSpecifier(Locatable loc);
-  void accept(ASTPrinter &visitor) override;
-};
-class CharSpecifier final : public TypeSpecifier {
-public:
-  CharSpecifier(Locatable loc);
-  void accept(ASTPrinter &visitor) override;
-};
-class IntSpecifier final : public TypeSpecifier {
-public:
-  IntSpecifier(Locatable loc);
-  void accept(ASTPrinter &visitor) override;
-};
-
-class StructSpecifier final : public TypeSpecifier {
+class StructSpec final : public DeclSpec {
   Symbol iden;
-  std::vector<StructDeclarationPtr> struct_decl_list;
+  std::vector<DeclPtr> decls;
+  bool is_bracketed;
 
 public:
-  StructSpecifier(Locatable loc, Symbol iden,
-                  std::vector<StructDeclarationPtr> struct_decl_list);
-  void accept(ASTPrinter &visitor) override;
+  StructSpec(Locatable loc, Symbol iden, bool is_bracketed,
+             std::vector<DeclPtr> decls);
+  bool isAnoymous() const;
+  Symbol getIdentifier() const;
+  bool isBracketed() const;
+  const std::vector<std::reference_wrapper<const Decl>> getDecls() const;
 };
 
-class Declarator : public AST {
+class Declarator {
 public:
-  Declarator(Locatable loc);
-  virtual ~Declarator() = 0;
+  enum Kind { Primitive, Pointer, Function };
+
+private:
+  Locatable loc;
+  Kind kind;
+
+public:
+  Declarator(Locatable loc, Kind kind);
+  virtual ~Declarator() {}
+  const Locatable &getLoc();
+  Kind getKind() const;
 };
 
 class PrimitiveDeclarator final : public Declarator {
+  Symbol iden;
+
 public:
-  PrimitiveDeclarator(Locatable loc, Symbol tag);
-  void accept(ASTPrinter &visitor) override;
+  PrimitiveDeclarator(Locatable loc, Symbol iden);
+  Symbol getIdentifier() const;
 };
 class PointerDeclarator final : public Declarator {
   DeclaratorPtr decl;
 
 public:
   PointerDeclarator(Locatable loc, DeclaratorPtr decl);
-  void accept(ASTPrinter &visitor) override;
+  const Declarator &getDeclarator() const;
 };
 class FunctionDeclarator final : public Declarator {
   DeclaratorPtr decl;
-  std::vector<ParameterDeclarationPtr> params;
+  std::vector<DeclPtr> params;
 
 public:
   FunctionDeclarator(Locatable loc, DeclaratorPtr decl,
-                     std::vector<ParameterDeclarationPtr> params);
-  void accept(ASTPrinter &visitor) override;
+                     std::vector<DeclPtr> params);
+  const Declarator &getDeclarator() const;
+  const std::vector<std::reference_wrapper<const Decl>> getParams() const;
 };
