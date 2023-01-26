@@ -6,7 +6,7 @@
 enum Type
 {
     typeUnknown,
-    typeBool,
+    typeVoid,
     typeInt,
     typeChar
 };
@@ -17,8 +17,8 @@ inline const char* ToString( Type type )
     {
         case typeUnknown:
             return "<unknown>";
-        case typeBool:
-            return "bool";
+        case typeVoid:
+            return "void";
         case typeInt:
             return "int";
         case typeChar:
