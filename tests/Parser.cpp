@@ -76,6 +76,9 @@ TEST_CASE("Expr", "[Parser]") {
     REQUIRE(parser.parse(25, R"(c="bla")") == R"((c = "bla"))");
     REQUIRE(parser.parse(26, "(a < sizeof b || !(b == f(23, sizeof(int))))") ==
             "((a < (sizeof b)) || (!(b == (f(23, (sizeof(int)))))))");
+    REQUIRE(parser.parse(
+                26, "((a < (sizeof b)) || (!(b == (f(23, (sizeof(int)))))))") ==
+            "((a < (sizeof b)) || (!(b == (f(23, (sizeof(int)))))))");
   }
 }
 
@@ -128,6 +131,14 @@ TEST_CASE("Stmt", "[Parser]") {
                             "else if (1) return 1;else return 0;") ==
             "if (1)\n\treturn (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - "
             "y))));\nelse if (1)\n\treturn 1;\nelse\n\treturn 0;");
+  }
+  SECTION("WhileStmt") {
+    REQUIRE(parser.parse(0, "if (a < b) {while (1)foo:break;}") ==
+            "if ((a < b)) {\n\twhile (1)\nfoo:\n\t\tbreak;\n}");
+    REQUIRE(parser.parse(1, "if ((a < b)) {while (((a < (sizeof b)) || (!(b == "
+                            "(f(23, (sizeof(int))))))))foo:break;}") ==
+            "if ((a < b)) {\n\twhile (((a < (sizeof b)) || (!(b == "
+            "(f(23, (sizeof(int))))))))\nfoo:\n\t\tbreak;\n}");
   }
 }
 

@@ -167,8 +167,9 @@ public:
     return os;
   }
   void VisitIdentifierStmt(const IdentifierStmt &stmt) {
-    os << stmt.getIdentifier();
-    os << " : ";
+    os << *stmt.getIdentifier();
+    os << ":\n";
+    indent();
     visit(stmt.getStmt());
   }
   void VisitCompStmt(const CompStmt &stmt) {
@@ -195,11 +196,18 @@ public:
   void VisitIfStmt(const IfStmt &stmt) {
     os << "if (";
     stmt.getCond().print(os);
-    os << ")\n";
-    indentation++;
-    indent();
-    visit(stmt.getIf());
-    indentation--;
+    os << ")";
+    const Stmt &ifStmt = stmt.getIf();
+    if (ifStmt.getKind() == Stmt::Comp) {
+      os << ' ';
+      visit(ifStmt);
+    } else {
+      os << '\n';
+      indentation++;
+      indent();
+      visit(ifStmt);
+      indentation--;
+    }
   }
   void VisitIfElseStmt(const IfElseStmt &stmt) {
     os << "if (";
@@ -228,15 +236,18 @@ public:
   void VisitWhileStmt(const WhileStmt &stmt) {
     os << "while (";
     stmt.getCond().print(os);
-    os << ") ";
+    os << ")";
     indentation++;
-    visit(stmt.getDo());
+    const Stmt &doStmt = stmt.getDo();
+    if (doStmt.getKind() != Stmt::Comp) {
+      os << '\n';
+    }
+    visit(doStmt);
     indentation--;
-    os << '\n';
   }
   void VisitGoToStmt(const GoToStmt &stmt) {
     os << "goto ";
-    os << stmt.getIdentifier();
+    os << *stmt.getIdentifier();
   }
   void VisitContinueStmt([[maybe_unused]] const ContinueStmt &stmt) {
     os << "continue;";

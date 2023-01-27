@@ -68,7 +68,7 @@ ExprPtr Parser::parsePostfixExprSuffix(ExprPtr expr) {
       /// TODO: check token kinds?
       auto arg = parseExpr();
       args.push_back(std::move(arg));
-      if (check(TK_RPAREN))
+      if (accept(TK_RPAREN))
         break;
       expect(TK_COMMA, "')' or ',' in argument list");
     }
@@ -126,6 +126,7 @@ ExprPtr Parser::parseUnaryExpr() {
     if (is_paren_type_name()) {
       Symbol type_name = (cursor + 1)->Text;
       bump(), bump();
+      expect(TK_RPAREN, "')' after type-name in sizeof (type-name)");
       return std::make_unique<SizeofTypeExpr>(loc, type_name);
     }
     return std::make_unique<SizeofExpr>(loc, parseUnaryExpr());
@@ -162,11 +163,11 @@ ExprPtr Parser::parseStringLiteralExpr() {
 }
 ExprPtr Parser::parseParenExpr() {
   Locatable loc(location());
-  bump();
+  expect(TK_LPAREN, "'('");
   auto expr = parseExpr();
-  if (!expr)
-    return nullptr;
   expect(TK_RPAREN, "')'");
+  if (expr == nullptr)
+    return expr;
   return std::make_unique<ParenExpr>(loc, std::move(expr));
 }
 

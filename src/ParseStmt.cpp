@@ -35,7 +35,7 @@ StmtPtr Parser::parseStmt() {
     case TK_COLON:
       bump(), bump();
       StmtPtr stmt = parseStmt();
-      return std::make_unique<IdentifierStmt>(loc, iden, parseStmt());
+      return std::make_unique<IdentifierStmt>(loc, iden, std::move(stmt));
     }
   }
   case TK_LBRACE: {
