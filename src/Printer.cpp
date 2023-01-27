@@ -169,14 +169,15 @@ public:
   void VisitIdentifierStmt(const IdentifierStmt &stmt) {
     os << *stmt.getIdentifier();
     os << ":\n";
-    indent();
     visit(stmt.getStmt());
   }
   void VisitCompStmt(const CompStmt &stmt) {
     os << "{\n";
     indentation++;
-    for (auto item : stmt.getBlockItemList()) {
-      indent();
+    for (const Stmt &item : stmt.getBlockItemList()) {
+      if (item.getKind() == Stmt::If || item.getKind() == Stmt::IfElse ||
+          item.getKind() == Stmt::Comp)
+        indent();
       visit(item);
       os << '\n';
     }
@@ -185,10 +186,12 @@ public:
     os << "}";
   }
   void VisitDeclStmt(const DeclStmt &stmt) {
+    indent();
     stmt.getDeclaration().print(os, indentation);
     os << ";";
   }
   void VisitExprStmt(const ExprStmt &stmt) {
+    indent();
     if (!stmt.isEmpty())
       stmt.getExpr().print(os);
     os << ";";
@@ -212,14 +215,21 @@ public:
   void VisitIfElseStmt(const IfElseStmt &stmt) {
     os << "if (";
     stmt.getCond().print(os);
-    os << ")\n";
-    indentation++;
-    indent();
-    visit(stmt.getIf());
-    indentation--;
-    os << '\n';
-    indent();
-    os << "else";
+    os << ")";
+    const Stmt &ifStmt = stmt.getIf();
+    if (ifStmt.getKind() == Stmt::Comp) {
+      os << ' ';
+      visit(ifStmt);
+      os << " else";
+    } else {
+      os << '\n';
+      indentation++;
+      visit(ifStmt);
+      indentation--;
+      os << '\n';
+      indent();
+      os << "else";
+    }
     const Stmt &elseStmt = stmt.getElse();
     if (elseStmt.getKind() == Stmt::If || elseStmt.getKind() == Stmt::IfElse ||
         elseStmt.getKind() == Stmt::Comp) {
@@ -228,34 +238,42 @@ public:
     } else {
       os << '\n';
       indentation++;
-      indent();
       visit(elseStmt);
       indentation--;
     }
   }
   void VisitWhileStmt(const WhileStmt &stmt) {
+    indent();
     os << "while (";
     stmt.getCond().print(os);
     os << ")";
-    indentation++;
     const Stmt &doStmt = stmt.getDo();
-    if (doStmt.getKind() != Stmt::Comp) {
+    if (doStmt.getKind() == Stmt::Comp) {
+      os << ' ';
+      visit(doStmt);
+    } else {
       os << '\n';
+      indentation++;
+      visit(doStmt);
+      indentation--;
     }
-    visit(doStmt);
-    indentation--;
   }
   void VisitGoToStmt(const GoToStmt &stmt) {
+    indent();
     os << "goto ";
     os << *stmt.getIdentifier();
+    os << ";";
   }
   void VisitContinueStmt([[maybe_unused]] const ContinueStmt &stmt) {
+    indent();
     os << "continue;";
   }
   void VisitBreakStmt([[maybe_unused]] const BreakStmt &stmt) {
+    indent();
     os << "break;";
   }
   void VisitReturnStmt(const ReturnStmt &stmt) {
+    indent();
     os << "return";
     if (!stmt.isEmpty()) {
       os << ' ';

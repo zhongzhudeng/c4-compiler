@@ -13,10 +13,11 @@ DeclPtr Parser::parseDecl(DeclKind dKind) {
   DeclSpecPtr spec = nullptr;
   Locatable loc(location());
   TokenKind tk = kind();
+  Symbol savedText = cursor->Text;
   bump();
   switch (tk) {
   default:
-    errorloc(loc, "Expected type specifier but got `", *cursor->Text, "'");
+    errorloc(loc, "Expected type specifier but got `", *savedText, "'");
   case TK_VOID:
     spec = std::make_unique<VoidSpec>(loc);
     break;
