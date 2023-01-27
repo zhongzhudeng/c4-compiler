@@ -14,11 +14,15 @@ void Compiler::tokenize() {
 void Compiler::parse() {
   Lexer lexer(filename, symbolInternalizer);
   Parser parser(lexer.tokenize());
-  parser.parse([](ExternDeclPtr) {});
+  parser.parse([](ExternDeclPtr, bool) {});
 }
 
 void Compiler::print_ast() {
   Lexer lexer(filename, symbolInternalizer);
   Parser parser(lexer.tokenize());
-  parser.parse([](ExternDeclPtr ast) { ast->print(std::cout); });
+  parser.parse([](ExternDeclPtr ast, bool is_end) {
+    ast->print(std::cout);
+    if (!is_end)
+      std::cout << '\n';
+  });
 }

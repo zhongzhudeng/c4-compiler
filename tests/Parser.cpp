@@ -146,9 +146,9 @@ TEST_CASE("ExternDecl", "[Parser]") {
   UnitTestParser<ExternDecl> parser;
   SECTION("FuncDef") {
     REQUIRE(parser.parse(0, "int main(void){return 0;}") ==
-            "int (main(void))\n{\n\treturn 0;\n}\n\n");
+            "int (main(void))\n{\n\treturn 0;\n}\n");
     REQUIRE(parser.parse(1, "int main(void){int a;int b;}") ==
-            "int (main(void))\n{\n\tint a;\n\tint b;\n}\n\n");
+            "int (main(void))\n{\n\tint a;\n\tint b;\n}\n");
     REQUIRE(parser.parse(2, R"(int (f(int x, int y))
 {
 	{
@@ -186,7 +186,6 @@ TEST_CASE("ExternDecl", "[Parser]") {
 		}
 	}
 }
-
 )");
     REQUIRE(parser.parse(3, R"(int (main(void))
 {
@@ -212,7 +211,6 @@ bar:
 end:
 	return 0;
 }
-
 )") == R"(int (main(void))
 {
 	int a;
@@ -237,7 +235,6 @@ bar:
 end:
 	return 0;
 }
-
 )");
   }
 }
@@ -300,6 +297,10 @@ end:
   lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
   Parser parser(std::move(token_stream));
   std::ostringstream os;
-  parser.parse([&](ExternDeclPtr ast) { ast->print(os); });
+  parser.parse([&](ExternDeclPtr ast, bool is_end) {
+    ast->print(os);
+    if (!is_end)
+      os << '\n';
+  });
   REQUIRE(os.str() == ans);
 }

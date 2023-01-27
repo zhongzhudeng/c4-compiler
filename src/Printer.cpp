@@ -207,7 +207,6 @@ public:
     } else {
       os << '\n';
       indentation++;
-      indent();
       visit(ifStmt);
       indentation--;
     }
@@ -292,9 +291,12 @@ public:
     externDecl.getDecl().print(os);
     os << "\n";
     externDecl.getCompStmt().print(os);
-    os << "\n\n";
+    os << "\n";
   }
-  void VisitDecl(const Decl &externDecl) { externDecl.print(os); }
+  void VisitDecl(const Decl &externDecl) {
+    externDecl.print(os);
+    os << ";\n";
+  }
 };
 
 void Expr::print(std::ostream &os) const {

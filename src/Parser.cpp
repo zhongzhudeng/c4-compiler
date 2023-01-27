@@ -7,11 +7,11 @@
 
 #include "Token.hpp"
 
-void Parser::parse(std::function<void(ExternDeclPtr)> f) {
+void Parser::parse(std::function<void(ExternDeclPtr, bool)> f) {
   ExternDeclPtr ast = nullptr;
   do {
     ast = parseExternDecl();
-    f(std::move(ast));
+    f(std::move(ast), is_end());
   } while (!is_end());
 }
 
