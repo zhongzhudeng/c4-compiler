@@ -8,8 +8,11 @@
 #include "Token.hpp"
 
 void Parser::parse(std::function<void(ExternDeclPtr)> f) {
-  for (auto ast = parseExternDecl(); !is_end(); ast = parseExternDecl())
+  ExternDeclPtr ast = nullptr;
+  do {
+    ast = parseExternDecl();
     f(std::move(ast));
+  } while (!is_end());
 }
 
 Parser::Parser(std::vector<Token> token_stream)

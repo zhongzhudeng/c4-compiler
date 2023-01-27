@@ -105,7 +105,7 @@ TEST_CASE("Stmt", "[Parser]") {
   UnitTestParser<Stmt> parser;
   SECTION("ExprStmt") { REQUIRE(parser.parse(0, "a = 1;") == "(a = 1);"); }
   SECTION("CompStmt") {
-    REQUIRE(parser.parse(0, "{a=1;b=1;}") == "{\n\t(a = 1);\n\t(b = 1);\n}\n");
+    REQUIRE(parser.parse(0, "{a=1;b=1;}") == "{\n\t(a = 1);\n\t(b = 1);\n}");
   }
   SECTION("ReturnStmt") {
     REQUIRE(parser.parse(0, "return 0;") == "return 0;");
@@ -133,11 +133,101 @@ TEST_CASE("Stmt", "[Parser]") {
 
 TEST_CASE("ExternDecl", "[Parser]") {
   UnitTestParser<ExternDecl> parser;
-  SECTION("FuncDecl") {
+  SECTION("FuncDef") {
     REQUIRE(parser.parse(0, "int main(void){return 0;}") ==
             "int (main(void))\n{\n\treturn 0;\n}\n\n");
     REQUIRE(parser.parse(1, "int main(void){int a;int b;}") ==
             "int (main(void))\n{\n\tint a;\n\tint b;\n}\n\n");
+    REQUIRE(parser.parse(2, R"(int (f(int x, int y))
+{
+	{
+		struct S
+		{
+			int x;
+		} s;
+		((s.x) = x);
+		struct S (*p);
+		(p = (&s));
+		if (1)
+			return (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - y))));
+		else if (1)
+			return 1;
+		else {
+			return 0;
+		}
+	}
+})") == R"(int (f(int x, int y))
+{
+	{
+		struct S
+		{
+			int x;
+		} s;
+		((s.x) = x);
+		struct S (*p);
+		(p = (&s));
+		if (1)
+			return (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - y))));
+		else if (1)
+			return 1;
+		else {
+			return 0;
+		}
+	}
+}
+
+)");
+    REQUIRE(parser.parse(3, R"(int (main(void))
+{
+	int a;
+	int b;
+	{
+		(a = 1);
+	}
+	(b = (a * 2));
+	if ((a < b)) {
+		while (((a < (sizeof b)) || (!(b == (f(23, (sizeof(int))))))))
+foo:
+			break;
+	} else if (0) {
+		char (*c);
+		while (1) {
+			(c = "bla");
+			continue;
+		}
+	} else
+		goto end;
+bar:
+end:
+	return 0;
+}
+
+)") == R"(int (main(void))
+{
+	int a;
+	int b;
+	{
+		(a = 1);
+	}
+	(b = (a * 2));
+	if ((a < b)) {
+		while (((a < (sizeof b)) || (!(b == (f(23, (sizeof(int))))))))
+foo:
+			break;
+	} else if (0) {
+		char (*c);
+		while (1) {
+			(c = "bla");
+			continue;
+		}
+	} else
+		goto end;
+bar:
+end:
+	return 0;
+}
+
+)");
   }
 }
 

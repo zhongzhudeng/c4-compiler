@@ -17,8 +17,12 @@ StmtPtr Parser::parseStmt() {
   default:
     errorloc(loc, "Unexpected Token '", *cursor->Text,
              "' when expecting statement");
-  case TK_LPAREN:
-    return std::make_unique<ExprStmt>(loc, parseExpr());
+  case TK_LPAREN: {
+    auto expr = parseExpr();
+    expect(TK_SEMICOLON, "';' after expression in statement");
+    return std::make_unique<ExprStmt>(loc, std::move(expr));
+  }
+
   case TK_IDENTIFIER: {
 
     Symbol iden = cursor->Text;

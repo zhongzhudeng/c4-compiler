@@ -97,7 +97,6 @@ public:
     return os;
   }
   void visit(const Decl &decl) {
-    this->indent();
     VisitDeclSpec(decl.getDeclSpec());
     if (!decl.isNullDeclarator()) {
       os << " ";
@@ -118,16 +117,17 @@ public:
     }
     if (declSpec.isBracketed()) {
       os << "\n";
-      this->indent();
+      indent();
       os << "{\n";
       indentation++;
       for (auto decl : declSpec.getDecls()) {
+        indent();
         visit(decl);
         os << ";";
       }
       os << '\n';
       indentation--;
-      this->indent();
+      indent();
       os << "}";
     }
   }
@@ -167,40 +167,37 @@ public:
     return os;
   }
   void VisitIdentifierStmt(const IdentifierStmt &stmt) {
-    indent();
     os << stmt.getIdentifier();
     os << " : ";
     visit(stmt.getStmt());
   }
   void VisitCompStmt(const CompStmt &stmt) {
-    indent();
     os << "{\n";
     indentation++;
     for (auto item : stmt.getBlockItemList()) {
+      indent();
       visit(item);
       os << '\n';
     }
     indentation--;
     indent();
-    os << "}\n";
+    os << "}";
   }
   void VisitDeclStmt(const DeclStmt &stmt) {
-    indent();
-    stmt.getDeclaration().print(os);
+    stmt.getDeclaration().print(os, indentation);
     os << ";";
   }
   void VisitExprStmt(const ExprStmt &stmt) {
-    indent();
     if (!stmt.isEmpty())
       stmt.getExpr().print(os);
     os << ";";
   }
   void VisitIfStmt(const IfStmt &stmt) {
-    indent();
     os << "if (";
     stmt.getCond().print(os);
     os << ")\n";
     indentation++;
+    indent();
     visit(stmt.getIf());
     indentation--;
   }
@@ -209,17 +206,21 @@ public:
     stmt.getCond().print(os);
     os << ")\n";
     indentation++;
+    indent();
     visit(stmt.getIf());
     indentation--;
     os << '\n';
+    indent();
     os << "else";
     const Stmt &elseStmt = stmt.getElse();
-    if (elseStmt.getKind() == Stmt::If || elseStmt.getKind() == Stmt::IfElse) {
+    if (elseStmt.getKind() == Stmt::If || elseStmt.getKind() == Stmt::IfElse ||
+        elseStmt.getKind() == Stmt::Comp) {
       os << ' ';
       visit(elseStmt);
     } else {
       os << '\n';
       indentation++;
+      indent();
       visit(elseStmt);
       indentation--;
     }
@@ -244,7 +245,6 @@ public:
     os << "break;";
   }
   void VisitReturnStmt(const ReturnStmt &stmt) {
-    indent();
     os << "return";
     if (!stmt.isEmpty()) {
       os << ' ';
@@ -263,7 +263,7 @@ public:
     externDecl.getDecl().print(os);
     os << "\n";
     externDecl.getCompStmt().print(os);
-    os << "\n";
+    os << "\n\n";
   }
   void VisitDecl(const Decl &externDecl) { externDecl.print(os); }
 };
