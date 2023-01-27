@@ -199,25 +199,30 @@ public:
     indent();
     os << "if (";
     stmt.getCond().print(os);
-    os << ") ";
+    os << ")\n";
     indentation++;
     visit(stmt.getIf());
     indentation--;
-    os << '\n';
   }
   void VisitIfElseStmt(const IfElseStmt &stmt) {
     os << "if (";
     stmt.getCond().print(os);
-    os << ") ";
+    os << ")\n";
     indentation++;
     visit(stmt.getIf());
     indentation--;
     os << '\n';
-    os << "else ";
-    indentation++;
-    visit(stmt.getElse());
-    indentation--;
-    os << '\n';
+    os << "else";
+    const Stmt &elseStmt = stmt.getElse();
+    if (elseStmt.getKind() == Stmt::If || elseStmt.getKind() == Stmt::IfElse) {
+      os << ' ';
+      visit(elseStmt);
+    } else {
+      os << '\n';
+      indentation++;
+      visit(elseStmt);
+      indentation--;
+    }
   }
   void VisitWhileStmt(const WhileStmt &stmt) {
     os << "while (";
@@ -240,9 +245,11 @@ public:
   }
   void VisitReturnStmt(const ReturnStmt &stmt) {
     indent();
-    os << "return ";
-    if (!stmt.isEmpty())
+    os << "return";
+    if (!stmt.isEmpty()) {
+      os << ' ';
       stmt.getExpr().print(os);
+    }
     os << ";";
   }
 };

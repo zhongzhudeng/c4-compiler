@@ -107,6 +107,28 @@ TEST_CASE("Stmt", "[Parser]") {
   SECTION("CompStmt") {
     REQUIRE(parser.parse(0, "{a=1;b=1;}") == "{\n\t(a = 1);\n\t(b = 1);\n}\n");
   }
+  SECTION("ReturnStmt") {
+    REQUIRE(parser.parse(0, "return 0;") == "return 0;");
+    REQUIRE(parser.parse(1, "return -(*&s.x = sizeof s.x * (p->x - y));") ==
+            "return (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - y))));");
+  }
+  SECTION("IfStmt") {
+    REQUIRE(
+        parser.parse(0, "if (1) return -(*&s.x = sizeof s.x * (p->x - y));") ==
+        "if (1)\n\treturn (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - y))));");
+  }
+  SECTION("IfElseStmt") {
+    REQUIRE(parser.parse(0, "if (1) return -(*&s.x = sizeof s.x * (p->x - y)); "
+                            "else return 0;") ==
+            "if (1)\n\treturn (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - "
+            "y))));\nelse\n\treturn 0;");
+  }
+  SECTION("IfElseIf") {
+    REQUIRE(parser.parse(0, "if (1) return -(*&s.x = sizeof s.x * (p->x - y)); "
+                            "else if (1) return 1;else return 0;") ==
+            "if (1)\n\treturn (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - "
+            "y))));\nelse if (1)\n\treturn 1;\nelse\n\treturn 0;");
+  }
 }
 
 TEST_CASE("ExternDecl", "[Parser]") {
