@@ -20,6 +20,7 @@ Parser::Parser(std::vector<Token> token_stream)
   cursor = this->token_stream.begin();
   end = this->token_stream.cend();
 }
+Parser::~Parser() {}
 
 const Locatable &Parser::location(void) { return *cursor; }
 void Parser::bump(void) { cursor++; }

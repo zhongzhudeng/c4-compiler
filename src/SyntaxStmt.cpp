@@ -1,11 +1,10 @@
 #include "SyntaxStmt.hpp"
 #include "SymbolInternalizer.hpp"
 #include "SyntaxExpr.hpp"
-#include <ostream>
-#include <sstream>
-#include <utility>
+#include "SyntaxExternDecl.hpp"
 
 Stmt::Stmt(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
+Stmt::~Stmt() {}
 const Locatable &Stmt::getLoc() { return loc; }
 Stmt::Kind Stmt::getKind() const { return kind; }
 

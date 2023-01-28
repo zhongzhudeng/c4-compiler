@@ -7,8 +7,6 @@
 #include <memory>
 #include <vector>
 
-#include "FirstFollow.def"
-
 DeclPtr Parser::parseDecl(DeclKind dKind) {
   DeclSpecPtr spec = nullptr;
   Locatable loc(location());

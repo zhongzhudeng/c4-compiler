@@ -2,7 +2,6 @@
 #include "Diagnostic.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
-#include "SyntaxDecl.hpp"
 #include <vector>
 
 class Stmt {
@@ -20,7 +19,7 @@ private:
 
 public:
   Stmt(Locatable loc, Kind kind);
-  virtual ~Stmt(){};
+  virtual ~Stmt();
   const Locatable &getLoc();
   Kind getKind() const;
   void print(std::ostream &os, unsigned identation = 0) const;

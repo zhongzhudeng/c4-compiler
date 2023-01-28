@@ -1,5 +1,4 @@
 #pragma once
-#include "Diagnostic.hpp"
 #include <memory>
 
 class Expr;

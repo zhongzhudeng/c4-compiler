@@ -16,7 +16,7 @@ private:
 
 public:
   DeclSpec(Locatable loc, Kind kind);
-  virtual ~DeclSpec() {}
+  virtual ~DeclSpec();
   const Locatable &getLoc();
   Kind getKind() const;
 };
@@ -58,7 +58,7 @@ private:
 
 public:
   Declarator(Locatable loc, Kind kind);
-  virtual ~Declarator() {}
+  virtual ~Declarator();
   const Locatable &getLoc();
   Kind getKind() const;
 };

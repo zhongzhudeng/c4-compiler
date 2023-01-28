@@ -1,13 +1,11 @@
 #include "SyntaxDecl.hpp"
 #include "Diagnostic.hpp"
-#include "Syntax.hpp"
-#include <algorithm>
-#include <iterator>
-#include <utility>
 #include <vector>
 
 DeclSpec::DeclSpec(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
+DeclSpec::~DeclSpec() {}
 Declarator::Declarator(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
+Declarator::~Declarator() {}
 
 const Locatable &DeclSpec::getLoc() { return loc; }
 const Locatable &Declarator::getLoc() { return loc; }

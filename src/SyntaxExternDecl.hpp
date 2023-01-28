@@ -1,7 +1,6 @@
 #pragma once
+#include "Diagnostic.hpp"
 #include "Syntax.hpp"
-#include "SyntaxStmt.hpp"
-#include <vector>
 
 class ExternDecl {
 public:
@@ -13,13 +12,13 @@ private:
 
 public:
   ExternDecl(Locatable loc, Kind kind);
-  virtual ~ExternDecl() {}
+  virtual ~ExternDecl();
   const Locatable &getLoc();
   Kind getKind() const;
   void print(std::ostream &os) const;
 };
 
-class FuncDef : public ExternDecl {
+class FuncDef final : public ExternDecl {
   DeclPtr decl;
   CompStmtPtr compoundStmt;
 
@@ -35,6 +34,7 @@ class Decl : public ExternDecl {
 
 public:
   Decl(Locatable loc, DeclSpecPtr declSpec, DeclaratorPtr declarator);
+  virtual ~Decl();
   const DeclSpec &getDeclSpec() const;
   bool isNullDeclarator() const;
   const Declarator &getDeclarator() const;

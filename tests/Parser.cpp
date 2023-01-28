@@ -1,7 +1,6 @@
 #include "Parser.hpp"
 #include "Lexer.hpp"
 #include "Syntax.hpp"
-#include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
 #include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"

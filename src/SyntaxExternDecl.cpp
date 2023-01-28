@@ -1,8 +1,11 @@
 #include "SyntaxExternDecl.hpp"
 #include "Diagnostic.hpp"
+#include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
 #include "SyntaxStmt.hpp"
 
 ExternDecl::ExternDecl(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
+ExternDecl::~ExternDecl() {}
 const Locatable &ExternDecl::getLoc() { return loc; }
 ExternDecl::Kind ExternDecl::getKind() const { return kind; }
 
@@ -20,6 +23,7 @@ const CompStmt &FuncDef::getCompStmt() const {
 Decl::Decl(Locatable loc, DeclSpecPtr declSpec, DeclaratorPtr declarator)
     : ExternDecl(loc, Kind::Decl), declSpec(std::move(declSpec)),
       declarator(std::move(declarator)) {}
+Decl::~Decl() {}
 
 const DeclSpec &Decl::getDeclSpec() const {
   return const_cast<DeclSpec &>(*declSpec);

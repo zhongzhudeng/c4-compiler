@@ -20,7 +20,7 @@ private:
 
 public:
   Expr(Locatable loc, Kind kind);
-  virtual ~Expr(){}
+  virtual ~Expr();
   const Locatable &getLoc();
   Kind getKind() const;
   void print(std::ostream &os) const;

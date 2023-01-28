@@ -3,6 +3,7 @@
 #include "Syntax.hpp"
 
 Expr::Expr(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
+Expr::~Expr() {}
 const Locatable &Expr::getLoc() { return loc; }
 Expr::Kind Expr::getKind() const { return kind; }
 

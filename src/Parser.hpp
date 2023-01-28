@@ -11,6 +11,7 @@ template <typename AST> class UnitTestParser;
 class Parser {
 public:
   Parser(std::vector<Token> token_stream);
+  ~Parser();
   void parse(std::function<void(ExternDeclPtr, bool)> f);
 
 private:

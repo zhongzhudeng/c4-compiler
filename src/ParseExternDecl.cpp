@@ -1,5 +1,6 @@
 #include "Diagnostic.hpp"
 #include "Parser.hpp"
+#include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
@@ -8,10 +9,10 @@
 
 ExternDeclPtr Parser::parseExternDecl() {
   Locatable loc(location());
-  auto decl = parseDecl();
-  auto declarator = decl->getDeclarator();
+  DeclPtr decl = parseDecl();
+  const Declarator &declarator = decl->getDeclarator();
   if (declarator.getKind() == Declarator::Function) {
-    auto compStmt = parseCompoundStmt();
+    CompStmtPtr compStmt = parseCompoundStmt();
     return std::make_unique<FuncDef>(loc, std::move(decl), std::move(compStmt));
   }
   expect(TK_SEMICOLON, "';' after declaration");

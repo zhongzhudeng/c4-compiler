@@ -2,8 +2,8 @@
 #include "Parser.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
-#include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
+#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
 #include "Token.hpp"
 #include <memory>
@@ -18,7 +18,7 @@ StmtPtr Parser::parseStmt() {
     errorloc(loc, "Unexpected Token '", *cursor->Text,
              "' when expecting statement");
   case TK_LPAREN: {
-    auto expr = parseExpr();
+    ExprPtr expr = parseExpr();
     expect(TK_SEMICOLON, "';' after expression in statement");
     return std::make_unique<ExprStmt>(loc, std::move(expr));
   }
@@ -28,7 +28,7 @@ StmtPtr Parser::parseStmt() {
     Symbol iden = cursor->Text;
     switch (kind_first()) {
     default: {
-      auto expr = parseExpr();
+      ExprPtr expr = parseExpr();
       expect(TK_SEMICOLON, "';' after expression in statement");
       return std::make_unique<ExprStmt>(loc, std::move(expr));
     }
@@ -44,11 +44,11 @@ StmtPtr Parser::parseStmt() {
   case TK_IF: {
     bump();
     expect(TK_LPAREN, "'('");
-    auto expr = parseExpr();
+    ExprPtr expr = parseExpr();
     expect(TK_RPAREN, "')'");
-    auto stmt = parseStmt();
+    StmtPtr stmt = parseStmt();
     if (accept(TK_ELSE)) {
-      auto elseStmt = parseStmt();
+      StmtPtr elseStmt = parseStmt();
       return std::make_unique<IfElseStmt>(loc, std::move(expr), std::move(stmt),
                                           std::move(elseStmt));
     } else
