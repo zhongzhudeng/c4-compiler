@@ -175,8 +175,7 @@ public:
     os << "{\n";
     indentation++;
     for (const Stmt &item : stmt.getBlockItemList()) {
-      if (item.getKind() == Stmt::If || item.getKind() == Stmt::IfElse ||
-          item.getKind() == Stmt::Comp)
+      if (item.getKind() == Stmt::IfElse || item.getKind() == Stmt::Comp)
         indent();
       visit(item);
       os << '\n';
@@ -196,48 +195,37 @@ public:
       stmt.getExpr().print(os);
     os << ";";
   }
-  void VisitIfStmt(const IfStmt &stmt) {
-    os << "if (";
-    stmt.getCond().print(os);
-    os << ")";
-    const Stmt &ifStmt = stmt.getIf();
-    if (ifStmt.getKind() == Stmt::Comp) {
-      os << ' ';
-      visit(ifStmt);
-    } else {
-      os << '\n';
-      indentation++;
-      visit(ifStmt);
-      indentation--;
-    }
-  }
   void VisitIfElseStmt(const IfElseStmt &stmt) {
     os << "if (";
     stmt.getCond().print(os);
     os << ")";
-    const Stmt &ifStmt = stmt.getIf();
-    if (ifStmt.getKind() == Stmt::Comp) {
+    const Stmt &then = stmt.getThen();
+    if (then.getKind() == Stmt::Comp) {
       os << ' ';
-      visit(ifStmt);
+      visit(then);
+      if (stmt.isElseEmpty())
+        return;
       os << " else";
     } else {
       os << '\n';
       indentation++;
-      visit(ifStmt);
+      visit(then);
       indentation--;
+      if (stmt.isElseEmpty())
+        return;
       os << '\n';
       indent();
       os << "else";
     }
-    const Stmt &elseStmt = stmt.getElse();
-    if (elseStmt.getKind() == Stmt::If || elseStmt.getKind() == Stmt::IfElse ||
-        elseStmt.getKind() == Stmt::Comp) {
+
+    const Stmt &Else = stmt.getElse();
+    if (Else.getKind() == Stmt::IfElse || Else.getKind() == Stmt::Comp) {
       os << ' ';
-      visit(elseStmt);
+      visit(Else);
     } else {
       os << '\n';
       indentation++;
-      visit(elseStmt);
+      visit(Else);
       indentation--;
     }
   }

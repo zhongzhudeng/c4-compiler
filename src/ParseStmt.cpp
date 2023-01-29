@@ -44,15 +44,14 @@ StmtPtr Parser::parseStmt() {
   case TK_IF: {
     bump();
     expect(TK_LPAREN, "'('");
-    ExprPtr expr = parseExpr();
+    ExprPtr cond = parseExpr();
     expect(TK_RPAREN, "')'");
-    StmtPtr stmt = parseStmt();
-    if (accept(TK_ELSE)) {
-      StmtPtr elseStmt = parseStmt();
-      return std::make_unique<IfElseStmt>(loc, std::move(expr), std::move(stmt),
-                                          std::move(elseStmt));
-    } else
-      return std::make_unique<IfStmt>(loc, std::move(expr), std::move(stmt));
+    StmtPtr then = parseStmt();
+    StmtPtr Else = nullptr;
+    if (accept(TK_ELSE))
+      Else = parseStmt();
+    return std::make_unique<IfElseStmt>(loc, std::move(cond), std::move(then),
+                                        std::move(Else));
   }
   case TK_WHILE: {
     bump();

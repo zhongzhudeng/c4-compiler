@@ -34,7 +34,6 @@ class Stmt;
 class IdentifierStmt;
 class CompStmt;
 class ExprStmt;
-class IfStmt;
 class IfElseStmt;
 class WhileStmt;
 class GoToStmt;

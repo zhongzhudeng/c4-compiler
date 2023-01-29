@@ -62,25 +62,17 @@ public:
   const class Expr &getExpr() const;
   bool isEmpty() const;
 };
-class IfStmt final : public Stmt {
-  ExprPtr cond;
-  StmtPtr ifSt;
-
-public:
-  IfStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt);
-  const class Expr &getCond() const;
-  const Stmt &getIf() const;
-};
 class IfElseStmt final : public Stmt {
   ExprPtr cond;
-  StmtPtr ifSt;
-  StmtPtr elseSt;
+  StmtPtr then;
+  StmtPtr Else;
 
 public:
-  IfElseStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt, StmtPtr elseSt);
+  IfElseStmt(Locatable loc, ExprPtr cond, StmtPtr then, StmtPtr Else);
   const class Expr &getCond() const;
-  const Stmt &getIf() const;
+  const Stmt &getThen() const;
   const Stmt &getElse() const;
+  bool isElseEmpty() const;
 };
 class WhileStmt final : public Stmt {
   ExprPtr cond;

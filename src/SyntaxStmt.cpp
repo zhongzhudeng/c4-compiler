@@ -17,12 +17,9 @@ DeclStmt::DeclStmt(Locatable loc, DeclPtr decl)
     : Stmt(loc, Kind::Decl), decl(std::move(decl)) {}
 ExprStmt::ExprStmt(Locatable loc, ExprPtr expr)
     : Stmt(loc, Kind::Expr), expr(std::move(expr)){};
-IfStmt::IfStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt)
-    : Stmt(loc, Kind::If), cond(std::move(cond)), ifSt(std::move(ifSt)){};
-IfElseStmt::IfElseStmt(Locatable loc, ExprPtr cond, StmtPtr ifSt,
-                       StmtPtr elseSt)
-    : Stmt(loc, Kind::IfElse), cond(std::move(cond)), ifSt(std::move(ifSt)),
-      elseSt(std::move(elseSt)){};
+IfElseStmt::IfElseStmt(Locatable loc, ExprPtr cond, StmtPtr then, StmtPtr Else)
+    : Stmt(loc, Kind::IfElse), cond(std::move(cond)), then(std::move(then)),
+      Else(std::move(Else)){};
 WhileStmt::WhileStmt(Locatable loc, ExprPtr cond, StmtPtr doSt)
     : Stmt(loc, Kind::While), cond(std::move(cond)), doSt(std::move(doSt)){};
 GoToStmt::GoToStmt(Locatable loc, Symbol identifier)
@@ -50,13 +47,12 @@ const Expr &ExprStmt::getExpr() const {
   return const_cast<class Expr &>(*expr);
 };
 bool ExprStmt::isEmpty() const { return expr == nullptr; }
-const Expr &IfStmt::getCond() const { return const_cast<class Expr &>(*cond); };
-const Stmt &IfStmt::getIf() const { return const_cast<Stmt &>(*ifSt); };
 const Expr &IfElseStmt::getCond() const {
   return const_cast<class Expr &>(*cond);
 };
-const Stmt &IfElseStmt::getIf() const { return const_cast<Stmt &>(*ifSt); };
-const Stmt &IfElseStmt::getElse() const { return const_cast<Stmt &>(*elseSt); };
+const Stmt &IfElseStmt::getThen() const { return const_cast<Stmt &>(*then); };
+const Stmt &IfElseStmt::getElse() const { return const_cast<Stmt &>(*Else); };
+bool IfElseStmt::isElseEmpty() const { return Else == nullptr; }
 const Expr &WhileStmt::getCond() const {
   return const_cast<class Expr &>(*cond);
 };

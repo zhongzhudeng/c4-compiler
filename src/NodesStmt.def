@@ -34,12 +34,6 @@ DECL(Decl, Stmt)
 EXPR(Expr, Stmt)
 #undef EXPR
 
-#ifndef IF
-#define IF(Type, Base) STMT(Type, Base)
-#endif
-IF(If, Stmt)
-#undef IF
-
 #ifndef IFELSE
 #define IFELSE(Type, Base) STMT(Type, Base)
 #endif
