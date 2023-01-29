@@ -34,7 +34,7 @@ private:
   bool is_end();
 
   ExprPtr parseExpr();
-  DeclPtr parseDecl(DeclKind dKind = ANY);
+  DeclPtr parseDecl(DeclKind dKind);
   StmtPtr parseStmt();
 
   ExprPtr parseUnaryExpr();

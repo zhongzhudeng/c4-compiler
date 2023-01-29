@@ -9,7 +9,7 @@
 
 ExternDeclPtr Parser::parseExternDecl() {
   Locatable loc(location());
-  DeclPtr decl = parseDecl();
+  DeclPtr decl = parseDecl(DeclKind::ANY);
   const Declarator &declarator = decl->getDeclarator();
   if (declarator.getKind() == Declarator::Function) {
     CompStmtPtr compStmt = parseCompoundStmt();

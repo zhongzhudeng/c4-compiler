@@ -49,10 +49,12 @@ DeclPtr Parser::parseDecl(DeclKind dKind) {
   }
   }
   auto decl = parseDeclarator();
-  if (decl == nullptr) {
-    // TODO check if decl is a valid declarator or abstract declarator
+  if ((decl == nullptr && dKind == DeclKind::ABSTRACT) ||
+      (decl != nullptr && dKind == DeclKind::CONCRETE) ||
+      (dKind == DeclKind::ANY)) {
+    return std::make_unique<Decl>(loc, std::move(spec), std::move(decl));
   }
-  return std::make_unique<Decl>(loc, std::move(spec), std::move(decl));
+  errorloc(location(), "Unexpected Declaration type");
 }
 
 DeclaratorPtr Parser::parseNonFunDeclarator() {

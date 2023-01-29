@@ -21,7 +21,7 @@ public:
     if constexpr (std::is_same_v<AST, Expr>) {
       ptr = parser.parseExpr();
     } else if constexpr (std::is_same_v<AST, Decl>) {
-      ptr = parser.parseDecl();
+      ptr = parser.parseDecl(DeclKind::ANY);
     } else if constexpr (std::is_same_v<AST, Stmt>) {
       ptr = parser.parseStmt();
     } else if constexpr (std::is_same_v<AST, ExternDecl>) {
