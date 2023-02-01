@@ -94,7 +94,7 @@ ExprPtr Parser::parseUnaryExpr() {
 
   switch (kind()) {
   default:
-    errorloc(location(), "Unknown token ", cursor->Text,
+    errorloc(location(), "Unknown token ", *cursor->Text,
              " when expecting unary expression");
   case TK_LPAREN:
     expr = parseParenExpr();

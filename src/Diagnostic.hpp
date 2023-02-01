@@ -24,7 +24,7 @@ public:
 /// Base case of variadic template function for noting errors.
 template <typename T> [[noreturn]] void errorf_impl(const T msg) {
   std::cerr << msg << std::endl;
-  exit(EXIT_FAILURE);
+  throw "EXIT_FAILURE";
 }
 
 /// not for external use

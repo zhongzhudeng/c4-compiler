@@ -3,7 +3,7 @@ enable_testing()
 
 find_package(Catch2 3 REQUIRED)
 find_package(fmt REQUIRED)
-add_executable(tests Lexer.cpp Parser.cpp)
+add_executable(tests Lexer.cpp Parser.cpp Sema.cpp)
 target_compile_features(tests PRIVATE cxx_std_20)
 target_include_directories(tests PRIVATE ../src)
 

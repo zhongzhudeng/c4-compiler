@@ -1,4 +1,5 @@
 #include "Compiler.hpp"
+#include <exception>
 #include <getopt.h>
 #include <iostream>
 
@@ -21,22 +22,25 @@ int main(int argc, char **argv) {
       return 1;
     }
     Compiler compiler(filename);
-
-    switch (option_index) {
-    case 0: {
-      compiler.tokenize();
-      break;
-    }
-    case 1: {
-      compiler.parse();
-      break;
-    }
-    case 2: {
-      compiler.print_ast();
-      break;
-    }
-    default:
-      std::cerr << "Invalid command line arguments\n";
+    try {
+      switch (option_index) {
+      case 0: {
+        compiler.tokenize();
+        break;
+      }
+      case 1: {
+        compiler.parse();
+        break;
+      }
+      case 2: {
+        compiler.print_ast();
+        break;
+      }
+      default:
+        std::cerr << "Invalid command line arguments\n";
+        return 1;
+      }
+    } catch (const char *msg) {
       return 1;
     }
   } break;
