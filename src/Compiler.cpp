@@ -1,6 +1,7 @@
 #include "Compiler.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Sema.hpp"
 #include "Syntax.hpp"
 #include "SyntaxExternDecl.hpp"
 
@@ -13,13 +14,15 @@ void Compiler::tokenize() {
 
 void Compiler::parse() {
   Lexer lexer(filename, symbolInternalizer);
-  Parser parser(lexer.tokenize());
+  Sema sema;
+  Parser parser(lexer.tokenize(), sema);
   parser.parse([](ExternDeclPtr, bool) {});
 }
 
 void Compiler::print_ast() {
   Lexer lexer(filename, symbolInternalizer);
-  Parser parser(lexer.tokenize());
+  Sema sema;
+  Parser parser(lexer.tokenize(), sema);
   parser.parse([](ExternDeclPtr ast, bool is_end) {
     ast->print(std::cout);
     if (!is_end)

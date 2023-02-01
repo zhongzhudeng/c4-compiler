@@ -31,7 +31,7 @@ class PointerDeclarator;
 class FunctionDeclarator;
 
 class Stmt;
-class IdentifierStmt;
+class LabeledStmt;
 class CompStmt;
 class ExprStmt;
 class IfElseStmt;
@@ -53,4 +53,6 @@ using DeclSpecPtr = std::unique_ptr<DeclSpec>;
 
 using DeclaratorPtr = std::unique_ptr<Declarator>;
 
+using LabeledStmtPtr = std::unique_ptr<LabeledStmt>;
 using CompStmtPtr = std::unique_ptr<CompStmt>;
+using GoToStmtPtr = std::unique_ptr<GoToStmt>;

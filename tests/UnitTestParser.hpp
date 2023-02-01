@@ -1,5 +1,7 @@
+#pragma once
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Sema.hpp"
 #include "Syntax.hpp"
 #include "SyntaxExpr.hpp"
 #include "SyntaxExternDecl.hpp"
@@ -15,7 +17,8 @@ public:
     Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
     std::vector<Token> token_stream;
     lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
-    Parser parser(std::move(token_stream));
+    Sema sema;
+    Parser parser(std::move(token_stream), sema);
     std::unique_ptr<AST> ptr;
     if constexpr (std::is_same_v<AST, Expr>) {
       ptr = parser.parseExpr();

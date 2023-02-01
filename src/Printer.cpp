@@ -166,7 +166,7 @@ public:
       os << '\t';
     return os;
   }
-  void VisitIdentifierStmt(const IdentifierStmt &stmt) {
+  void VisitLabeledStmt(const LabeledStmt &stmt) {
     os << *stmt.getIdentifier();
     os << ":\n";
     visit(stmt.getStmt());

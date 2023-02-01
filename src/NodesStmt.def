@@ -13,7 +13,7 @@
 #ifndef IDENTIFIER
 #define IDENTIFIER(Type, Base) STMT(Type, Base)
 #endif
-IDENTIFIER(Identifier, Stmt)
+IDENTIFIER(Labeled, Stmt)
 #undef IDENTIFIER
 
 #ifndef COMP
@@ -70,7 +70,7 @@ BREAK(Break, Stmt)
 RETURN(Return, Stmt)
 #undef BREAK
 
-LAST_STMT_RANGE(Stmt, Identifier, Return)
+LAST_STMT_RANGE(Stmt, Labeled, Return)
 
 #undef STMT
 #undef STMT_RANGE

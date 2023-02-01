@@ -1,6 +1,7 @@
 #pragma once
 #include "Diagnostic.hpp"
 #include "Parser.hpp"
+#include "Sema.hpp"
 #include "Syntax.hpp"
 #include "Token.hpp"
 #include <functional>
@@ -10,7 +11,7 @@ template <typename AST> class UnitTestParser;
 
 class Parser {
 public:
-  Parser(std::vector<Token> token_stream);
+  Parser(std::vector<Token> token_stream, Sema &Action);
   ~Parser();
   void parse(std::function<void(ExternDeclPtr, bool)> f);
 
@@ -18,6 +19,9 @@ private:
   std::vector<Token> token_stream;
   std::vector<Token>::iterator cursor;
   std::vector<Token>::const_iterator end;
+
+  Sema &Action;
+
   friend UnitTestParser<Expr>;
   friend UnitTestParser<Decl>;
   friend UnitTestParser<Stmt>;

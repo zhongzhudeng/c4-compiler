@@ -36,7 +36,7 @@ public:
   // enclosingFunction)
   //     : m_scope(scope), m_funcTable(funcTable),
   //     m_enclosingFunction(enclosingFunction){}
-  void VisitIdentifierStmt(const IdentifierStmt &stmt) {}
+  void VisitIdentifierStmt(const LabeledStmt &stmt) {}
   void VisitCompStmt(const CompStmt &stmt) {}
   void VisitDeclStmt(const DeclStmt &stmt) {}
   void VisitExprStmt(const ExprStmt &stmt) {}

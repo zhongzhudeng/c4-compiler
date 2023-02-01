@@ -266,7 +266,8 @@ end:
   Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
   std::vector<Token> token_stream;
   lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
-  Parser parser(std::move(token_stream));
+  Sema sema;
+  Parser parser(std::move(token_stream), sema);
   std::ostringstream os;
   parser.parse([&](ExternDeclPtr ast, bool is_end) {
     ast->print(os);

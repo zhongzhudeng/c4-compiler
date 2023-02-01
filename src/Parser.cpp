@@ -1,5 +1,6 @@
 #include "Parser.hpp"
 #include "Diagnostic.hpp"
+#include "Sema.hpp"
 #include "Syntax.hpp"
 #include "SyntaxExternDecl.hpp"
 #include <functional>
@@ -15,8 +16,8 @@ void Parser::parse(std::function<void(ExternDeclPtr, bool)> f) {
   } while (!is_end());
 }
 
-Parser::Parser(std::vector<Token> token_stream)
-    : token_stream(std::move(token_stream)) {
+Parser::Parser(std::vector<Token> token_stream, Sema &Action)
+    : token_stream(std::move(token_stream)), Action(Action) {
   cursor = this->token_stream.begin();
   end = this->token_stream.cend();
 }

@@ -8,8 +8,8 @@ Stmt::~Stmt() {}
 const Locatable &Stmt::getLoc() { return loc; }
 Stmt::Kind Stmt::getKind() const { return kind; }
 
-IdentifierStmt::IdentifierStmt(Locatable loc, Symbol identifier, StmtPtr stmt)
-    : Stmt(loc, Kind::Identifier), identifier(identifier),
+LabeledStmt::LabeledStmt(Locatable loc, Symbol identifier, StmtPtr stmt)
+    : Stmt(loc, Kind::Labeled), identifier(identifier),
       stmt(std::move(stmt)) {}
 CompStmt::CompStmt(Locatable loc, std::vector<StmtPtr> blockItemList)
     : Stmt(loc, Kind::Comp), blockItemList(std::move(blockItemList)){};
@@ -29,8 +29,8 @@ BreakStmt::BreakStmt(Locatable loc) : Stmt(loc, Kind::Break){};
 ReturnStmt::ReturnStmt(Locatable loc, ExprPtr expr)
     : Stmt(loc, Kind::Return), expr(std::move(expr)){};
 
-Symbol IdentifierStmt::getIdentifier() const { return identifier; };
-const Stmt &IdentifierStmt::getStmt() const {
+Symbol LabeledStmt::getIdentifier() const { return identifier; };
+const Stmt &LabeledStmt::getStmt() const {
   return const_cast<Stmt &>(*stmt);
 };
 const std::vector<std::reference_wrapper<const Stmt>>

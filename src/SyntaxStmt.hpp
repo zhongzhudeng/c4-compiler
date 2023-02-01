@@ -25,12 +25,12 @@ public:
   void print(std::ostream &os, unsigned identation = 0) const;
 };
 
-class IdentifierStmt final : public Stmt {
+class LabeledStmt final : public Stmt {
   Symbol identifier;
   StmtPtr stmt;
 
 public:
-  IdentifierStmt(Locatable loc, Symbol identifier, StmtPtr stmt);
+  LabeledStmt(Locatable loc, Symbol identifier, StmtPtr stmt);
   Symbol getIdentifier() const;
   const Stmt &getStmt() const;
 };

@@ -24,8 +24,7 @@ StmtPtr Parser::parseStmt() {
   }
 
   case TK_IDENTIFIER: {
-
-    Symbol iden = cursor->Text;
+    Token IdenTok = *cursor;
     switch (kind_first()) {
     default: {
       ExprPtr expr = parseExpr();
@@ -35,7 +34,7 @@ StmtPtr Parser::parseStmt() {
     case TK_COLON:
       bump(), bump();
       StmtPtr stmt = parseStmt();
-      return std::make_unique<IdentifierStmt>(loc, iden, std::move(stmt));
+      return Action.ActOnLabeledStmt(IdenTok, std::move(stmt));
     }
   }
   case TK_LBRACE: {
@@ -63,10 +62,10 @@ StmtPtr Parser::parseStmt() {
   }
   case TK_GOTO: {
     bump();
-    Symbol iden = cursor->Text;
+    Token IdenTok = *cursor;
     expect(TK_IDENTIFIER, "identifier after goto");
     expect(TK_SEMICOLON, "';'");
-    return std::make_unique<GoToStmt>(loc, iden);
+    return Action.ActOnGotoStmt(loc, IdenTok);
   }
   case TK_CONTINUE: {
     bump();
