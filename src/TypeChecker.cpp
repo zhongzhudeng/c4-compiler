@@ -40,7 +40,6 @@ public:
   void VisitCompStmt(const CompStmt &stmt) {}
   void VisitDeclStmt(const DeclStmt &stmt) {}
   void VisitExprStmt(const ExprStmt &stmt) {}
-  void VisitIfStmt(const IfStmt &stmt) {}
   void VisitIfElseStmt(const IfElseStmt &stmt) {}
   void VisitWhileStmt(const WhileStmt &stmt) {}
   void VisitGoToStmt(const GoToStmt &stmt) {}
