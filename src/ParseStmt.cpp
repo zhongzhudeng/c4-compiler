@@ -2,6 +2,7 @@
 #include "Parser.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
 #include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
@@ -24,6 +25,7 @@ StmtPtr Parser::parseStmt() {
   }
 
   case TK_IDENTIFIER: {
+    Symbol iden = cursor->Text;
     Token IdenTok = *cursor;
     switch (kind_first()) {
     default: {
@@ -33,8 +35,10 @@ StmtPtr Parser::parseStmt() {
     }
     case TK_COLON:
       bump(), bump();
+      LabelDeclPtr label_decl = std::make_unique<LabelDecl>(loc, iden);
       StmtPtr stmt = parseStmt();
-      return Action.ActOnLabeledStmt(IdenTok, std::move(stmt));
+      return Action.ActOnLabeledStmt(loc, std::move(label_decl),
+                                     std::move(stmt));
     }
   }
   case TK_LBRACE: {
@@ -62,10 +66,10 @@ StmtPtr Parser::parseStmt() {
   }
   case TK_GOTO: {
     bump();
-    Token IdenTok = *cursor;
+    Symbol iden = cursor->Text;
     expect(TK_IDENTIFIER, "identifier after goto");
     expect(TK_SEMICOLON, "';'");
-    return Action.ActOnGotoStmt(loc, IdenTok);
+    return Action.ActOnGotoStmt(loc, iden);
   }
   case TK_CONTINUE: {
     bump();

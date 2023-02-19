@@ -6,6 +6,27 @@
 #include "SyntaxExternDecl.hpp"
 #include <vector>
 
+class NamedDecl : public Decl {
+public:
+  enum Kind { Label, Var };
+
+private:
+  Symbol iden;
+
+public:
+  NamedDecl(Locatable loc, Symbol iden, Kind kind);
+  Symbol getIdentifier() const;
+};
+
+class LabelDecl : public NamedDecl {
+public:
+  LabelDecl(Locatable loc, Symbol iden);
+};
+
+class VarDecl : public NamedDecl {};
+
+class FuncDecl : public NamedDecl {};
+
 class DeclSpec {
 public:
   enum Kind { Void, Char, Int, Struct };

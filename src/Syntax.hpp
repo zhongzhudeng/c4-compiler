@@ -19,6 +19,13 @@ class MemberExpr;
 class Decl;
 enum DeclKind { ANY, ABSTRACT, CONCRETE };
 
+class NamedDecl;
+
+class VarDecl;
+class LabelDecl;
+using LabelDeclPtr = std::unique_ptr<LabelDecl>;
+class FuncDecl;
+
 class DeclSpec;
 class VoidSpec;
 class CharSpec;

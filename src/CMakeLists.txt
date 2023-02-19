@@ -8,6 +8,7 @@ add_library(compiler SHARED
   Parser.cpp
   ParseStmt.cpp
   Printer.cpp
+  Scope.cpp
   Sema.cpp
   SymbolInternalizer.cpp
   SyntaxDecl.cpp

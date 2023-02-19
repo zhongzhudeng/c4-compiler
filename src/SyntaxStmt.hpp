@@ -26,12 +26,12 @@ public:
 };
 
 class LabeledStmt final : public Stmt {
-  Symbol identifier;
+  LabelDeclPtr label;
   StmtPtr stmt;
 
 public:
-  LabeledStmt(Locatable loc, Symbol identifier, StmtPtr stmt);
-  Symbol getIdentifier() const;
+  LabeledStmt(Locatable loc, LabelDeclPtr label, StmtPtr stmt);
+  const LabelDecl &getLabelDecl() const;
   const Stmt &getStmt() const;
 };
 class CompStmt final : public Stmt {
@@ -84,11 +84,12 @@ public:
   const Stmt &getDo() const;
 };
 class GoToStmt final : public Stmt {
-  Symbol identifier;
+  const LabelDecl *label_decl;
 
 public:
-  GoToStmt(Locatable loc, Symbol identifier);
-  Symbol getIdentifier() const;
+  GoToStmt(Locatable loc, const LabelDecl *label_decl = nullptr);
+  void set_label_decl(const LabelDecl *label_decl);
+  const LabelDecl &getLabelDecl() const;
 };
 class ContinueStmt final : public Stmt {
 public:
