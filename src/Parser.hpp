@@ -3,6 +3,7 @@
 #include "Parser.hpp"
 #include "Sema.hpp"
 #include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
 #include "Token.hpp"
 #include <functional>
 #include <vector>
@@ -13,7 +14,7 @@ class Parser {
 public:
   Parser(std::vector<Token> token_stream, Sema &Action);
   ~Parser();
-  void parse(std::function<void(ExternDeclPtr, bool)> f);
+  void parse(std::function<void(DeclPtr, bool)> f);
 
 private:
   std::vector<Token> token_stream;
@@ -23,9 +24,9 @@ private:
   Sema &Action;
 
   friend UnitTestParser<Expr>;
+  friend UnitTestParser<DeclaratorDecl>;
   friend UnitTestParser<Decl>;
   friend UnitTestParser<Stmt>;
-  friend UnitTestParser<ExternDecl>;
 
   const Locatable &location(void);
   void bump(void);
@@ -38,7 +39,12 @@ private:
   bool is_end();
 
   ExprPtr parseExpr();
-  DeclPtr parseDecl(DeclKind dKind);
+
+  DeclSpecPtr parseDeclSpec();
+  DeclaratorDeclPtr parseDecl();
+  DeclaratorPtr parseDeclarator();
+  DeclaratorPtr parseNonFuncDeclarator();
+
   StmtPtr parseStmt();
 
   ExprPtr parseUnaryExpr();
@@ -50,8 +56,6 @@ private:
   ExprPtr parseStringLiteralExpr();
   ExprPtr parseParenExpr();
 
-  DeclaratorPtr parseNonFunDeclarator();
-  DeclaratorPtr parseDeclarator();
   CompStmtPtr parseCompoundStmt();
-  ExternDeclPtr parseExternDecl();
+  DeclPtr parseExternDecl();
 };

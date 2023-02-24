@@ -1,7 +1,6 @@
 #pragma once
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
-#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
 
 template <typename Derived> class ExprVisitor {
@@ -23,33 +22,59 @@ public:
 
 template <typename Derived> class DeclVisitor {
 public:
+  void visit(const Decl &decl) {
+    switch (decl.getKind()) {
+    case Decl::Declarator:
+      return static_cast<Derived &>(*this).VisitDeclaratorDecl(
+          static_cast<const DeclaratorDecl &>(decl));
+    case Decl::LabelDecl:
+      return static_cast<Derived &>(*this).VisitLabelDecl(
+          static_cast<const LabelDecl &>(decl));
+    case Decl::FuncDef:
+      return static_cast<Derived &>(*this).VisitFuncDef(
+          static_cast<const FuncDef &>(decl));
+    case Decl::StructDef:
+      return static_cast<Derived &>(*this).VisitStructDef(
+          static_cast<const StructDef &>(decl));
+    }
+  }
   void VisitDeclSpec(const DeclSpec &declSpec) {
     switch (declSpec.getKind()) {
-    case DeclSpec::Void:
+    case Type::Void:
       return static_cast<Derived &>(*this).VisitVoidSpec(
           static_cast<const VoidSpec &>(declSpec));
-    case DeclSpec::Char:
+    case Type::Char:
       return static_cast<Derived &>(*this).VisitCharSpec(
           static_cast<const CharSpec &>(declSpec));
-    case DeclSpec::Int:
+    case Type::Int:
       return static_cast<Derived &>(*this).VisitIntSpec(
           static_cast<const IntSpec &>(declSpec));
-    case DeclSpec::Struct:
+    case Type::Struct:
       return static_cast<Derived &>(*this).VisitStructSpec(
           static_cast<const StructSpec &>(declSpec));
     }
   }
   void VisitDeclarator(const Declarator &declarator) {
     switch (declarator.getKind()) {
-    case Declarator::Primitive:
-      return static_cast<Derived &>(*this).VisitPrimitiveDeclarator(
-          static_cast<const PrimitiveDeclarator &>(declarator));
-    case Declarator::Pointer:
-      return static_cast<Derived &>(*this).VisitPointerDeclarator(
-          static_cast<const PointerDeclarator &>(declarator));
+    case Declarator::Valued:
+      return static_cast<Derived &>(*this).VisitValuedDeclarator(
+          static_cast<const ValuedDeclarator &>(declarator));
     case Declarator::Function:
       return static_cast<Derived &>(*this).VisitFunctionDeclarator(
           static_cast<const FunctionDeclarator &>(declarator));
+    case Declarator::Abstract:
+      return static_cast<Derived &>(*this).VisitAbstractDeclarator(
+          static_cast<const AbstractDeclarator &>(declarator));
+    }
+  }
+  void VisitValuedDeclarator(const ValuedDeclarator &declarator) {
+    switch (declarator.getKind()) {
+    case ValuedDeclarator::Variable:
+      return static_cast<Derived &>(*this).VisitVariableDeclarator(
+          static_cast<const VariableDeclarator &>(declarator));
+    case ValuedDeclarator::FunctionVariable:
+      return static_cast<Derived &>(*this).VisitFunctionVariableDeclarator(
+          static_cast<const FunctionVariableDeclarator &>(declarator));
     }
   }
 };
@@ -69,18 +94,4 @@ public:
     }
   }
 #undef DISPATCH
-};
-
-template <typename Derived> class ExternDeclVisitor {
-public:
-  void visit(const ExternDecl &externDecl) {
-    switch (externDecl.getKind()) {
-    case ExternDecl::FuncDef:
-      return static_cast<Derived &>(*this).VisitFuncDef(
-          static_cast<const FuncDef &>(externDecl));
-    case ExternDecl::Decl:
-      return static_cast<Derived &>(*this).VisitDecl(
-          static_cast<const Decl &>(externDecl));
-    }
-  }
 };

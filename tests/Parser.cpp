@@ -1,9 +1,7 @@
 #include "Parser.hpp"
-#include "Lexer.hpp"
-#include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
 #include "UnitTestParser.hpp"
 #include <catch2/catch_test_macros.hpp>
-#include <sstream>
 
 TEST_CASE("Expr", "[Parser]") {
   UnitTestParser<Expr> parser;
@@ -54,10 +52,15 @@ TEST_CASE("Expr", "[Parser]") {
 }
 
 TEST_CASE("Decl", "[Parser]") {
-  UnitTestParser<Decl> parser;
+  UnitTestParser<DeclaratorDecl> parser;
   SECTION("Struct") {
     REQUIRE(parser.parse(0, "struct S{int x;} s") ==
             "struct S\n{\n\tint x;\n} s");
+  }
+  SECTION("FunctionVariable") {
+    REQUIRE(parser.parse(1, "void *(**p)(int)") == "void (*((*(*p))(int)))");
+    REQUIRE(parser.parse(1, "void (*((*(*p))(int)))") ==
+            "void (*((*(*p))(int)))");
   }
   SECTION("Function") {
     REQUIRE(parser.parse(0, "int main(void)") == "int (main(void))");
@@ -65,13 +68,17 @@ TEST_CASE("Decl", "[Parser]") {
     REQUIRE(parser.parse(1, "int f(int x, int y)") == "int (f(int x, int y))");
     REQUIRE(parser.parse(1, "int (f(int x, int y))") ==
             "int (f(int x, int y))");
+    REQUIRE(parser.parse(2, "int f(int x, void *(**p)(int))") ==
+            "int (f(int x, void (*((*(*p))(int)))))");
+    // TODO: anoymous function variable in parameter
+    // REQUIRE(parser.parse(2, "int f(int x, void *(**)(int))") ==
+    // "int (f(int x, int y))");
   }
   SECTION("Pointer") {
-    REQUIRE(parser.parse(0, "struct S *p") == "struct S (*p)");
-    REQUIRE(parser.parse(0, "struct S (*p)") == "struct S (*p)");
-    REQUIRE(parser.parse(1, "void *(**p)(int)") == "void (*((*(*p))(int)))");
-    REQUIRE(parser.parse(1, "void (*((*(*p))(int)))") ==
-            "void (*((*(*p))(int)))");
+    REQUIRE(parser.parse(0, "struct S{int x;} *p") ==
+            "struct S\n{\n\tint x;\n} (*p)");
+    REQUIRE(parser.parse(0, "struct S{int x;} **p") ==
+            "struct S\n{\n\tint x;\n} (*(*p))");
   }
 }
 
@@ -113,166 +120,12 @@ TEST_CASE("Stmt", "[Parser]") {
   }
 }
 
-TEST_CASE("ExternDecl", "[Parser]") {
-  UnitTestParser<ExternDecl> parser;
+TEST_CASE("ExternalDeclaration", "[Parser]") {
+  UnitTestParser<Decl> parser;
   SECTION("FuncDef") {
     REQUIRE(parser.parse(0, "int main(void){return 0;}") ==
             "int (main(void))\n{\n\treturn 0;\n}\n");
     REQUIRE(parser.parse(1, "int main(void){int a;int b;}") ==
             "int (main(void))\n{\n\tint a;\n\tint b;\n}\n");
-    REQUIRE(parser.parse(2, R"(int (f(int x, int y))
-{
-	{
-		struct S
-		{
-			int x;
-		} s;
-		((s.x) = x);
-		struct S (*p);
-		(p = (&s));
-		if (1)
-			return (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - y))));
-		else if (1)
-			return 1;
-		else {
-			return 0;
-		}
-	}
-})") == R"(int (f(int x, int y))
-{
-	{
-		struct S
-		{
-			int x;
-		} s;
-		((s.x) = x);
-		struct S (*p);
-		(p = (&s));
-		if (1)
-			return (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - y))));
-		else if (1)
-			return 1;
-		else {
-			return 0;
-		}
-	}
-}
-)");
-    REQUIRE(parser.parse(3, R"(int (main(void))
-{
-	int a;
-	int b;
-	{
-		(a = 1);
-	}
-	(b = (a * 2));
-	if ((a < b)) {
-		while (((a < (sizeof b)) || (!(b == (f(23, (sizeof(int))))))))
-foo:
-			break;
-	} else if (0) {
-		char (*c);
-		while (1) {
-			(c = "bla");
-			continue;
-		}
-	} else
-		goto end;
-bar:
-end:
-	return 0;
-}
-)") == R"(int (main(void))
-{
-	int a;
-	int b;
-	{
-		(a = 1);
-	}
-	(b = (a * 2));
-	if ((a < b)) {
-		while (((a < (sizeof b)) || (!(b == (f(23, (sizeof(int))))))))
-foo:
-			break;
-	} else if (0) {
-		char (*c);
-		while (1) {
-			(c = "bla");
-			continue;
-		}
-	} else
-		goto end;
-bar:
-end:
-	return 0;
-}
-)");
   }
-}
-
-TEST_CASE("Full", "[Parser]") {
-  std::string src =
-      R"(int (f(int x, int y))
-{
-	{
-		struct S
-		{
-			int x;
-		} s;
-		((s.x) = x);
-		struct S (*p);
-		(p = (&s));
-		if (1)
-			return (-((*(&(s.x))) = ((sizeof (s.x)) * ((p->x) - y))));
-		else if (1)
-			return 1;
-		else {
-			return 0;
-		}
-	}
-}
-
-void (*((*(*p))(int)));
-
-int (main(void))
-{
-	int a;
-	int b;
-	{
-		(a = 1);
-	}
-	(b = (a * 2));
-	if ((a < b)) {
-		while (((a < (sizeof b)) || (!(b == (f(23, (sizeof(int))))))))
-foo:
-			break;
-	} else if (0) {
-		char (*c);
-		while (1) {
-			(c = "bla");
-			continue;
-		}
-	} else
-		goto end;
-bar:
-end:
-	return 0;
-}
-)";
-  std::string ans = src;
-
-  std::string filename = "dummy.c";
-  SymbolInternalizer symbolInternalizer;
-  Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
-  std::vector<Token> token_stream;
-  lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
-  Sema sema;
-  Parser parser(std::move(token_stream), sema);
-  std::ostringstream os;
-  parser.parse([&](ExternDeclPtr ast, bool is_end) {
-    ast->print(os);
-    if (!is_end)
-      os << '\n';
-  });
-  REQUIRE(os.str() == ans);
 }

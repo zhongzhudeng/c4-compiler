@@ -1,29 +1,20 @@
 #pragma once
 
-#include <cassert>
+#include "SymbolInternalizer.hpp"
+#include <cstddef>
 
-// TODO: Use other representation to handle struct
-enum Type
-{
-    typeUnknown,
-    typeVoid,
-    typeInt,
-    typeChar
+class Type {
+public:
+  enum Kind { Void, Char, Int, Struct };
+
+private:
+  Kind kind;
+  Symbol struct_iden;
+  size_t pointers;
+
+public:
+  Type(Kind kind, size_t pointers);
+  Type(Symbol struct_iden, size_t pointers);
+  bool operator==(Type other) const;
+  bool operator!=(Type other) const;
 };
-
-inline const char* ToString( Type type )
-{
-    switch( type )
-    {
-        case typeUnknown:
-            return "<unknown>";
-        case typeVoid:
-            return "void";
-        case typeInt:
-            return "int";
-        case typeChar:
-            return "char";
-        default:
-            return "";
-    }
-}

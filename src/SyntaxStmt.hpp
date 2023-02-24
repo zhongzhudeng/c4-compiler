@@ -46,11 +46,11 @@ public:
 
 // Wrapper for Declaration in compound statement
 class DeclStmt final : public Stmt {
-  DeclPtr decl;
+  DeclaratorDeclPtr decl;
 
 public:
-  DeclStmt(Locatable loc, DeclPtr decl);
-  const class Decl &getDeclaration() const;
+  DeclStmt(Locatable loc, DeclaratorDeclPtr decl);
+  const class DeclaratorDecl &getDeclaration() const;
 };
 
 class ExprStmt final : public Stmt {

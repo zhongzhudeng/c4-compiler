@@ -1,8 +1,6 @@
 #include "SyntaxStmt.hpp"
-#include "SymbolInternalizer.hpp"
-#include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
-#include "SyntaxExternDecl.hpp"
 
 Stmt::Stmt(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
 Stmt::~Stmt() {}
@@ -14,7 +12,7 @@ LabeledStmt::LabeledStmt(Locatable loc, LabelDeclPtr label, StmtPtr stmt)
 }
 CompStmt::CompStmt(Locatable loc, std::vector<StmtPtr> blockItemList)
     : Stmt(loc, Kind::Comp), blockItemList(std::move(blockItemList)){};
-DeclStmt::DeclStmt(Locatable loc, DeclPtr decl)
+DeclStmt::DeclStmt(Locatable loc, DeclaratorDeclPtr decl)
     : Stmt(loc, Kind::Decl), decl(std::move(decl)) {}
 ExprStmt::ExprStmt(Locatable loc, ExprPtr expr)
     : Stmt(loc, Kind::Expr), expr(std::move(expr)){};
@@ -41,8 +39,8 @@ CompStmt::getBlockItemList() const {
     res.emplace_back(std::cref(*blockItem));
   return res;
 };
-const class Decl &DeclStmt::getDeclaration() const {
-  return const_cast<class Decl &>(*decl);
+const class DeclaratorDecl &DeclStmt::getDeclaration() const {
+  return const_cast<class DeclaratorDecl &>(*decl);
 }
 const Expr &ExprStmt::getExpr() const {
   return const_cast<class Expr &>(*expr);
@@ -57,6 +55,9 @@ bool IfElseStmt::isElseEmpty() const { return Else == nullptr; }
 const Expr &WhileStmt::getCond() const {
   return const_cast<class Expr &>(*cond);
 };
+void GoToStmt::set_label_decl(const LabelDecl *label_decl) {
+  this->label_decl = label_decl;
+}
 const Stmt &WhileStmt::getDo() const { return const_cast<Stmt &>(*doSt); };
 const LabelDecl &GoToStmt::getLabelDecl() const {
   return const_cast<LabelDecl &>(*label_decl);

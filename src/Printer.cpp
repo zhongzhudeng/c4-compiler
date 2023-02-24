@@ -3,8 +3,8 @@
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
-#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
+#include <cstddef>
 #include <ostream>
 
 class ExprPrinter : public ExprVisitor<ExprPrinter> {
@@ -96,60 +96,89 @@ public:
       os << '\t';
     return os;
   }
-  void visit(const Decl &decl) {
+  void VisitDeclaratorDecl(const DeclaratorDecl &decl) {
     VisitDeclSpec(decl.getDeclSpec());
-    if (!decl.isNullDeclarator()) {
-      os << " ";
-      VisitDeclarator(decl.getDeclarator());
-    }
+    VisitDeclarator(decl.getDeclarator());
   }
-  void VisitVoidSpec([[maybe_unused]] const VoidSpec &declSpec) {
-    os << "void";
+  void VisitLabelDecl(const LabelDecl &decl) { os << *decl.getIdentifier(); }
+  void VisitFuncDef(const FuncDef &decl) {
+    decl.getDecl().print(os);
+    os << "\n";
+    decl.getCompStmt().print(os);
+    os << "\n";
   }
-  void VisitCharSpec([[maybe_unused]] const CharSpec &declSpec) {
-    os << "char";
-  }
-  void VisitIntSpec([[maybe_unused]] const IntSpec &declSpec) { os << "int"; }
-  void VisitStructSpec(const StructSpec &declSpec) {
-    os << "struct ";
-    if (!declSpec.isAnoymous()) {
-      os << *declSpec.getIdentifier();
-    }
-    if (declSpec.isBracketed()) {
-      os << "\n";
+  void VisitStructDef(const StructDef &decl) {
+    os << "struct " << *decl.getIdentifier() << "\n";
+    indent();
+    os << "{\n";
+    indentation++;
+    for (auto field_decl : decl.getFieldDecls()) {
       indent();
-      os << "{\n";
-      indentation++;
-      for (auto decl : declSpec.getDecls()) {
-        indent();
-        visit(decl);
-        os << ";";
-      }
-      os << '\n';
-      indentation--;
-      indent();
-      os << "}";
+      visit(field_decl);
+      os << ";";
     }
+    os << '\n';
+    indentation--;
+    indent();
+    os << "}";
   }
-  void VisitPrimitiveDeclarator(const PrimitiveDeclarator &declarator) {
-    os << *declarator.getIdentifier();
+  void VisitVoidSpec([[maybe_unused]] const VoidSpec &spec) { os << "void"; }
+  void VisitCharSpec([[maybe_unused]] const CharSpec &spec) { os << "char"; }
+  void VisitIntSpec([[maybe_unused]] const IntSpec &spec) { os << "int"; }
+  void VisitStructSpec(const StructSpec &spec) {
+    if (spec.has_def())
+      spec.getDef().print(os, indentation);
+    else
+      os << "struct " << *spec.getIdentifier();
   }
-  void VisitPointerDeclarator(const PointerDeclarator &declarator) {
-    os << "(*";
-    VisitDeclarator(declarator.getDeclarator());
+  void VisitVariableDeclarator(const ValuedDeclarator &decl) {
+    os << ' ';
+    PrintPointersFront(decl.pointer_size());
+    os << *decl.getIdentifier();
+    PrintPointersBack(decl.pointer_size());
+  }
+  void VisitFunctionVariableDeclarator(const FunctionVariableDeclarator &decl) {
+    os << ' ';
+    PrintPointersFront(decl.return_pointer_size());
+    os << '(';
+    PrintPointersFront(decl.pointer_size());
+    os << *decl.getIdentifier();
+    PrintPointersBack(decl.pointer_size());
+    PrintParameters(decl.getParams());
+    os << ')';
+    PrintPointersBack(decl.return_pointer_size());
+  }
+  void VisitFunctionDeclarator(const FunctionDeclarator &decl) {
+    os << ' ';
+    for (size_t i = 0; i < decl.pointer_size(); i++)
+      os << "(*";
+    os << "(" << *decl.getIdentifier();
+    PrintParameters(decl.getParams());
     os << ")";
+    for (size_t i = 0; i < decl.pointer_size(); i++)
+      os << ")";
   }
-  void VisitFunctionDeclarator(const FunctionDeclarator &declarator) {
+  void VisitAbstractDeclarator(const AbstractDeclarator &decl) {
+    for (size_t i = 0; i < decl.pointer_size(); i++)
+      os << "*";
+  }
+  void PrintParameters(
+      const std::vector<std::reference_wrapper<const DeclaratorDecl>> &params) {
     os << "(";
-    VisitDeclarator(declarator.getDeclarator());
-    os << "(";
-    auto params = declarator.getParams();
     visit(params.front());
     for (auto it = params.begin() + 1; it != params.end(); it++) {
       os << ", ";
       visit(*it);
     }
-    os << "))";
+    os << ')';
+  }
+  void PrintPointersFront(size_t n) {
+    for (size_t i = 0; i < n; i++)
+      os << "(*";
+  }
+  void PrintPointersBack(size_t n) {
+    for (size_t i = 0; i < n; i++)
+      os << ")";
   }
 };
 
@@ -167,7 +196,7 @@ public:
     return os;
   }
   void VisitLabeledStmt(const LabeledStmt &stmt) {
-    os << *stmt.getIdentifier();
+    stmt.getLabelDecl().print(os);
     os << ":\n";
     visit(stmt.getStmt());
   }
@@ -248,7 +277,7 @@ public:
   void VisitGoToStmt(const GoToStmt &stmt) {
     indent();
     os << "goto ";
-    os << *stmt.getIdentifier();
+    stmt.getLabelDecl().print(os);
     os << ";";
   }
   void VisitContinueStmt([[maybe_unused]] const ContinueStmt &stmt) {
@@ -270,23 +299,6 @@ public:
   }
 };
 
-class ExternDeclPrinter : public ExternDeclVisitor<ExternDeclPrinter> {
-  std::ostream &os;
-
-public:
-  ExternDeclPrinter(std::ostream &os) : os(os) {}
-  void VisitFuncDef(const FuncDef &externDecl) {
-    externDecl.getDecl().print(os);
-    os << "\n";
-    externDecl.getCompStmt().print(os);
-    os << "\n";
-  }
-  void VisitDecl(const Decl &externDecl) {
-    externDecl.print(os);
-    os << ";\n";
-  }
-};
-
 void Expr::print(std::ostream &os) const {
   ExprPrinter printer(os);
   printer.visit(const_cast<Expr &>(*this));
@@ -300,9 +312,4 @@ void Decl::print(std::ostream &os, unsigned identation) const {
 void Stmt::print(std::ostream &os, unsigned identation) const {
   StmtPrinter printer(os, identation);
   printer.visit(const_cast<Stmt &>(*this));
-}
-
-void ExternDecl::print(std::ostream &os) const {
-  ExternDeclPrinter printer(os);
-  printer.visit(const_cast<ExternDecl &>(*this));
 }

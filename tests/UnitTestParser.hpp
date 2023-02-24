@@ -3,8 +3,8 @@
 #include "Parser.hpp"
 #include "Sema.hpp"
 #include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
-#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
 #include "fmt/core.h"
 #include <sstream>
@@ -22,11 +22,13 @@ public:
     std::unique_ptr<AST> ptr;
     if constexpr (std::is_same_v<AST, Expr>) {
       ptr = parser.parseExpr();
-    } else if constexpr (std::is_same_v<AST, Decl>) {
-      ptr = parser.parseDecl(DeclKind::ANY);
+    } else if constexpr (std::is_same_v<AST, DeclaratorDecl>) {
+      ptr = parser.parseDecl();
     } else if constexpr (std::is_same_v<AST, Stmt>) {
+      sema.enter_func_scope();
       ptr = parser.parseStmt();
-    } else if constexpr (std::is_same_v<AST, ExternDecl>) {
+      sema.exit_func_scope();
+    } else if constexpr (std::is_same_v<AST, Decl>) {
       ptr = parser.parseExternDecl();
     }
     std::ostringstream os;

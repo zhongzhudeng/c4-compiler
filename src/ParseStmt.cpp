@@ -4,7 +4,6 @@
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
-#include "SyntaxExternDecl.hpp"
 #include "SyntaxStmt.hpp"
 #include "Token.hpp"
 #include <memory>
@@ -110,7 +109,7 @@ CompStmtPtr Parser::parseCompoundStmt() {
       DECLARATION
       Locatable l(location());
       bil.push_back(
-          std::make_unique<DeclStmt>(l, parseDecl(DeclKind::CONCRETE)));
+          std::make_unique<DeclStmt>(l, parseDecl()));
       expect(TK_SEMICOLON, "';' after declaration");
       break;
     }

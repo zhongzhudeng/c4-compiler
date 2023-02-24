@@ -2,14 +2,13 @@
 #include "Diagnostic.hpp"
 #include "Sema.hpp"
 #include "Syntax.hpp"
-#include "SyntaxExternDecl.hpp"
 #include <functional>
 #include <memory>
 
 #include "Token.hpp"
 
-void Parser::parse(std::function<void(ExternDeclPtr, bool)> f) {
-  ExternDeclPtr ast = nullptr;
+void Parser::parse(std::function<void(DeclPtr, bool)> f) {
+  DeclPtr ast = nullptr;
   do {
     ast = parseExternDecl();
     f(std::move(ast), is_end());

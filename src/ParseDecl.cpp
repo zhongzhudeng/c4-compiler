@@ -1,13 +1,37 @@
 #include "Diagnostic.hpp"
 #include "Parser.hpp"
 #include "SymbolInternalizer.hpp"
-#include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
+#include "SyntaxStmt.hpp"
 #include "Token.hpp"
 #include <memory>
+#include <utility>
 #include <vector>
 
-DeclPtr Parser::parseDecl(DeclKind dKind) {
+DeclPtr Parser::parseExternDecl() {
+  Locatable loc(location());
+  DeclaratorDeclPtr decl = parseDecl();
+  const Declarator &declarator = decl->getDeclarator();
+  if (declarator.getKind() == Declarator::Function) {
+    CompStmtPtr stmt = parseCompoundStmt();
+    return Action.ActOnFunctionDefinition(
+        loc,
+        std::unique_ptr<DeclaratorDecl>(
+            static_cast<DeclaratorDecl *>(decl.release())),
+        std::move(stmt));
+  }
+  expect(TK_SEMICOLON, "';' after declaration");
+  return decl;
+}
+
+DeclaratorDeclPtr Parser::parseDecl() {
+  Locatable loc(location());
+  auto spec = parseDeclSpec();
+  auto decl = parseDeclarator();
+  return Action.ActOnDeclaration(loc, std::move(spec), std::move(decl));
+}
+
+DeclSpecPtr Parser::parseDeclSpec() {
   DeclSpecPtr spec = nullptr;
   Locatable loc(location());
   TokenKind tk = kind();
@@ -26,40 +50,37 @@ DeclPtr Parser::parseDecl(DeclKind dKind) {
     spec = std::make_unique<IntSpec>(loc);
     break;
   case TK_STRUCT: {
-    Symbol iden = nullptr;
-    if (check(TK_IDENTIFIER)) {
-      iden = cursor->Text;
-      bump();
-    } else if (!check(TK_LBRACE)) {
-      errorloc(location(), "Expected struct declaration list but got `",
-               *cursor->Text, "'");
-    }
-    std::vector<DeclPtr> decls;
-    bool is_bracketed = false;
+    Token iden = *cursor;
+    expect(TK_IDENTIFIER, "identifier in struct declaration");
     if (accept(TK_LBRACE)) {
-      is_bracketed = true;
+      std::vector<DeclPtr> decls;
       do {
-        decls.push_back(parseDecl(DeclKind::CONCRETE));
+        auto fields = parseDecl();
+        decls.push_back(std::move(fields));
         expect(TK_SEMICOLON, ";");
       } while (!accept(TK_RBRACE));
+      auto struct_def =
+          Action.ActOnStructDefinition(loc, iden, std::move(decls));
+      spec = Action.ActOnStructSpec(loc, std::move(struct_def));
+    } else {
+      spec = Action.ActOnStructSpec(loc, iden.Text);
     }
-    spec =
-        std::make_unique<StructSpec>(loc, iden, is_bracketed, std::move(decls));
     break;
   }
   }
-  auto decl = parseDeclarator();
-  if ((decl == nullptr && dKind == DeclKind::ABSTRACT) ||
-      (decl != nullptr && dKind == DeclKind::CONCRETE) ||
-      (dKind == DeclKind::ANY)) {
-    return std::make_unique<Decl>(loc, std::move(spec), std::move(decl));
-  }
-  errorloc(location(), "Unexpected Declaration type");
+  return spec;
 }
 
-DeclaratorPtr Parser::parseNonFunDeclarator() {
+DeclaratorPtr Parser::parseNonFuncDeclarator() {
   Locatable loc(location());
   switch (kind()) {
+  default:
+    return std::make_unique<AbstractDeclarator>(loc);
+  case TK_IDENTIFIER: {
+    auto declarator = std::make_unique<VariableDeclarator>(loc, cursor->Text);
+    bump();
+    return declarator;
+  }
   case TK_LPAREN: {
     switch (kind_first()) {
     case TK_RPAREN:
@@ -67,40 +88,56 @@ DeclaratorPtr Parser::parseNonFunDeclarator() {
     case TK_CHAR:
     case TK_INT:
     case TK_STRUCT:
-      return nullptr;
+      return std::make_unique<AbstractDeclarator>(loc);
     default:
       bump();
-      auto res = parseDeclarator();
+      auto declarator = parseDeclarator();
       expect(TK_RPAREN, "')'");
-      return res;
+      declarator->set_paren();
+      return declarator;
     }
   }
   case TK_STAR: {
     bump();
-    auto inner = parseDeclarator();
-    return std::make_unique<PointerDeclarator>(loc, std::move(inner));
+    auto declarator = parseDeclarator();
+    if (declarator->getKind() != Declarator::Valued) {
+      declarator->add_pointer(loc);
+      return declarator;
+    }
+    auto valued_declarator = std::unique_ptr<ValuedDeclarator>(
+        static_cast<ValuedDeclarator *>(declarator.release()));
+    if (valued_declarator->getKind() != ValuedDeclarator::FunctionVariable) {
+      valued_declarator->add_pointer(loc);
+      return valued_declarator;
+    }
+    auto function_variable_declarator =
+        std::unique_ptr<FunctionVariableDeclarator>(
+            static_cast<FunctionVariableDeclarator *>(
+                valued_declarator.release()));
+    function_variable_declarator->add_return_pointer(loc);
+    return function_variable_declarator;
   }
-  case TK_IDENTIFIER: {
-    auto res = std::make_unique<PrimitiveDeclarator>(loc, cursor->Text);
-    bump();
-    return res;
-  }
-  default:
-    return nullptr;
   }
 }
 
 DeclaratorPtr Parser::parseDeclarator() {
   Locatable loc(location());
-  auto res = parseNonFunDeclarator();
+  DeclaratorPtr declarator = parseNonFuncDeclarator();
   if (accept(TK_LPAREN)) {
-    std::vector<DeclPtr> params;
+    if (declarator->getKind() != Declarator::Valued)
+      errorloc(loc, "Unexpected token `('");
+    auto decl = std::unique_ptr<ValuedDeclarator>(
+        static_cast<ValuedDeclarator *>(declarator.release()));
+    std::vector<DeclaratorDeclPtr> params;
     do {
-      params.push_back(parseDecl(DeclKind::ANY));
+      params.push_back(parseDecl());
     } while (accept(TK_COMMA));
     expect(TK_RPAREN, "')'");
-    res = std::make_unique<FunctionDeclarator>(loc, std::move(res),
-                                               std::move(params));
+    if (decl->is_paren())
+      return std::make_unique<FunctionVariableDeclarator>(loc, std::move(decl),
+                                                          std::move(params));
+    return std::make_unique<FunctionDeclarator>(loc, decl->getIdentifier(),
+                                                std::move(params));
   }
-  return res;
+  return declarator;
 }
