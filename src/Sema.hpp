@@ -12,16 +12,23 @@ class Sema final {
 public:
   Sema();
   ~Sema();
+
+  IdentifierExprPtr ActOnIdenExpr(Locatable loc, Symbol iden);
+  ArraySubscriptExprPtr ActOnArraySubscriptExpr(Locatable loc, ExprPtr expr,
+                                                ExprPtr squared_expr);
+
+  DeclaratorPtr ActOnNonFuncDeclarator(DeclaratorPtr decl);
+  FuncDefPtr ActOnFunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
+                                     CompStmtPtr stmt);
+  DeclaratorDeclPtr ActOnFunctionDecl(DeclaratorDeclPtr decl);
+
   StructDefPtr ActOnStructDefinition(Locatable loc, Token iden,
-                                     std::vector<DeclPtr> fields);
+                                     std::vector<DeclaratorDeclPtr> fields);
   StructSpecPtr ActOnStructSpec(Locatable loc, Symbol iden);
   StructSpecPtr ActOnStructSpec(Locatable loc, StructDefPtr struct_def);
 
   DeclaratorDeclPtr ActOnDeclaration(Locatable loc, DeclSpecPtr spec,
                                      DeclaratorPtr decl);
-
-  FuncDefPtr ActOnFunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
-                                     CompStmtPtr compoundStmt);
 
   LabeledStmtPtr ActOnLabeledStmt(Locatable loc, LabelDeclPtr label_decl,
                                   StmtPtr stmt);
@@ -29,6 +36,8 @@ public:
   void resolve_backing_label_decl();
   void enter_func_scope();
   void exit_func_scope();
+  void enter_scope();
+  void exit_scope();
 
 private:
   Scope *cur_scope;

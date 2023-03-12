@@ -2,6 +2,7 @@
 #include "Diagnostic.hpp"
 #include "SymbolInternalizer.hpp"
 #include "SyntaxStmt.hpp"
+#include <cassert>
 #include <utility>
 #include <vector>
 
@@ -33,6 +34,9 @@ const StructDef &StructSpec::getDef() const {
 }
 
 Declarator::Declarator(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
+Declarator::Declarator(Locatable loc, Kind kind,
+                       std::vector<Locatable> pointers)
+    : loc(loc), kind(kind), pointers(std::move(pointers)) {}
 Declarator::Declarator(DeclaratorPtr decl, Kind kind)
     : loc(decl->getLoc()), kind(kind), pointers(std::move(decl->pointers)) {}
 
@@ -50,24 +54,56 @@ size_t Declarator::pointer_size() const { return pointers.size(); }
 void Declarator::add_pointer(Locatable loc) { pointers.push_back(loc); }
 
 void Declarator::set_paren() { paren = true; }
-bool Declarator::is_paren() { return paren; }
+
+bool Declarator::is_paren() const { return paren; }
+
+bool Declarator::is_abstract() const { return kind == Abstract; }
+
+bool Declarator::is_named() const { return getKind() == Named; }
+
+bool Declarator::is_function() const {
+  return getKind() == Named &&
+         static_cast<const NamedDeclarator &>(*this).getKind() ==
+             NamedDeclarator::Function;
+}
+
+const VariableDeclarator &Declarator::as_variable_declarator() const {
+  assert(kind == Named);
+  const NamedDeclarator &named = static_cast<const NamedDeclarator &>(*this);
+  assert(named.getKind() == NamedDeclarator::Valued);
+  const ValuedDeclarator &valued = static_cast<const ValuedDeclarator &>(named);
+  assert(valued.getKind() == ValuedDeclarator::Variable);
+  return static_cast<const VariableDeclarator &>(valued);
+}
+
+NamedDeclarator::NamedDeclarator(Locatable loc, Symbol iden, Kind kind)
+    : Declarator(loc, Declarator::Named), iden(iden), kind(kind) {}
+NamedDeclarator::NamedDeclarator(Locatable loc, Symbol iden, Kind kind,
+                                 std::vector<Locatable> pointers)
+    : Declarator(loc, Declarator::Named, std::move(pointers)), iden(iden),
+      kind(kind) {}
+NamedDeclarator::~NamedDeclarator() {}
+NamedDeclarator::Kind NamedDeclarator::getKind() const { return kind; }
+Symbol NamedDeclarator::getIdentifier() const { return iden; }
 
 ValuedDeclarator::ValuedDeclarator(Locatable loc, Symbol iden, Kind kind)
-    : Declarator(loc, Declarator::Valued), iden(iden), kind(kind) {}
+    : NamedDeclarator(loc, iden, NamedDeclarator::Valued), kind(kind) {}
+ValuedDeclarator::ValuedDeclarator(Locatable loc, Symbol iden, Kind kind,
+                                   std::vector<Locatable> pointers)
+    : NamedDeclarator(loc, iden, NamedDeclarator::Valued, std::move(pointers)),
+      kind(kind) {}
+ValuedDeclarator::~ValuedDeclarator() {}
 ValuedDeclarator::Kind ValuedDeclarator::getKind() const { return kind; }
-Symbol ValuedDeclarator::getIdentifier() const { return iden; }
 
 VariableDeclarator::VariableDeclarator(Locatable loc, Symbol iden)
     : ValuedDeclarator(loc, iden, Kind::Variable) {}
 
 FunctionVariableDeclarator::FunctionVariableDeclarator(
-    Locatable loc, ValuedDeclaratorPtr decl,
+    Locatable loc, VariableDeclaratorPtr decl,
     std::vector<DeclaratorDeclPtr> params)
-    : ValuedDeclarator(loc, decl->getIdentifier(), Kind::FunctionVariable),
-      params(std::move(params)) {
-  for (auto p : decl->getPointers())
-    add_pointer(p);
-}
+    : ValuedDeclarator(loc, decl->getIdentifier(), Kind::FunctionVariable,
+                       decl->getPointers()),
+      params(std::move(params)) {}
 
 size_t FunctionVariableDeclarator::return_pointer_size() const {
   return return_pointers.size();
@@ -86,9 +122,7 @@ FunctionVariableDeclarator::getParams() const {
 
 FunctionDeclarator::FunctionDeclarator(Locatable loc, Symbol iden,
                                        std::vector<DeclaratorDeclPtr> params)
-    : Declarator(loc, Kind::Function), iden(iden), params(std::move(params)) {}
-
-Symbol FunctionDeclarator::getIdentifier() const { return iden; }
+    : NamedDeclarator(loc, iden, Kind::Function), params(std::move(params)) {}
 
 const std::vector<std::reference_wrapper<const DeclaratorDecl>>
 FunctionDeclarator::getParams() const {
@@ -152,14 +186,17 @@ Symbol FuncDef::getIdentifier() const {
       .getIdentifier();
 }
 
-StructDef::StructDef(Locatable loc, Symbol iden, std::vector<DeclPtr> decls)
+StructDef::StructDef(Locatable loc, Symbol iden,
+                     std::vector<DeclaratorDeclPtr> decls)
     : Decl(loc, Decl::StructDef), iden(iden), field_decls(std::move(decls)) {}
-
+// void StructDef::add_field(DeclPtr field) {
+//   field_decls.emplace_back(std::move(field));
+// }
 Symbol StructDef::getIdentifier() const { return iden; }
 
-const std::vector<std::reference_wrapper<const Decl>>
+const std::vector<std::reference_wrapper<const DeclaratorDecl>>
 StructDef::getFieldDecls() const {
-  std::vector<std::reference_wrapper<const Decl>> res;
+  std::vector<std::reference_wrapper<const DeclaratorDecl>> res;
   for (auto &structDecl : field_decls)
     res.emplace_back(std::cref(*structDecl));
   return res;

@@ -5,6 +5,7 @@
 #include "SyntaxExpr.hpp"
 #include "Token.hpp"
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "FirstFollow.def"
@@ -57,8 +58,8 @@ ExprPtr Parser::parsePostfixExprSuffix(ExprPtr expr) {
     bump();
     auto expr_in_square = parseExpr();
     expect(TK_RSQUARE, "']' in array subscript");
-    return std::make_unique<ArraySubscriptExpr>(loc, std::move(expr),
-                                                std::move(expr_in_square));
+    return Action.ActOnArraySubscriptExpr(loc, std::move(expr),
+                                          std::move(expr_in_square));
   }
   case TK_LPAREN: {
     Locatable loc(location());
@@ -84,8 +85,8 @@ ExprPtr Parser::parsePostfixExprSuffix(ExprPtr expr) {
     return std::make_unique<MemberExpr>(loc, std::move(expr), std::move(iden),
                                         acccesOp);
   }
-    POST_FOLLOW
-    return expr;
+    // POST_FOLLOW
+    // return expr;
   }
 }
 
@@ -133,7 +134,11 @@ ExprPtr Parser::parseUnaryExpr() {
     break;
   }
   }
-  expr = parsePostfixExprSuffix(std::move(expr));
+  TokenKind tk = kind();
+  while (tk == TK_LSQUARE || tk == TK_LPAREN || tk == TK_PERIOD ||
+         tk == TK_ARROW) {
+    expr = parsePostfixExprSuffix(std::move(expr));
+  }
   return expr;
 }
 
@@ -146,7 +151,7 @@ ExprPtr Parser::parseIdentifierExpr() {
   Locatable loc(location());
   Symbol identifier = cursor->Text;
   bump();
-  return std::make_unique<IdentifierExpr>(loc, identifier);
+  return Action.ActOnIdenExpr(loc, identifier);
 }
 
 ExprPtr Parser::parseConstantExpr() {

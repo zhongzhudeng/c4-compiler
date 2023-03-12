@@ -47,7 +47,7 @@ public:
 
 class Declarator {
 public:
-  enum Kind { Valued, Function, Abstract };
+  enum Kind { Named, Abstract };
 
 private:
   Locatable loc;
@@ -57,6 +57,7 @@ private:
 
 public:
   Declarator(Locatable loc, Kind kind);
+  Declarator(Locatable loc, Kind kind, std::vector<Locatable> pointers);
   Declarator(DeclaratorPtr decl, Kind kind);
   virtual ~Declarator();
   const Locatable &getLoc() const;
@@ -65,21 +66,43 @@ public:
   size_t pointer_size() const;
   void add_pointer(Locatable loc);
   void set_paren();
-  bool is_paren();
+  bool is_paren() const;
+  bool is_abstract() const;
+  bool is_named() const;
+  bool is_function() const;
+  const VariableDeclarator & as_variable_declarator() const;
 };
 
-class ValuedDeclarator : public Declarator {
+class NamedDeclarator : public Declarator {
 public:
-  enum Kind { Variable, FunctionVariable };
+  enum Kind { Valued, Function };
 
 private:
   Symbol iden;
   Kind kind;
 
 public:
-  ValuedDeclarator(Locatable loc, Symbol iden, Kind kind);
+  NamedDeclarator(Locatable loc, Symbol iden, Kind kind);
+  NamedDeclarator(Locatable loc, Symbol iden, Kind kind,
+                  std::vector<Locatable> pointers);
+  virtual ~NamedDeclarator();
   Kind getKind() const;
   Symbol getIdentifier() const;
+};
+
+class ValuedDeclarator : public NamedDeclarator {
+public:
+  enum Kind { Variable, FunctionVariable };
+
+private:
+  Kind kind;
+
+public:
+  ValuedDeclarator(Locatable loc, Symbol iden, Kind kind);
+  ValuedDeclarator(Locatable loc, Symbol iden, Kind kind,
+                   std::vector<Locatable> pointers);
+  virtual ~ValuedDeclarator();
+  Kind getKind() const;
 };
 
 class VariableDeclarator final : public ValuedDeclarator {
@@ -92,22 +115,22 @@ class FunctionVariableDeclarator final : public ValuedDeclarator {
   std::vector<Locatable> return_pointers;
 
 public:
-  FunctionVariableDeclarator(Locatable loc, ValuedDeclaratorPtr decl,
+  FunctionVariableDeclarator(Locatable loc, VariableDeclaratorPtr decl,
                              std::vector<DeclaratorDeclPtr> params);
+  FunctionVariableDeclarator(const FunctionVariableDeclarator &other) = delete;
   size_t return_pointer_size() const;
   void add_return_pointer(Locatable loc);
   const std::vector<std::reference_wrapper<const DeclaratorDecl>>
   getParams() const;
 };
 
-class FunctionDeclarator final : public Declarator {
-  Symbol iden;
+class FunctionDeclarator final : public NamedDeclarator {
   std::vector<DeclaratorDeclPtr> params;
 
 public:
   FunctionDeclarator(Locatable loc, Symbol iden,
                      std::vector<DeclaratorDeclPtr> params);
-  Symbol getIdentifier() const;
+  FunctionDeclarator(const FunctionDeclarator &other) = delete;
   const std::vector<std::reference_wrapper<const DeclaratorDecl>>
   getParams() const;
 };
@@ -142,9 +165,18 @@ public:
   DeclaratorDecl(Locatable loc, DeclSpecPtr declSpec, DeclaratorPtr declarator);
   virtual ~DeclaratorDecl();
   const DeclSpec &getDeclSpec() const;
-  const class Declarator &getDeclarator() const;
+  virtual const class Declarator &getDeclarator() const;
   Declarator::Kind getKind() const;
   const Type getType() const;
+};
+
+class NamedDeclaratorDecl : public DeclaratorDecl {
+public:
+  const NamedDeclarator &getDeclarator() const override;
+};
+
+class AbstractDeclaratorDecl : public DeclaratorDecl {
+  const AbstractDeclarator &getDeclarator() const override;
 };
 
 class LabelDecl final : public Decl {
@@ -168,10 +200,12 @@ public:
 
 class StructDef final : public Decl {
   Symbol iden;
-  std::vector<DeclPtr> field_decls;
+  std::vector<DeclaratorDeclPtr> field_decls;
 
 public:
-  StructDef(Locatable loc, Symbol iden, std::vector<DeclPtr> decls);
+  StructDef(Locatable loc, Symbol iden, std::vector<DeclaratorDeclPtr> decls);
+  StructDef(const StructDef &other) = delete;
   Symbol getIdentifier() const;
-  const std::vector<std::reference_wrapper<const Decl>> getFieldDecls() const;
+  const std::vector<std::reference_wrapper<const DeclaratorDecl>>
+  getFieldDecls() const;
 };

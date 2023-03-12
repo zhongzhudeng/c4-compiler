@@ -56,15 +56,23 @@ public:
   }
   void VisitDeclarator(const Declarator &declarator) {
     switch (declarator.getKind()) {
-    case Declarator::Valued:
-      return static_cast<Derived &>(*this).VisitValuedDeclarator(
-          static_cast<const ValuedDeclarator &>(declarator));
-    case Declarator::Function:
-      return static_cast<Derived &>(*this).VisitFunctionDeclarator(
-          static_cast<const FunctionDeclarator &>(declarator));
+    case Declarator::Named:
+      return static_cast<Derived &>(*this).VisitNamedDeclarator(
+          static_cast<const NamedDeclarator &>(declarator));
+
     case Declarator::Abstract:
       return static_cast<Derived &>(*this).VisitAbstractDeclarator(
           static_cast<const AbstractDeclarator &>(declarator));
+    }
+  }
+  void VisitNamedDeclarator(const NamedDeclarator &declarator) {
+    switch (declarator.getKind()) {
+    case NamedDeclarator::Valued:
+      return static_cast<Derived &>(*this).VisitValuedDeclarator(
+          static_cast<const ValuedDeclarator &>(declarator));
+    case NamedDeclarator::Function:
+      return static_cast<Derived &>(*this).VisitFunctionDeclarator(
+          static_cast<const FunctionDeclarator &>(declarator));
     }
   }
   void VisitValuedDeclarator(const ValuedDeclarator &declarator) {

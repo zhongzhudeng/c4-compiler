@@ -1,14 +1,16 @@
 #include "SyntaxExpr.hpp"
 #include "Diagnostic.hpp"
 #include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
+#include <cassert>
 
 Expr::Expr(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
 Expr::~Expr() {}
 const Locatable &Expr::getLoc() { return loc; }
 Expr::Kind Expr::getKind() const { return kind; }
 
-IdentifierExpr::IdentifierExpr(Locatable loc, Symbol identifier)
-    : Expr(loc, Expr::Identifier), identifier(identifier) {}
+IdentifierExpr::IdentifierExpr(Locatable loc, const NamedDeclaratorDecl &decl)
+    : Expr(loc, Expr::Identifier), decl(decl) {}
 ConstantExpr::ConstantExpr(Locatable loc, Symbol val)
     : Expr(loc, Expr::Constant), val(val) {}
 StringLiteralExpr::StringLiteralExpr(Locatable loc, Symbol val)
@@ -41,7 +43,10 @@ MemberExpr::MemberExpr(Locatable loc, ExprPtr expr, ExprPtr member,
     : Expr(loc, Expr::Member), expr(std::move(expr)), member(std::move(member)),
       acccesOp(acccesOp) {}
 
-Symbol IdentifierExpr::getIdentifier() const { return identifier; }
+Symbol IdentifierExpr::getIdentifier() const {
+  return decl.getDeclarator().getIdentifier();
+}
+
 Symbol ConstantExpr::getConstant() const { return val; };
 Symbol StringLiteralExpr::getStringLiteral() const { return val; };
 const Expr &ParenExpr::getExpr() const { return const_cast<Expr &>(*expr); }

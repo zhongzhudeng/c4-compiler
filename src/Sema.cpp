@@ -4,8 +4,10 @@
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
+#include "SyntaxExpr.hpp"
 #include "SyntaxStmt.hpp"
-#include <cstdlib>
+#include <algorithm>
+#include <cassert>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -16,29 +18,65 @@ Sema::Sema() {
 }
 Sema::~Sema() { delete program_scope; }
 
+IdentifierExprPtr Sema::ActOnIdenExpr(Locatable loc, Symbol iden) {
+  auto decl = cur_scope->find(iden);
+  if (!decl.has_value())
+    errorloc(loc, "Undefined symbol ", *iden);
+  return std::make_unique<IdentifierExpr>(loc, decl->get());
+}
+
+ArraySubscriptExprPtr Sema::ActOnArraySubscriptExpr(Locatable loc, ExprPtr expr,
+                                                    ExprPtr squared_expr) {
+  // Type ty = ;
+  // return std::make_unique<ArraySubscriptExpr>(loc, std::move(expr),
+  //                                             std::move(squared_expr), ty);
+}
+
+DeclaratorPtr Sema::ActOnNonFuncDeclarator(DeclaratorPtr decl) {
+  switch (decl->getKind()) {
+  case Declarator::Named: {
+    Symbol iden = static_cast<const NamedDeclarator &>(*decl).getIdentifier();
+    if (cur_scope->find(iden).has_value())
+      errorloc(decl->getLoc(), "Redefinition of symbol", iden);
+    return decl;
+  }
+  case Declarator::Abstract:
+    return decl;
+  }
+}
+
 FuncDefPtr Sema::ActOnFunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
                                          CompStmtPtr stmt) {
-  auto function_definition =
+  assert(cur_scope == program_scope);
+  Symbol iden = static_cast<const ValuedDeclarator &>(decl->getDeclarator())
+                    .getIdentifier();
+  if (program_scope->find_function(iden)) {
+    errorloc(loc, "Redefinition of function", iden);
+  }
+  auto function =
       std::make_unique<FuncDef>(loc, std::move(decl), std::move(stmt));
-  program_scope->insert_function_definition(*function_definition);
-  return function_definition;
+  program_scope->insert_function(*function);
+  return function;
 }
-StructDefPtr Sema::ActOnStructDefinition(Locatable loc, Token iden,
-                                         std::vector<DeclPtr> fields) {
+
+DeclaratorDeclPtr Sema::ActOnFunctionDecl(DeclaratorDeclPtr decl) {
+  assert(cur_scope == program_scope);
+  program_scope->insert_function_decl(*decl);
+  return decl;
+}
+
+StructDefPtr
+Sema::ActOnStructDefinition(Locatable loc, Token iden,
+                            std::vector<DeclaratorDeclPtr> fields) {
   // 1. check if the struct already defined in this scope
   if (cur_scope->find_struct(iden.Text).has_value())
     errorloc(iden, "struct already defined");
   // 2. check field decl types and iden
   for (auto &field : fields) {
-    if (field->getKind() != Decl::Declarator)
-      errorloc(field->getLoc(), "Unexpected declarator type");
-    const Declarator &declarator =
-        static_cast<DeclaratorDecl &>(*field).getDeclarator();
-    if (declarator.getKind() != Declarator::Valued)
-      errorloc(declarator.getLoc(), "Unexpected declarator type");
-    if (static_cast<const ValuedDeclarator &>(declarator).getIdentifier() ==
-        iden.Text)
-      errorloc(declarator.getLoc(),
+    const VariableDeclarator &decl =
+        field->getDeclarator().as_variable_declarator();
+    if (decl.getIdentifier() == iden.Text)
+      errorloc(decl.getLoc(),
                "A structure or union shall not contain a member with  an "
                "instance of itself");
   }
@@ -61,40 +99,37 @@ StructSpecPtr Sema::ActOnStructSpec(Locatable loc, StructDefPtr struct_def) {
 DeclaratorDeclPtr Sema::ActOnDeclaration(Locatable loc, DeclSpecPtr spec,
                                          DeclaratorPtr decl) {
   switch (decl->getKind()) {
-  case Declarator::Valued: {
-    auto valued_declarator = std::unique_ptr<ValuedDeclarator>(
-        static_cast<ValuedDeclarator *>(decl.release()));
-    switch (valued_declarator->getKind()) {
-    case ValuedDeclarator::Variable: {
-      if (cur_scope->find_variable(valued_declarator->getIdentifier())
-              .has_value())
-        errorloc(decl->getLoc(), "variable already defined");
-      auto variable = std::make_unique<DeclaratorDecl>(
-          loc, std::move(spec), std::move(valued_declarator));
-      cur_scope->insert_variable(*variable);
+  case Declarator::Named: {
+    const NamedDeclarator &named_declarator =
+        static_cast<const NamedDeclarator &>(*decl);
+    switch (named_declarator.getKind()) {
+    case NamedDeclarator::Valued: {
+      auto valued_declarator = std::unique_ptr<ValuedDeclarator>(
+          static_cast<ValuedDeclarator *>(decl.release()));
+      DeclaratorDeclPtr variable = nullptr;
+      switch (valued_declarator->getKind()) {
+      case ValuedDeclarator::Variable:
+        variable = std::make_unique<DeclaratorDecl>(
+            loc, std::move(spec), std::move(valued_declarator));
+        break;
+      case ValuedDeclarator::FunctionVariable:
+        variable = std::make_unique<DeclaratorDecl>(
+            loc, std::move(spec), std::move(valued_declarator));
+        break;
+      }
+      cur_scope->insert(*variable);
       return variable;
     }
-    case ValuedDeclarator::FunctionVariable:
-      auto function_variable = std::make_unique<DeclaratorDecl>(
-          loc, std::move(spec), std::move(valued_declarator));
-      cur_scope->insert_function_variable(*function_variable);
-      return function_variable;
+    case NamedDeclarator::Function:
+      return std::make_unique<DeclaratorDecl>(loc, std::move(spec),
+                                              std::move(decl));
     }
   }
-  case Declarator::Function: {
-    if (cur_scope != program_scope)
-      errorloc(loc, "function declared not in program scope");
-    auto function =
-        std::make_unique<DeclaratorDecl>(loc, std::move(spec), std::move(decl));
-    program_scope->insert_function(*function);
-    return function;
-  }
-  case Declarator::Abstract: {
+  case Declarator::Abstract:
     return std::make_unique<DeclaratorDecl>(
         loc, std::move(spec),
         std::unique_ptr<AbstractDeclarator>(
             static_cast<AbstractDeclarator *>(decl.release())));
-  }
   }
 }
 
@@ -136,14 +171,23 @@ void Sema::resolve_backing_label_decl() {
 }
 
 void Sema::enter_func_scope() {
-  if (cur_scope != program_scope)
-    exit(1); // TODO:
+  assert(cur_scope == program_scope);
   cur_func_scope = new FuncScope(program_scope);
   cur_scope = cur_func_scope;
 }
 void Sema::exit_func_scope() {
-  if (cur_scope != cur_func_scope)
-    exit(1); // TODO:
+  assert(cur_scope == cur_func_scope);
   delete cur_func_scope;
   cur_scope = program_scope;
+}
+
+void Sema::enter_scope() {
+  auto new_scope = new Scope(cur_scope);
+  cur_scope = new_scope;
+}
+
+void Sema::exit_scope() {
+  auto parent_scope = cur_scope;
+  delete cur_scope;
+  cur_scope = parent_scope;
 }

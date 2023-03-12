@@ -98,6 +98,7 @@ StmtPtr Parser::parseStmt() {
 }
 
 CompStmtPtr Parser::parseCompoundStmt() {
+  Action.enter_scope();
   Locatable loc(location());
   expect(TK_LBRACE, "'{' in compound statement");
   std::vector<StmtPtr> bil;
@@ -108,11 +109,11 @@ CompStmtPtr Parser::parseCompoundStmt() {
       break;
       DECLARATION
       Locatable l(location());
-      bil.push_back(
-          std::make_unique<DeclStmt>(l, parseDecl()));
+      bil.push_back(std::make_unique<DeclStmt>(l, parseDecl()));
       expect(TK_SEMICOLON, "';' after declaration");
       break;
     }
   }
+  Action.exit_scope();
   return std::make_unique<CompStmt>(loc, std::move(bil));
 }

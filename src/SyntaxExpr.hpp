@@ -27,10 +27,10 @@ public:
 };
 
 class IdentifierExpr final : public Expr {
-  Symbol identifier;
+  const NamedDeclaratorDecl &decl;
 
 public:
-  IdentifierExpr(Locatable loc, Symbol identifier);
+  IdentifierExpr(Locatable loc, const NamedDeclaratorDecl &decl);
   Symbol getIdentifier() const;
 };
 class ConstantExpr final : public Expr {
