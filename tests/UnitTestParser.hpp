@@ -7,32 +7,24 @@
 #include "SyntaxExpr.hpp"
 #include "SyntaxStmt.hpp"
 #include "fmt/core.h"
+#include <cstdint>
 #include <sstream>
 
-template <typename AST> class UnitTestParser {
+class UnitTestParser {
+private:
+  uint64_t test_idx=0;
+
 public:
-  std::string parse(int idx, std::string src) {
-    std::string filename = fmt::format("dummy{}.c", idx);
+  std::string parse(std::string src) {
+    std::string filename = fmt::format("dummy{}.c", test_idx++);
     SymbolInternalizer symbolInternalizer;
     Lexer lexer(filename.data(), std::move(src), symbolInternalizer);
     std::vector<Token> token_stream;
     lexer.tokenize([&](Token tok) { token_stream.emplace_back(tok); });
     Sema sema;
     Parser parser(std::move(token_stream), sema);
-    std::unique_ptr<AST> ptr;
-    if constexpr (std::is_same_v<AST, Expr>) {
-      ptr = parser.parseExpr();
-    } else if constexpr (std::is_same_v<AST, DeclaratorDecl>) {
-      ptr = parser.parseDecl();
-    } else if constexpr (std::is_same_v<AST, Stmt>) {
-      sema.enter_func_scope();
-      ptr = parser.parseStmt();
-      sema.exit_func_scope();
-    } else if constexpr (std::is_same_v<AST, Decl>) {
-      ptr = parser.parseExternDecl();
-    }
     std::ostringstream os;
-    ptr->print(os);
+    parser.parse()->print(os);
     return os.str();
   }
 };

@@ -19,7 +19,7 @@ Sema::Sema() {
 Sema::~Sema() { delete program_scope; }
 
 IdentifierExprPtr Sema::ActOnIdenExpr(Locatable loc, Symbol iden) {
-  auto decl = cur_scope->find(iden);
+  auto decl = cur_scope->find_variable(iden);
   if (!decl.has_value())
     errorloc(loc, "Undefined symbol ", *iden);
   return std::make_unique<IdentifierExpr>(loc, decl->get());
@@ -36,7 +36,7 @@ DeclaratorPtr Sema::ActOnNonFuncDeclarator(DeclaratorPtr decl) {
   switch (decl->getKind()) {
   case Declarator::Named: {
     Symbol iden = static_cast<const NamedDeclarator &>(*decl).getIdentifier();
-    if (cur_scope->find(iden).has_value())
+    if (cur_scope->find_variable(iden).has_value())
       errorloc(decl->getLoc(), "Redefinition of symbol", iden);
     return decl;
   }
@@ -48,14 +48,12 @@ DeclaratorPtr Sema::ActOnNonFuncDeclarator(DeclaratorPtr decl) {
 FuncDefPtr Sema::ActOnFunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
                                          CompStmtPtr stmt) {
   assert(cur_scope == program_scope);
-  Symbol iden = static_cast<const ValuedDeclarator &>(decl->getDeclarator())
-                    .getIdentifier();
-  if (program_scope->find_function(iden)) {
-    errorloc(loc, "Redefinition of function", iden);
-  }
+  Symbol iden = decl->getDeclarator().as_function_declarator().getIdentifier();
+  if (program_scope->find_function_definition(iden))
+    errorloc(loc, "Redefinition of function ", *iden);
   auto function =
-      std::make_unique<FuncDef>(loc, std::move(decl), std::move(stmt));
-  program_scope->insert_function(*function);
+      std::make_unique<FunctionDefinition>(loc, std::move(decl), std::move(stmt));
+  program_scope->insert_function_definition(*function);
   return function;
 }
 
@@ -99,37 +97,25 @@ StructSpecPtr Sema::ActOnStructSpec(Locatable loc, StructDefPtr struct_def) {
 DeclaratorDeclPtr Sema::ActOnDeclaration(Locatable loc, DeclSpecPtr spec,
                                          DeclaratorPtr decl) {
   switch (decl->getKind()) {
-  case Declarator::Named: {
-    const NamedDeclarator &named_declarator =
-        static_cast<const NamedDeclarator &>(*decl);
-    switch (named_declarator.getKind()) {
-    case NamedDeclarator::Valued: {
-      auto valued_declarator = std::unique_ptr<ValuedDeclarator>(
-          static_cast<ValuedDeclarator *>(decl.release()));
-      DeclaratorDeclPtr variable = nullptr;
-      switch (valued_declarator->getKind()) {
-      case ValuedDeclarator::Variable:
-        variable = std::make_unique<DeclaratorDecl>(
-            loc, std::move(spec), std::move(valued_declarator));
-        break;
-      case ValuedDeclarator::FunctionVariable:
-        variable = std::make_unique<DeclaratorDecl>(
-            loc, std::move(spec), std::move(valued_declarator));
-        break;
-      }
-      cur_scope->insert(*variable);
-      return variable;
-    }
-    case NamedDeclarator::Function:
-      return std::make_unique<DeclaratorDecl>(loc, std::move(spec),
-                                              std::move(decl));
-    }
-  }
   case Declarator::Abstract:
     return std::make_unique<DeclaratorDecl>(
         loc, std::move(spec),
         std::unique_ptr<AbstractDeclarator>(
             static_cast<AbstractDeclarator *>(decl.release())));
+  case Declarator::Named: {
+    switch (decl->as_named_declarator().getKind()) {
+    case NamedDeclarator::Function:
+      return std::make_unique<DeclaratorDecl>(loc, std::move(spec),
+                                              std::move(decl));
+    case NamedDeclarator::Valued: {
+      DeclaratorDeclPtr variable_decl = std::make_unique<DeclaratorDecl>(
+          loc, std::move(spec), std::move(decl));
+
+      cur_scope->insert_variable(*variable_decl);
+      return variable_decl;
+    }
+    }
+  }
   }
 }
 
@@ -190,4 +176,14 @@ void Sema::exit_scope() {
   auto parent_scope = cur_scope;
   delete cur_scope;
   cur_scope = parent_scope;
+}
+
+// TODO:
+void Sema::add_parameters(const FunctionDeclarator &function_declarator) {
+  assert(cur_scope == cur_func_scope);
+  auto params = function_declarator.getParams();
+  std::for_each(params.begin(), params.end(),
+                [&](std::reference_wrapper<const DeclaratorDecl> decl) {
+                  cur_scope->insert_variable(decl.get());
+                });
 }

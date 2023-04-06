@@ -34,28 +34,36 @@ class NamedDeclarator;
 class ValuedDeclarator;
 class VariableDeclarator;
 class FunctionVariableDeclarator;
-class AbstractDeclarator;
 class FunctionDeclarator;
+class AbstractDeclarator;
+class AbstractVariableDeclarator;
+class AbstractFunctionVariableDeclarator;
 using DeclaratorPtr = std::unique_ptr<Declarator>;
 using NamedDeclaratorPtr = std::unique_ptr<NamedDeclarator>;
 using ValuedDeclaratorPtr = std::unique_ptr<ValuedDeclarator>;
 using VariableDeclaratorPtr = std::unique_ptr<VariableDeclarator>;
 using FunctionVariableDeclaratorPtr =
     std::unique_ptr<FunctionVariableDeclarator>;
-using AbstractDeclaratorPtr = std::unique_ptr<AbstractDeclarator>;
 using FunctionDeclaratorPtr = std::unique_ptr<FunctionDeclarator>;
+using AbstractDeclaratorPtr = std::unique_ptr<AbstractDeclarator>;
+using AbstractVariableDeclaratorPtr =
+    std::unique_ptr<AbstractVariableDeclarator>;
+using AbstractFunctionVariableDeclaratorPtr =
+    std::unique_ptr<AbstractFunctionVariableDeclarator>;
 
+class TranslationUnit;
 class Decl;
 class DeclaratorDecl;
 class NamedDeclaratorDecl;
 class LabelDecl;
-class FuncDef;
+class FunctionDefinition;
 class StructDef;
+using TranslationUnitPtr = std::unique_ptr<TranslationUnit>;
 using DeclPtr = std::unique_ptr<Decl>;
 using DeclaratorDeclPtr = std::unique_ptr<DeclaratorDecl>;
 using NamedDeclaratorDeclPtr = std::unique_ptr<NamedDeclaratorDecl>;
 using LabelDeclPtr = std::unique_ptr<LabelDecl>;
-using FuncDefPtr = std::unique_ptr<FuncDef>;
+using FuncDefPtr = std::unique_ptr<FunctionDefinition>;
 using StructDefPtr = std::unique_ptr<StructDef>;
 
 class Stmt;

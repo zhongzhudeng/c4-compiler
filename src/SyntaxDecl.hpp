@@ -67,10 +67,18 @@ public:
   void add_pointer(Locatable loc);
   void set_paren();
   bool is_paren() const;
-  bool is_abstract() const;
   bool is_named() const;
+  bool is_valued() const;
+  bool is_variable() const;
+  bool is_function_variable() const;
   bool is_function() const;
-  const VariableDeclarator & as_variable_declarator() const;
+  bool is_abstract() const;
+  const NamedDeclarator &as_named_declarator() const;
+  const ValuedDeclarator &as_valued_declarator() const;
+  const VariableDeclarator &as_variable_declarator() const;
+  const FunctionVariableDeclarator &as_function_variable_declarator() const;
+  const FunctionDeclarator &as_function_declarator() const;
+  const AbstractDeclarator &as_abstract_declarator() const;
 };
 
 class NamedDeclarator : public Declarator {
@@ -135,9 +143,28 @@ public:
   getParams() const;
 };
 
-class AbstractDeclarator final : public Declarator {
+class AbstractDeclarator : public Declarator {
+public:
+  enum Kind { Variable, FunctionVariable };
+
+private:
+  Kind kind;
+
 public:
   AbstractDeclarator(Locatable loc);
+};
+
+class AbstractVariableDeclarator final : public AbstractDeclarator {};
+class AbstractFunctionVariableDeclarator final : public AbstractDeclarator {};
+
+class TranslationUnit {
+private:
+  std::vector<DeclPtr> declarations;
+
+public:
+  void insert(DeclPtr decl);
+  const std::vector<std::reference_wrapper<const Decl>> getDeclarations() const;
+  void print(std::ostream &os) const;
 };
 
 class Decl {
@@ -153,6 +180,7 @@ public:
   virtual ~Decl();
   const Locatable &getLoc() const;
   Kind getKind() const;
+  bool is_function_definition() const;
   void print(std::ostream &os, unsigned indentation = 0) const;
 };
 
@@ -165,19 +193,53 @@ public:
   DeclaratorDecl(Locatable loc, DeclSpecPtr declSpec, DeclaratorPtr declarator);
   virtual ~DeclaratorDecl();
   const DeclSpec &getDeclSpec() const;
-  virtual const class Declarator &getDeclarator() const;
+  const class Declarator &getDeclarator() const;
   Declarator::Kind getKind() const;
   const Type getType() const;
 };
 
 class NamedDeclaratorDecl : public DeclaratorDecl {
 public:
-  const NamedDeclarator &getDeclarator() const override;
+  NamedDeclaratorDecl(Locatable loc, DeclSpecPtr declSpec,
+                      NamedDeclaratorPtr declarator);
+  Symbol getIdentifier() const;
 };
 
-class AbstractDeclaratorDecl : public DeclaratorDecl {
-  const AbstractDeclarator &getDeclarator() const override;
+class VariableDecl;
+class FunctionVariableDecl;
+
+class ValuedDecl : public NamedDeclaratorDecl {
+public:
+  ValuedDecl(Locatable loc, DeclSpecPtr declSpec,
+             ValuedDeclaratorPtr declarator);
+  ValuedDeclarator::Kind getKind() const;
+  const VariableDecl &as_variable() const;
+  const FunctionVariableDecl &as_function_variable() const;
 };
+
+class VariableDecl final : public ValuedDecl {
+public:
+  VariableDecl(Locatable loc, DeclSpecPtr declSpec,
+               VariableDeclaratorPtr declarator);
+};
+
+class FunctionVariableDecl final : public ValuedDecl {
+public:
+  FunctionVariableDecl(Locatable loc, DeclSpecPtr declSpec,
+                       FunctionVariableDeclaratorPtr declarator);
+};
+
+class FunctionDecl final : public NamedDeclaratorDecl {
+public:
+  FunctionDecl(Locatable loc, DeclSpecPtr declSpec,
+               FunctionDeclaratorPtr declarator);
+};
+
+class AbstractDecl : public DeclaratorDecl {};
+
+class AbstractVariableDecl final : public AbstractDecl {};
+
+class AbstractFunctionVariableDecl final : public AbstractDecl {};
 
 class LabelDecl final : public Decl {
   Symbol iden;
@@ -187,13 +249,15 @@ public:
   Symbol getIdentifier() const;
 };
 
-class FuncDef final : public Decl {
+class FunctionDefinition final : public Decl {
   DeclaratorDeclPtr decl;
   CompStmtPtr compoundStmt;
 
 public:
-  FuncDef(Locatable loc, DeclaratorDeclPtr decl, CompStmtPtr compoundStmt);
+  FunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
+                     CompStmtPtr compoundStmt);
   const DeclaratorDecl &getDecl() const;
+  const FunctionDeclarator &getDeclarator() const;
   const CompStmt &getCompStmt() const;
   Symbol getIdentifier() const;
 };

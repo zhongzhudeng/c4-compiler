@@ -6,6 +6,18 @@
 #include <utility>
 #include <vector>
 
+void TranslationUnit::insert(DeclPtr decl) {
+  declarations.push_back(std::move(decl));
+}
+
+const std::vector<std::reference_wrapper<const Decl>>
+TranslationUnit::getDeclarations() const {
+  std::vector<std::reference_wrapper<const Decl>> res;
+  for (auto &decl : declarations)
+    res.emplace_back(std::cref(*decl));
+  return res;
+}
+
 DeclSpec::DeclSpec(Locatable loc, Type::Kind kind) : loc(loc), kind(kind) {}
 
 DeclSpec::~DeclSpec() {}
@@ -57,23 +69,55 @@ void Declarator::set_paren() { paren = true; }
 
 bool Declarator::is_paren() const { return paren; }
 
-bool Declarator::is_abstract() const { return kind == Abstract; }
+bool Declarator::is_named() const { return kind == Named; }
 
-bool Declarator::is_named() const { return getKind() == Named; }
-
-bool Declarator::is_function() const {
-  return getKind() == Named &&
-         static_cast<const NamedDeclarator &>(*this).getKind() ==
-             NamedDeclarator::Function;
+bool Declarator::is_valued() const {
+  return is_named() &&
+         as_named_declarator().getKind() == NamedDeclarator::Valued;
 }
 
+bool Declarator::is_variable() const {
+  return is_valued() &&
+         as_valued_declarator().getKind() == ValuedDeclarator::Variable;
+}
+
+bool Declarator::is_function_variable() const {
+  return is_valued() &&
+         as_valued_declarator().getKind() == ValuedDeclarator::FunctionVariable;
+}
+
+bool Declarator::is_function() const {
+  return is_named() &&
+         as_named_declarator().getKind() == NamedDeclarator::Function;
+}
+
+bool Declarator::is_abstract() const { return kind == Abstract; }
+
+const NamedDeclarator &Declarator::as_named_declarator() const {
+  assert(is_named());
+  return static_cast<const NamedDeclarator &>(*this);
+}
+
+const ValuedDeclarator &Declarator::as_valued_declarator() const {
+  assert(is_valued());
+  return static_cast<const ValuedDeclarator &>(*this);
+}
 const VariableDeclarator &Declarator::as_variable_declarator() const {
-  assert(kind == Named);
-  const NamedDeclarator &named = static_cast<const NamedDeclarator &>(*this);
-  assert(named.getKind() == NamedDeclarator::Valued);
-  const ValuedDeclarator &valued = static_cast<const ValuedDeclarator &>(named);
-  assert(valued.getKind() == ValuedDeclarator::Variable);
-  return static_cast<const VariableDeclarator &>(valued);
+  assert(is_variable());
+  return static_cast<const VariableDeclarator &>(*this);
+}
+const FunctionVariableDeclarator &
+Declarator::as_function_variable_declarator() const {
+  assert(is_function_variable());
+  return static_cast<const FunctionVariableDeclarator &>(*this);
+}
+const FunctionDeclarator &Declarator::as_function_declarator() const {
+  assert(is_function());
+  return static_cast<const FunctionDeclarator &>(*this);
+}
+const AbstractDeclarator &Declarator::as_abstract_declarator() const {
+  assert(is_abstract());
+  return static_cast<const AbstractDeclarator &>(*this);
 }
 
 NamedDeclarator::NamedDeclarator(Locatable loc, Symbol iden, Kind kind)
@@ -140,6 +184,8 @@ Decl::~Decl() {}
 const Locatable &Decl::getLoc() const { return loc; }
 Decl::Kind Decl::getKind() const { return kind; }
 
+bool Decl::is_function_definition() const { return kind == FuncDef; }
+
 LabelDecl::LabelDecl(Locatable loc, Symbol iden)
     : Decl(loc, Decl::LabelDecl), iden(iden) {}
 Symbol LabelDecl::getIdentifier() const { return iden; }
@@ -169,21 +215,33 @@ const Type DeclaratorDecl::getType() const {
              : Type(declSpec->getKind(), declarator->pointer_size());
 }
 
-FuncDef::FuncDef(Locatable loc, DeclaratorDeclPtr decl,
+const NamedDeclarator &NamedDeclaratorDecl::getDeclarator() const {
+  return DeclaratorDecl::getDeclarator().as_named_declarator();
+}
+
+const AbstractDeclarator &AbstractDecl::getDeclarator() const {
+  return DeclaratorDecl::getDeclarator().as_abstract_declarator();
+}
+
+FunctionDefinition::FunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
                  CompStmtPtr compoundStmt)
     : Decl(loc, Kind::FuncDef), decl(std::move(decl)),
       compoundStmt(std::move(compoundStmt)) {}
 
-const class DeclaratorDecl &FuncDef::getDecl() const {
+const class DeclaratorDecl &FunctionDefinition::getDecl() const {
   return const_cast<class DeclaratorDecl &>(*decl);
 }
 
-const CompStmt &FuncDef::getCompStmt() const {
+const CompStmt &FunctionDefinition::getCompStmt() const {
   return const_cast<CompStmt &>(*compoundStmt);
 }
-Symbol FuncDef::getIdentifier() const {
-  return static_cast<const FunctionDeclarator &>(getDecl().getDeclarator())
-      .getIdentifier();
+
+Symbol FunctionDefinition::getIdentifier() const {
+  return getDeclarator().getIdentifier();
+}
+
+const FunctionDeclarator &FunctionDefinition::getDeclarator() const {
+  return getDecl().getDeclarator().as_function_declarator();
 }
 
 StructDef::StructDef(Locatable loc, Symbol iden,

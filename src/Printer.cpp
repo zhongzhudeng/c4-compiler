@@ -82,6 +82,26 @@ public:
   }
 };
 
+class TranslationUnitPrinter
+    : public TranslationUnitVisitor<TranslationUnitPrinter> {
+  std::ostream &os;
+
+public:
+  TranslationUnitPrinter(std::ostream &os) : os(os) {}
+  void visit(const TranslationUnit &ast) {
+    auto declarations = ast.getDeclarations();
+    for (auto it = declarations.begin(); it != declarations.end() - 1; it++) {
+      it->get().print(os);
+      if (not it->get().is_function_definition())
+        os << ';';
+      os << '\n';
+    }
+    declarations.back().get().print(os);
+    if (not declarations.back().get().is_function_definition())
+      os << ';';
+  }
+};
+
 class DeclPrinter : public DeclVisitor<DeclPrinter> {
   std::ostream &os;
   unsigned indentation;
@@ -101,7 +121,7 @@ public:
     VisitDeclarator(decl.getDeclarator());
   }
   void VisitLabelDecl(const LabelDecl &decl) { os << *decl.getIdentifier(); }
-  void VisitFuncDef(const FuncDef &decl) {
+  void VisitFuncDef(const FunctionDefinition &decl) {
     decl.getDecl().print(os);
     os << "\n";
     decl.getCompStmt().print(os);
@@ -302,6 +322,11 @@ public:
 void Expr::print(std::ostream &os) const {
   ExprPrinter printer(os);
   printer.visit(const_cast<Expr &>(*this));
+}
+
+void TranslationUnit::print(std::ostream &os) const {
+  TranslationUnitPrinter printer(os);
+  printer.visit(const_cast<TranslationUnit &>(*this));
 }
 
 void Decl::print(std::ostream &os, unsigned identation) const {

@@ -15,16 +15,13 @@ void Compiler::parse() {
   Lexer lexer(filename, symbolInternalizer);
   Sema sema;
   Parser parser(lexer.tokenize(), sema);
-  parser.parse([](DeclPtr, bool) {});
+  parser.parse();
 }
 
 void Compiler::print_ast() {
   Lexer lexer(filename, symbolInternalizer);
   Sema sema;
   Parser parser(lexer.tokenize(), sema);
-  parser.parse([](DeclPtr ast, bool is_end) {
-    ast->print(std::cout);
-    if (!is_end)
-      std::cout << '\n';
-  });
+  auto ast = parser.parse();
+  ast->print(std::cout);
 }

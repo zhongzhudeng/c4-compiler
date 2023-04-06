@@ -38,9 +38,10 @@ public:
   void exit_func_scope();
   void enter_scope();
   void exit_scope();
+  void add_parameters(const FunctionDeclarator &function_declarator);
 
 private:
-  Scope *cur_scope;
-  FuncScope *cur_func_scope;
-  ProgramScope *program_scope;
+  Scope *cur_scope = nullptr;
+  FuncScope *cur_func_scope = nullptr;
+  ProgramScope *program_scope = nullptr;
 };

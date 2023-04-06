@@ -47,7 +47,7 @@ Level precedence(TokenKind tk) {
   }
 }
 
-ExprPtr Parser::parsePostfixExprSuffix(ExprPtr expr) {
+ExprPtr Parser::ParsePostfixExprSuffix(ExprPtr expr) {
   switch (kind()) {
   default:
     if (is_end())
@@ -56,7 +56,7 @@ ExprPtr Parser::parsePostfixExprSuffix(ExprPtr expr) {
   case TK_LSQUARE: {
     Locatable loc(location());
     bump();
-    auto expr_in_square = parseExpr();
+    auto expr_in_square = ParseExpr();
     expect(TK_RSQUARE, "']' in array subscript");
     return Action.ActOnArraySubscriptExpr(loc, std::move(expr),
                                           std::move(expr_in_square));
@@ -67,7 +67,7 @@ ExprPtr Parser::parsePostfixExprSuffix(ExprPtr expr) {
     std::vector<ExprPtr> args;
     while (!accept(TK_RPAREN)) {
       /// TODO: check token kinds?
-      auto arg = parseExpr();
+      auto arg = ParseExpr();
       args.push_back(std::move(arg));
       if (accept(TK_RPAREN))
         break;
@@ -81,7 +81,7 @@ ExprPtr Parser::parsePostfixExprSuffix(ExprPtr expr) {
     Locatable loc(location());
     Symbol acccesOp = cursor->Text;
     bump();
-    auto iden = parseIdentifierExpr();
+    auto iden = ParseIdentifierExpr();
     return std::make_unique<MemberExpr>(loc, std::move(expr), std::move(iden),
                                         acccesOp);
   }
@@ -90,7 +90,7 @@ ExprPtr Parser::parsePostfixExprSuffix(ExprPtr expr) {
   }
 }
 
-ExprPtr Parser::parseUnaryExpr() {
+ExprPtr Parser::ParseUnaryExpr() {
   ExprPtr expr = nullptr;
 
   switch (kind()) {
@@ -98,16 +98,16 @@ ExprPtr Parser::parseUnaryExpr() {
     errorloc(location(), "Unknown token ", *cursor->Text,
              " when expecting unary expression");
   case TK_LPAREN:
-    expr = parseParenExpr();
+    expr = ParseParenExpr();
     break;
   case TK_IDENTIFIER:
-    expr = parseIdentifierExpr();
+    expr = ParseIdentifierExpr();
     break;
   case TK_CONSTANT:
-    expr = parseConstantExpr();
+    expr = ParseConstantExpr();
     break;
   case TK_STRING_LITERAL:
-    expr = parseStringLiteralExpr();
+    expr = ParseStringLiteralExpr();
     break;
   case TK_AMP:
   case TK_STAR:
@@ -116,7 +116,7 @@ ExprPtr Parser::parseUnaryExpr() {
     Locatable loc(location());
     Symbol Op = cursor->Text;
     bump();
-    expr = parseUnaryExpr();
+    expr = ParseUnaryExpr();
     expr = std::make_unique<UnaryExpr>(loc, Op, std::move(expr));
     break;
   }
@@ -130,53 +130,53 @@ ExprPtr Parser::parseUnaryExpr() {
       expect(TK_RPAREN, "')' after type-name in sizeof (type-name)");
       return std::make_unique<SizeofTypeExpr>(loc, type_name);
     }
-    return std::make_unique<SizeofExpr>(loc, parseUnaryExpr());
+    return std::make_unique<SizeofExpr>(loc, ParseUnaryExpr());
     break;
   }
   }
   TokenKind tk = kind();
   while (tk == TK_LSQUARE || tk == TK_LPAREN || tk == TK_PERIOD ||
          tk == TK_ARROW) {
-    expr = parsePostfixExprSuffix(std::move(expr));
+    expr = ParsePostfixExprSuffix(std::move(expr));
   }
   return expr;
 }
 
-ExprPtr Parser::parseExpr() {
-  ExprPtr LHS = parseUnaryExpr();
-  return parseBinaryExprRHS(Assignment, std::move(LHS));
+ExprPtr Parser::ParseExpr() {
+  ExprPtr LHS = ParseUnaryExpr();
+  return ParseBinaryExprRHS(Assignment, std::move(LHS));
 }
 
-ExprPtr Parser::parseIdentifierExpr() {
+ExprPtr Parser::ParseIdentifierExpr() {
   Locatable loc(location());
   Symbol identifier = cursor->Text;
   bump();
   return Action.ActOnIdenExpr(loc, identifier);
 }
 
-ExprPtr Parser::parseConstantExpr() {
+ExprPtr Parser::ParseConstantExpr() {
   Locatable loc(location());
   Symbol val = cursor->Text;
   bump();
   return std::make_unique<ConstantExpr>(loc, val);
 }
-ExprPtr Parser::parseStringLiteralExpr() {
+ExprPtr Parser::ParseStringLiteralExpr() {
   Locatable loc(location());
   Symbol val = cursor->Text;
   bump();
   return std::make_unique<StringLiteralExpr>(loc, val);
 }
-ExprPtr Parser::parseParenExpr() {
+ExprPtr Parser::ParseParenExpr() {
   Locatable loc(location());
   expect(TK_LPAREN, "'('");
-  auto expr = parseExpr();
+  auto expr = ParseExpr();
   expect(TK_RPAREN, "')'");
   if (expr == nullptr)
     return expr;
   return std::make_unique<ParenExpr>(loc, std::move(expr));
 }
 
-ExprPtr Parser::parseBinaryExprRHS(int exprPrec, ExprPtr LHS) {
+ExprPtr Parser::ParseBinaryExprRHS(int exprPrec, ExprPtr LHS) {
   for (;;) {
     ExprPtr middle = nullptr;
     int TokPrec = precedence(cursor->Kind);
@@ -186,15 +186,15 @@ ExprPtr Parser::parseBinaryExprRHS(int exprPrec, ExprPtr LHS) {
     Symbol BinOp = cursor->Text;
     bump();
     if (TokPrec == Conditional) {
-      middle = parseExpr();
+      middle = ParseExpr();
       expect(TK_COLON, "':' in conditional expression");
     }
-    ExprPtr RHS = parseUnaryExpr();
+    ExprPtr RHS = ParseUnaryExpr();
     if (!RHS)
       return 0;
     int NextPrec = precedence(cursor->Kind);
     if (TokPrec < NextPrec) {
-      RHS = parseBinaryExprRHS(TokPrec + 1, std::move(RHS));
+      RHS = ParseBinaryExprRHS(TokPrec + 1, std::move(RHS));
       if (!RHS)
         return nullptr;
     }

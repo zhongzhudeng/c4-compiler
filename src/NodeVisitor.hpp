@@ -2,6 +2,7 @@
 #include "SyntaxDecl.hpp"
 #include "SyntaxExpr.hpp"
 #include "SyntaxStmt.hpp"
+#include <algorithm>
 
 template <typename Derived> class ExprVisitor {
 public:
@@ -20,6 +21,15 @@ public:
 #undef DISPATCH
 };
 
+template <typename Derived> class TranslationUnitVisitor {
+public:
+  void visit(const TranslationUnit &ast) {
+    auto declarations = ast.getDeclarations();
+    std::for_each(declarations.begin(), declarations.end(),
+                  [](std::reference_wrapper<const Decl> decl) {});
+  }
+};
+
 template <typename Derived> class DeclVisitor {
 public:
   void visit(const Decl &decl) {
@@ -32,7 +42,7 @@ public:
           static_cast<const LabelDecl &>(decl));
     case Decl::FuncDef:
       return static_cast<Derived &>(*this).VisitFuncDef(
-          static_cast<const FuncDef &>(decl));
+          static_cast<const FunctionDefinition &>(decl));
     case Decl::StructDef:
       return static_cast<Derived &>(*this).VisitStructDef(
           static_cast<const StructDef &>(decl));

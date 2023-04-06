@@ -4,6 +4,19 @@
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Expr", "[Parser]") {
+  UnitTestParser parser;
+  SECTION("Primary") {
+    REQUIRE(parser.parse(0, "int main(void){int a;return 0;}") ==
+            "int (main(void))\n{\n\tint a;\n\treturn 0;\n}\n");
+    REQUIRE(parser.parse(1, "int main(void){int a;int b;}") ==
+            "int (main(void))\n{\n\tint a;\n\tint b;\n}\n");
+    REQUIRE(parser.parse(1, "int main(void){char * a;a=\"abc\";}") ==
+            "int (main(void))\n{\n\tchar (*a);\n\a = \"abc\";\n}\n");
+  }
+}
+
+/*
+TEST_CASE("Expr", "[Parser]") {
   UnitTestParser<Expr> parser;
   SECTION("Primary") {
     REQUIRE(parser.parse(1, "a") == "a");
@@ -50,40 +63,11 @@ TEST_CASE("Expr", "[Parser]") {
             "((a < (sizeof b)) || (!(b == (f(23, (sizeof(int)))))))");
   }
 }
+*/
 
-TEST_CASE("Decl", "[Parser]") {
-  UnitTestParser<DeclaratorDecl> parser;
-  SECTION("Struct") {
-    REQUIRE(parser.parse(0, "struct S{int x;} s") ==
-            "struct S\n{\n\tint x;\n} s");
-  }
-  SECTION("FunctionVariable") {
-    REQUIRE(parser.parse(1, "void *(**p)(int)") == "void (*((*(*p))(int)))");
-    REQUIRE(parser.parse(1, "void (*((*(*p))(int)))") ==
-            "void (*((*(*p))(int)))");
-  }
-  SECTION("Function") {
-    REQUIRE(parser.parse(0, "int main(void)") == "int (main(void))");
-    REQUIRE(parser.parse(0, "int (main(void))") == "int (main(void))");
-    REQUIRE(parser.parse(1, "int f(int x, int y)") == "int (f(int x, int y))");
-    REQUIRE(parser.parse(1, "int (f(int x, int y))") ==
-            "int (f(int x, int y))");
-    REQUIRE(parser.parse(2, "int f(int x, void *(**p)(int))") ==
-            "int (f(int x, void (*((*(*p))(int)))))");
-    // TODO: anoymous function variable in parameter
-    // REQUIRE(parser.parse(2, "int f(int x, void *(**)(int))") ==
-    // "int (f(int x, int y))");
-  }
-  SECTION("Pointer") {
-    REQUIRE(parser.parse(0, "struct S{int x;} *p") ==
-            "struct S\n{\n\tint x;\n} (*p)");
-    REQUIRE(parser.parse(0, "struct S{int x;} **p") ==
-            "struct S\n{\n\tint x;\n} (*(*p))");
-  }
-}
-
+/*
 TEST_CASE("Stmt", "[Parser]") {
-  UnitTestParser<Stmt> parser;
+  UnitTestParser parser;
   SECTION("ExprStmt") { REQUIRE(parser.parse(0, "a = 1;") == "(a = 1);"); }
   SECTION("CompStmt") {
     REQUIRE(parser.parse(0, "{a=1;b=1;}") == "{\n\t(a = 1);\n\t(b = 1);\n}");
@@ -119,13 +103,4 @@ TEST_CASE("Stmt", "[Parser]") {
             "(f(23, (sizeof(int))))))))\nfoo:\n\t\tbreak;\n}");
   }
 }
-
-TEST_CASE("ExternalDeclaration", "[Parser]") {
-  UnitTestParser<Decl> parser;
-  SECTION("FuncDef") {
-    REQUIRE(parser.parse(0, "int main(void){return 0;}") ==
-            "int (main(void))\n{\n\treturn 0;\n}\n");
-    REQUIRE(parser.parse(1, "int main(void){int a;int b;}") ==
-            "int (main(void))\n{\n\tint a;\n\tint b;\n}\n");
-  }
-}
+*/

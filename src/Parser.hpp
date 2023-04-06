@@ -8,13 +8,13 @@
 #include <functional>
 #include <vector>
 
-template <typename AST> class UnitTestParser;
+class UnitTestParser;
 
 class Parser {
 public:
   Parser(std::vector<Token> token_stream, Sema &Action);
   ~Parser();
-  void parse(std::function<void(DeclPtr, bool)> f);
+  TranslationUnitPtr parse();
 
 private:
   std::vector<Token> token_stream;
@@ -23,10 +23,7 @@ private:
 
   Sema &Action;
 
-  friend UnitTestParser<Expr>;
-  friend UnitTestParser<DeclaratorDecl>;
-  friend UnitTestParser<Decl>;
-  friend UnitTestParser<Stmt>;
+  friend UnitTestParser;
 
   const Locatable &location(void);
   void bump(void);
@@ -38,24 +35,24 @@ private:
   bool is_paren_type_name();
   bool is_end();
 
-  ExprPtr parseExpr();
+  ExprPtr ParseExpr();
 
-  DeclSpecPtr parseDeclSpec();
-  DeclaratorDeclPtr parseDecl();
-  DeclaratorPtr parseDeclarator();
-  DeclaratorPtr parseNonFuncDeclarator();
+  DeclSpecPtr ParseDeclSpec();
+  DeclaratorDeclPtr ParseDecl();
+  DeclaratorPtr ParseDeclarator();
+  DeclaratorPtr ParseNonFuncDeclarator();
 
-  StmtPtr parseStmt();
+  StmtPtr ParseStmt();
 
-  ExprPtr parseUnaryExpr();
-  ExprPtr parseBinaryExprRHS(int, ExprPtr);
-  ExprPtr parsePostfixExprSuffix(ExprPtr expr);
+  ExprPtr ParseUnaryExpr();
+  ExprPtr ParseBinaryExprRHS(int, ExprPtr);
+  ExprPtr ParsePostfixExprSuffix(ExprPtr expr);
 
-  ExprPtr parseIdentifierExpr();
-  ExprPtr parseConstantExpr();
-  ExprPtr parseStringLiteralExpr();
-  ExprPtr parseParenExpr();
+  ExprPtr ParseIdentifierExpr();
+  ExprPtr ParseConstantExpr();
+  ExprPtr ParseStringLiteralExpr();
+  ExprPtr ParseParenExpr();
 
-  CompStmtPtr parseCompoundStmt();
-  DeclPtr parseExternDecl();
+  CompStmtPtr ParseCompoundStmt();
+  DeclPtr ParseExternDecl();
 };

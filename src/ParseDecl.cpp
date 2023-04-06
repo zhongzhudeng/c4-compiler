@@ -1,6 +1,7 @@
 #include "Diagnostic.hpp"
 #include "Parser.hpp"
 #include "SymbolInternalizer.hpp"
+#include "Syntax.hpp"
 #include "SyntaxDecl.hpp"
 #include "SyntaxStmt.hpp"
 #include "Token.hpp"
@@ -9,31 +10,41 @@
 #include <utility>
 #include <vector>
 
-DeclPtr Parser::parseExternDecl() {
+TranslationUnitPtr Parser::parse() {
+  TranslationUnitPtr ast = std::make_unique<TranslationUnit>();
+  do {
+    ast->insert(ParseExternDecl());
+  } while (!is_end());
+  return ast;
+}
+
+DeclPtr Parser::ParseExternDecl() {
   Locatable loc(location());
-  DeclaratorDeclPtr decl = parseDecl();
-  if (decl->getDeclarator().is_function()) {
+  DeclaratorDeclPtr decl = ParseDecl();
+  const Declarator &declarator = decl->getDeclarator();
+  if (declarator.is_function()) {
     if (kind() == TK_LBRACE) {
-      CompStmtPtr stmt = parseCompoundStmt();
+      Action.enter_func_scope();
+      Action.add_parameters(declarator.as_function_declarator());
+      CompStmtPtr stmt = ParseCompoundStmt();
       Action.exit_func_scope();
       return Action.ActOnFunctionDefinition(loc, std::move(decl),
                                             std::move(stmt));
     }
-    Action.exit_func_scope();
     decl = Action.ActOnFunctionDecl(std::move(decl));
   }
   expect(TK_SEMICOLON, "';' after declaration");
   return decl;
 }
 
-DeclaratorDeclPtr Parser::parseDecl() {
+DeclaratorDeclPtr Parser::ParseDecl() {
   Locatable loc(location());
-  auto spec = parseDeclSpec();
-  auto decl = parseDeclarator();
+  auto spec = ParseDeclSpec();
+  auto decl = ParseDeclarator();
   return Action.ActOnDeclaration(loc, std::move(spec), std::move(decl));
 }
 
-DeclSpecPtr Parser::parseDeclSpec() {
+DeclSpecPtr Parser::ParseDeclSpec() {
   DeclSpecPtr spec = nullptr;
   Locatable loc(location());
   TokenKind tk = kind();
@@ -58,7 +69,7 @@ DeclSpecPtr Parser::parseDeclSpec() {
       std::vector<DeclaratorDeclPtr> decls;
       do {
         decls.push_back(std::make_unique<DeclaratorDecl>(
-            location(), parseDeclSpec(), parseDeclarator()));
+            location(), ParseDeclSpec(), ParseDeclarator()));
         expect(TK_SEMICOLON, ";");
       } while (!accept(TK_RBRACE));
       auto struct_def =
@@ -73,7 +84,7 @@ DeclSpecPtr Parser::parseDeclSpec() {
   return spec;
 }
 
-DeclaratorPtr Parser::parseNonFuncDeclarator() {
+DeclaratorPtr Parser::ParseNonFuncDeclarator() {
   Locatable loc(location());
   switch (kind()) {
   default:
@@ -93,7 +104,7 @@ DeclaratorPtr Parser::parseNonFuncDeclarator() {
       return std::make_unique<AbstractDeclarator>(loc);
     default:
       bump();
-      auto declarator = parseDeclarator();
+      auto declarator = ParseDeclarator();
       expect(TK_RPAREN, "')'");
       declarator->set_paren();
       return declarator;
@@ -101,56 +112,48 @@ DeclaratorPtr Parser::parseNonFuncDeclarator() {
   }
   case TK_STAR: {
     bump();
-    auto declarator = parseDeclarator();
-    if (declarator->is_abstract()) {
+    auto declarator = ParseDeclarator();
+    if (declarator->is_abstract() || declarator->is_function() ||
+        declarator->is_variable()) {
       declarator->add_pointer(loc);
       return declarator;
     }
-    assert(declarator->getKind() == Declarator::Named);
-    auto valued_declarator = std::unique_ptr<ValuedDeclarator>(
-        static_cast<ValuedDeclarator *>(declarator.release()));
-    if (valued_declarator->getKind() != ValuedDeclarator::FunctionVariable) {
-      valued_declarator->add_pointer(loc);
-      return valued_declarator;
-    }
+
+    assert(declarator->is_function_variable());
     auto function_variable_declarator =
         std::unique_ptr<FunctionVariableDeclarator>(
-            static_cast<FunctionVariableDeclarator *>(
-                valued_declarator.release()));
+            static_cast<FunctionVariableDeclarator *>(declarator.release()));
     function_variable_declarator->add_return_pointer(loc);
     return function_variable_declarator;
   }
   }
 }
 
-DeclaratorPtr Parser::parseDeclarator() {
+DeclaratorPtr Parser::ParseDeclarator() {
   Locatable loc(location());
-  DeclaratorPtr decl = parseNonFuncDeclarator();
+  DeclaratorPtr declarator = ParseNonFuncDeclarator();
   if (accept(TK_LPAREN)) {
-    if (!decl->is_named())
-      errorloc(loc, "Unexpected token `('");
-    auto valued_decl = std::unique_ptr<ValuedDeclarator>(
-        static_cast<ValuedDeclarator *>(decl.release()));
-    if (valued_decl->getKind() != ValuedDeclarator::Variable)
+    if (not declarator->is_variable())
       errorloc(loc, "Unexpected token `('");
     auto variable_decl = std::unique_ptr<VariableDeclarator>(
-        static_cast<VariableDeclarator *>(valued_decl.release()));
+        static_cast<VariableDeclarator *>(declarator.release()));
     std::vector<DeclaratorDeclPtr> params;
-    Action.enter_func_scope();
     do {
-      params.push_back(parseDecl());
+      auto decl = ParseDecl();
+      assert(not decl->getDeclarator().is_function());
+      params.push_back(std::move(decl));
     } while (accept(TK_COMMA));
     expect(TK_RPAREN, "')'");
-    if (variable_decl->is_paren()) {
-      Action.exit_func_scope();
-      auto decl = Action.ActOnNonFuncDeclarator(std::move(variable_decl));
-      auto variable_decl = std::unique_ptr<VariableDeclarator>(
-          static_cast<VariableDeclarator *>(valued_decl.release()));
-      return std::make_unique<FunctionVariableDeclarator>(
-          loc, std::move(variable_decl), std::move(params));
-    }
-    return std::make_unique<FunctionDeclarator>(
-        loc, valued_decl->getIdentifier(), std::move(params));
+    if (not variable_decl->is_paren())
+      return std::make_unique<FunctionDeclarator>(
+          loc, variable_decl->getIdentifier(), std::move(params));
+
+    auto decl = Action.ActOnNonFuncDeclarator(std::move(variable_decl));
+    return std::make_unique<FunctionVariableDeclarator>(
+        loc,
+        std::unique_ptr<VariableDeclarator>(
+            static_cast<VariableDeclarator *>(decl.release())),
+        std::move(params));
   }
-  return Action.ActOnNonFuncDeclarator(std::move(decl));
+  return Action.ActOnNonFuncDeclarator(std::move(declarator));
 }

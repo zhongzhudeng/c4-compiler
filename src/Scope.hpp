@@ -4,6 +4,7 @@
 // Maps names to Variable Declarations
 #include "SymbolInternalizer.hpp"
 #include "Syntax.hpp"
+#include "SyntaxDecl.hpp"
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -13,47 +14,61 @@ class FuncScope;
 class ProgramScope;
 
 class Scope {
+  using VariableDeclfRef = std::reference_wrapper<const VariableDecl>;
+  using FunctionVariableDeclRef =
+      std::reference_wrapper<const FunctionVariableDecl>;
+  using StructDefRef = std::reference_wrapper<const StructDef>;
+
 public:
   Scope(const Scope *parent = nullptr);
-  std::optional<std::reference_wrapper<NamedDeclaratorDecl>> find(Symbol iden) const;
-  void insert(Decl &decl);
-  std::optional<std::reference_wrapper<StructDef>>
-  find_struct(Symbol iden) const;
-  void insert_struct(StructDef &struct_def);
+  std::optional<VariableDeclfRef> find_variable(Symbol iden) const;
+  std::optional<FunctionVariableDeclRef>
+  find_function_variable(Symbol iden) const;
+  std::optional<StructDefRef> find_struct(Symbol iden) const;
+  void insert_variable(const VariableDecl &variable);
+  void insert_function_variable(const FunctionVariableDecl &function_variable);
+  void insert_struct(const StructDef &struct_def);
 
 private:
-  std::unordered_map<Symbol, std::reference_wrapper<NamedDeclaratorDecl>> table;
-  std::unordered_map<Symbol, std::reference_wrapper<StructDef>> structs;
+  std::unordered_map<Symbol, std::reference_wrapper<const VariableDecl>>
+      variables;
+  std::unordered_map<Symbol, std::reference_wrapper<const FunctionVariableDecl>>
+      function_variables;
+  std::unordered_map<Symbol, std::reference_wrapper<const StructDef>> structs;
   const Scope *parent;
 };
 
 class FuncScope : public Scope {
+  using LabelDeclRef = std::reference_wrapper<const LabelDecl>;
+
 public:
   FuncScope(const ProgramScope *parent);
-  void insert_parameter(DeclaratorDecl &parameter);
-  std::optional<std::reference_wrapper<LabelDecl>>
-  find_label(const Symbol iden) const;
-  void insert_label(LabelDecl &label_decl);
-  void push_on_back_list(GoToStmt &stmt, const Symbol label);
-  const std::vector<std::tuple<std::reference_wrapper<GoToStmt>, Symbol>> &
+  std::optional<LabelDeclRef> find_label(const Symbol iden) const;
+  void insert_parameter(const ValuedDecl &parameter);
+  void insert_label(const LabelDecl &label_decl);
+  void push_on_back_list(const GoToStmt &stmt, const Symbol label);
+  const std::vector<
+      std::tuple<std::reference_wrapper<const GoToStmt>, Symbol>> &
   get_back_list() const;
 
 private:
-  std::vector<std::tuple<std::reference_wrapper<GoToStmt>, Symbol>> back_list;
-  std::unordered_map<Symbol, std::reference_wrapper<LabelDecl>> labels;
+  std::unordered_map<Symbol, LabelDeclRef> labels;
+  std::vector<std::tuple<std::reference_wrapper<const GoToStmt>, Symbol>>
+      back_list;
 };
 
 class ProgramScope : public Scope {
+  using FuncDefRef = std::reference_wrapper<const FunctionDefinition>;
+  using FuncDeclRef = std::reference_wrapper<const FunctionDecl>;
+
 public:
   ProgramScope();
-  std::optional<std::reference_wrapper<FuncDef>> find_function(Symbol iden);
-  // std::optional<std::reference_wrapper<DeclaratorDecl>> find_function_decl(Symbol iden);
-  void insert_function(FuncDef &function);
-  void insert_function_decl(DeclaratorDecl &function_decl);
+  std::optional<FuncDefRef> find_function_definition(Symbol iden);
+  std::optional<FuncDeclRef> find_function_decl(Symbol iden);
+  void insert_function_definition(const FunctionDefinition &function);
+  void insert_function_decl(const FunctionDecl &function_decl);
 
 private:
-  std::unordered_map<Symbol, std::reference_wrapper<FuncDef>> functions;
-  std::unordered_map<Symbol,
-                     std::vector<std::reference_wrapper<DeclaratorDecl>>>
-      function_declars;
+  std::unordered_map<Symbol, FuncDefRef> function_definitions;
+  std::unordered_map<Symbol, std::vector<FuncDeclRef>> function_decls;
 };

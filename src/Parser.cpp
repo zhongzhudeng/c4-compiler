@@ -7,14 +7,6 @@
 
 #include "Token.hpp"
 
-void Parser::parse(std::function<void(DeclPtr, bool)> f) {
-  DeclPtr ast = nullptr;
-  do {
-    ast = parseExternDecl();
-    f(std::move(ast), is_end());
-  } while (!is_end());
-}
-
 Parser::Parser(std::vector<Token> token_stream, Sema &Action)
     : token_stream(std::move(token_stream)), Action(Action) {
   cursor = this->token_stream.begin();

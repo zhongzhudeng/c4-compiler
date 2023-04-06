@@ -11,14 +11,14 @@
 
 #include "FirstFollow.def"
 
-StmtPtr Parser::parseStmt() {
+StmtPtr Parser::ParseStmt() {
   Locatable loc(location());
   switch (kind()) {
   default:
     errorloc(loc, "Unexpected Token '", *cursor->Text,
              "' when expecting statement");
   case TK_LPAREN: {
-    ExprPtr expr = parseExpr();
+    ExprPtr expr = ParseExpr();
     expect(TK_SEMICOLON, "';' after expression in statement");
     return std::make_unique<ExprStmt>(loc, std::move(expr));
   }
@@ -28,39 +28,42 @@ StmtPtr Parser::parseStmt() {
     Token IdenTok = *cursor;
     switch (kind_first()) {
     default: {
-      ExprPtr expr = parseExpr();
+      ExprPtr expr = ParseExpr();
       expect(TK_SEMICOLON, "';' after expression in statement");
       return std::make_unique<ExprStmt>(loc, std::move(expr));
     }
     case TK_COLON:
       bump(), bump();
       LabelDeclPtr label_decl = std::make_unique<LabelDecl>(loc, iden);
-      StmtPtr stmt = parseStmt();
+      StmtPtr stmt = ParseStmt();
       return Action.ActOnLabeledStmt(loc, std::move(label_decl),
                                      std::move(stmt));
     }
   }
   case TK_LBRACE: {
-    return parseCompoundStmt();
+    Action.enter_scope();
+    auto stmt = ParseCompoundStmt();
+    Action.exit_scope();
+    return stmt;
   }
   case TK_IF: {
     bump();
     expect(TK_LPAREN, "'('");
-    ExprPtr cond = parseExpr();
+    ExprPtr cond = ParseExpr();
     expect(TK_RPAREN, "')'");
-    StmtPtr then = parseStmt();
+    StmtPtr then = ParseStmt();
     StmtPtr Else = nullptr;
     if (accept(TK_ELSE))
-      Else = parseStmt();
+      Else = ParseStmt();
     return std::make_unique<IfElseStmt>(loc, std::move(cond), std::move(then),
                                         std::move(Else));
   }
   case TK_WHILE: {
     bump();
     expect(TK_LPAREN, "'(' after while");
-    ExprPtr expr = parseExpr();
+    ExprPtr expr = ParseExpr();
     expect(TK_RPAREN, "')' after expression in while statement");
-    StmtPtr stmt = parseStmt();
+    StmtPtr stmt = ParseStmt();
     return std::make_unique<WhileStmt>(loc, std::move(expr), std::move(stmt));
   }
   case TK_GOTO: {
@@ -86,7 +89,7 @@ StmtPtr Parser::parseStmt() {
     bump();
     ExprPtr expr = nullptr;
     if (kind() != TK_SEMICOLON)
-      expr = parseExpr();
+      expr = ParseExpr();
     StmtPtr stmt = std::make_unique<ReturnStmt>(loc, std::move(expr));
     expect(TK_SEMICOLON, "';'");
     return stmt;
@@ -97,23 +100,21 @@ StmtPtr Parser::parseStmt() {
   }
 }
 
-CompStmtPtr Parser::parseCompoundStmt() {
-  Action.enter_scope();
+CompStmtPtr Parser::ParseCompoundStmt() {
   Locatable loc(location());
   expect(TK_LBRACE, "'{' in compound statement");
   std::vector<StmtPtr> bil;
   while (!accept(TK_RBRACE)) {
     switch (kind()) {
     default:
-      bil.push_back(parseStmt());
+      bil.push_back(ParseStmt());
       break;
       DECLARATION
       Locatable l(location());
-      bil.push_back(std::make_unique<DeclStmt>(l, parseDecl()));
+      bil.push_back(std::make_unique<DeclStmt>(l, ParseDecl()));
       expect(TK_SEMICOLON, "';' after declaration");
       break;
     }
   }
-  Action.exit_scope();
   return std::make_unique<CompStmt>(loc, std::move(bil));
 }
