@@ -278,3 +278,530 @@ TEST_CASE("sema lets block-scope functions hide outer block objects",
   requireInvalid("int f(void) { return 0; } "
                  "int main(void) { int f; { int f(int); return 0; } }");
 }
+
+
+namespace {
+
+DeclId topLevelDecl(const TestCompiler &compiler, size_t index) {
+  return compiler.ast().translationUnit().decls.at(index);
+}
+
+Symbol declName(const TestCompiler &compiler, DeclId id) {
+  const AST &ast = compiler.ast();
+  const Decl &decl = ast.decl(id);
+  if (auto *var = std::get_if<VarDecl>(&decl.node))
+    return declaratorName(ast, var->declarator);
+  if (auto *function = std::get_if<FunctionDecl>(&decl.node))
+    return declaratorName(ast, function->declarator);
+  if (auto *param = std::get_if<ParamDecl>(&decl.node))
+    return declaratorName(ast, param->declarator);
+  if (auto *field = std::get_if<FieldDecl>(&decl.node))
+    return declaratorName(ast, field->declarator);
+  return nullptr;
+}
+
+void collectDeclaratorParams(const AST &ast, DeclaratorId id,
+                             std::vector<DeclId> &out) {
+  if (!id.valid())
+    return;
+  const Declarator &declarator = ast.declarator(id);
+  if (auto *pointer = std::get_if<PointerDeclarator>(&declarator.node)) {
+    collectDeclaratorParams(ast, pointer->inner, out);
+    return;
+  }
+  if (auto *function = std::get_if<FunctionDeclarator>(&declarator.node)) {
+    for (DeclId param : function->params)
+      out.push_back(param);
+    collectDeclaratorParams(ast, function->inner, out);
+  }
+}
+
+std::vector<DeclId> declaratorParams(const AST &ast, DeclaratorId id) {
+  std::vector<DeclId> result;
+  collectDeclaratorParams(ast, id, result);
+  return result;
+}
+
+void collectStmtDecls(const AST &ast, StmtId id, std::vector<DeclId> &out) {
+  if (!id.valid())
+    return;
+  const Stmt &stmt = ast.stmt(id);
+  if (auto *compound = std::get_if<CompoundStmt>(&stmt.node)) {
+    for (StmtId item : compound->items)
+      collectStmtDecls(ast, item, out);
+    return;
+  }
+  if (auto *declStmt = std::get_if<DeclStmt>(&stmt.node)) {
+    out.push_back(declStmt->decl);
+    return;
+  }
+  if (auto *ifStmt = std::get_if<IfStmt>(&stmt.node)) {
+    collectStmtDecls(ast, ifStmt->thenStmt, out);
+    collectStmtDecls(ast, ifStmt->elseStmt, out);
+    return;
+  }
+  if (auto *whileStmt = std::get_if<WhileStmt>(&stmt.node)) {
+    collectStmtDecls(ast, whileStmt->body, out);
+    return;
+  }
+  if (auto *labelStmt = std::get_if<LabelStmt>(&stmt.node))
+    collectStmtDecls(ast, labelStmt->stmt, out);
+}
+
+std::vector<DeclId> localDecls(const TestCompiler &compiler) {
+  std::vector<DeclId> result;
+  const AST &ast = compiler.ast();
+  for (DeclId id : ast.translationUnit().decls) {
+    const Decl &decl = ast.decl(id);
+    if (auto *function = std::get_if<FunctionDecl>(&decl.node))
+      if (function->body.valid())
+        collectStmtDecls(ast, function->body, result);
+  }
+  return result;
+}
+
+ScopeId onlyFunctionScope(const SemanticModel &model) {
+  ScopeId result;
+  for (size_t i = 0; i < model.scopeCount(); ++i) {
+    ScopeId id{static_cast<uint32_t>(i)};
+    if (model.scope(id).kind != ScopeKind::Function)
+      continue;
+    REQUIRE_FALSE(result.valid());
+    result = id;
+  }
+  REQUIRE(result.valid());
+  return result;
+}
+
+} // namespace
+
+TEST_CASE("sema gives compatible declarations one entity",
+          "[sema][architecture]") {
+  const std::string source = R"(
+int f(int);
+int f(int x) { return x; }
+int f(int);
+)";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const AST &ast = compiler.ast();
+  const SemanticModel &model = compiler.model();
+  REQUIRE(ast.translationUnit().decls.size() == 3);
+  DeclId first = topLevelDecl(compiler, 0);
+  DeclId definition = topLevelDecl(compiler, 1);
+  DeclId last = topLevelDecl(compiler, 2);
+
+  EntityId entity = model.decl(first).entity;
+  REQUIRE(entity.valid());
+  CHECK(model.decl(definition).entity == entity);
+  CHECK(model.decl(last).entity == entity);
+  CHECK(model.decl(first).scope == model.fileScope());
+  CHECK(model.decl(definition).scope == model.fileScope());
+  CHECK(model.decl(last).scope == model.fileScope());
+
+  const Entity &function = model.entity(entity);
+  CHECK(function.kind == EntityKind::Function);
+  CHECK(function.linkage == Linkage::External);
+  CHECK(function.definition == DefinitionState::Defined);
+  CHECK(function.declarations.size() == 3);
+
+  Symbol name = declName(compiler, first);
+  REQUIRE(name != nullptr);
+  CHECK(model.lookup(model.fileScope(), name) == entity);
+
+  REQUIRE(function.parameters.size() == 1);
+  DeclId parameter = function.parameters[0];
+  EntityId parameterEntity = model.decl(parameter).entity;
+  REQUIRE(parameterEntity.valid());
+  CHECK(model.entity(parameterEntity).kind == EntityKind::Object);
+  CHECK(model.entity(parameterEntity).linkage == Linkage::None);
+  ScopeId functionScope = model.decl(parameter).scope;
+  CHECK(model.scope(functionScope).kind == ScopeKind::Function);
+  CHECK(model.scope(functionScope).parent == model.fileScope());
+  Symbol parameterName = declName(compiler, parameter);
+  REQUIRE(parameterName != nullptr);
+  CHECK(model.lookup(functionScope, parameterName) == parameterEntity);
+}
+
+TEST_CASE("sema binds block-scope functions to the external entity",
+          "[sema][architecture]") {
+  const std::string source = R"(
+int main(void) {
+  int f;
+  { int f(void); return f(); }
+  { int f(void); }
+  return f;
+}
+)";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const SemanticModel &model = compiler.model();
+  std::vector<DeclId> locals = localDecls(compiler);
+  REQUIRE(locals.size() == 3);
+
+  EntityId object = model.decl(locals[0]).entity;
+  EntityId function = model.decl(locals[1]).entity;
+  REQUIRE(object.valid());
+  REQUIRE(function.valid());
+  CHECK(object != function);
+  CHECK(model.entity(object).kind == EntityKind::Object);
+  CHECK(model.entity(object).linkage == Linkage::None);
+  CHECK(model.entity(function).kind == EntityKind::Function);
+  CHECK(model.entity(function).linkage == Linkage::External);
+  CHECK(model.decl(locals[2]).entity == function);
+  CHECK(model.entity(function).declarations.size() == 2);
+
+  ScopeId objectScope = model.decl(locals[0]).scope;
+  ScopeId firstBlock = model.decl(locals[1]).scope;
+  ScopeId secondBlock = model.decl(locals[2]).scope;
+  CHECK(model.scope(objectScope).kind == ScopeKind::Function);
+  CHECK(model.scope(firstBlock).kind == ScopeKind::Block);
+  CHECK(model.scope(secondBlock).kind == ScopeKind::Block);
+  CHECK(model.scope(firstBlock).parent == objectScope);
+  CHECK(model.scope(secondBlock).parent == objectScope);
+  CHECK(firstBlock != secondBlock);
+
+  Symbol name = declName(compiler, locals[0]);
+  REQUIRE(name != nullptr);
+  CHECK(model.binding(objectScope, name) == object);
+  CHECK(model.binding(firstBlock, name) == function);
+  CHECK(model.binding(secondBlock, name) == function);
+  CHECK(model.lookup(firstBlock, name) == function);
+  CHECK(model.lookup(objectScope, name) == object);
+}
+
+TEST_CASE("sema keeps prototype tags in function prototype scope",
+          "[sema][architecture]") {
+  const std::string source = R"(
+int f(struct P { int x; } *p);
+int main(void) { struct P *q; return 0; }
+)";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const AST &ast = compiler.ast();
+  const SemanticModel &model = compiler.model();
+  REQUIRE(ast.translationUnit().decls.size() == 2);
+  auto *function =
+      std::get_if<FunctionDecl>(&ast.decl(topLevelDecl(compiler, 0)).node);
+  REQUIRE(function != nullptr);
+  std::vector<DeclId> params = declaratorParams(ast, function->declarator);
+  REQUIRE(params.size() == 1);
+  DeclId parameter = params[0];
+
+  ScopeId prototype = model.decl(parameter).scope;
+  CHECK(model.scope(prototype).kind == ScopeKind::FunctionPrototype);
+  auto *paramDecl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
+  REQUIRE(paramDecl != nullptr);
+  const TypeSpec &spec = ast.typeSpec(paramDecl->spec);
+  REQUIRE(spec.tag != nullptr);
+  StructDecl *prototypeTag = model.typeSpec(paramDecl->spec).record;
+  REQUIRE(prototypeTag != nullptr);
+  CHECK(model.bindingTag(prototype, spec.tag) == prototypeTag);
+  CHECK(model.bindingTag(model.fileScope(), spec.tag) == nullptr);
+  CHECK(model.lookupTag(model.fileScope(), spec.tag) == nullptr);
+
+  std::vector<DeclId> locals = localDecls(compiler);
+  REQUIRE(locals.size() == 1);
+  auto *q = std::get_if<VarDecl>(&ast.decl(locals[0]).node);
+  REQUIRE(q != nullptr);
+  StructDecl *mainTag = model.typeSpec(q->spec).record;
+  REQUIRE(mainTag != nullptr);
+  CHECK(mainTag != prototypeTag);
+  ScopeId mainScope = model.decl(locals[0]).scope;
+  CHECK(model.scope(mainScope).kind == ScopeKind::Function);
+  CHECK(model.bindingTag(mainScope, spec.tag) == mainTag);
+  CHECK(model.lookupTag(mainScope, spec.tag) == mainTag);
+}
+
+TEST_CASE("sema keeps definition parameter tags in the function scope",
+          "[sema][architecture]") {
+  const std::string source = R"(
+int f(struct S { int x; } *p) {
+  struct S *q;
+  q = p;
+  return q->x;
+}
+)";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const AST &ast = compiler.ast();
+  const SemanticModel &model = compiler.model();
+  REQUIRE(ast.translationUnit().decls.size() == 1);
+  DeclId definition = topLevelDecl(compiler, 0);
+  auto *function = std::get_if<FunctionDecl>(&ast.decl(definition).node);
+  REQUIRE(function != nullptr);
+  std::vector<DeclId> params = declaratorParams(ast, function->declarator);
+  REQUIRE(params.size() == 1);
+  DeclId parameter = params[0];
+
+  ScopeId functionScope = model.decl(parameter).scope;
+  CHECK(model.scope(functionScope).kind == ScopeKind::Function);
+  CHECK(model.scope(functionScope).parent == model.fileScope());
+  auto *paramDecl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
+  REQUIRE(paramDecl != nullptr);
+  const TypeSpec &spec = ast.typeSpec(paramDecl->spec);
+  REQUIRE(spec.tag != nullptr);
+  StructDecl *tag = model.typeSpec(paramDecl->spec).record;
+  REQUIRE(tag != nullptr);
+  CHECK(tag->complete);
+  CHECK(model.bindingTag(functionScope, spec.tag) == tag);
+  CHECK(model.bindingTag(model.fileScope(), spec.tag) == nullptr);
+
+  EntityId entityId = model.decl(definition).entity;
+  REQUIRE(entityId.valid());
+  const Entity &entity = model.entity(entityId);
+  CHECK(entity.definition == DefinitionState::Defined);
+  REQUIRE(entity.parameters.size() == 1);
+  CHECK(entity.parameters[0] == parameter);
+  CHECK(model.entity(model.decl(parameter).entity).linkage == Linkage::None);
+
+  std::vector<DeclId> locals = localDecls(compiler);
+  REQUIRE(locals.size() == 1);
+  auto *q = std::get_if<VarDecl>(&ast.decl(locals[0]).node);
+  REQUIRE(q != nullptr);
+  CHECK(model.decl(locals[0]).scope == functionScope);
+  CHECK(model.typeSpec(q->spec).record == tag);
+  Symbol parameterName = declName(compiler, parameter);
+  REQUIRE(parameterName != nullptr);
+  CHECK(model.lookup(functionScope, parameterName) ==
+        model.decl(parameter).entity);
+}
+
+TEST_CASE("sema adopts only the defining function declarator's scope",
+          "[sema][architecture]") {
+  const std::string source = R"(
+int (*f(struct S *p))(int) {
+  struct S *q;
+  q = p;
+  return 0;
+}
+)";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const AST &ast = compiler.ast();
+  const SemanticModel &model = compiler.model();
+  REQUIRE(ast.translationUnit().decls.size() == 1);
+  DeclId definition = topLevelDecl(compiler, 0);
+  EntityId entityId = model.decl(definition).entity;
+  REQUIRE(entityId.valid());
+  const Entity &entity = model.entity(entityId);
+  CHECK(entity.kind == EntityKind::Function);
+  REQUIRE(entity.parameters.size() == 1);
+  DeclId parameter = entity.parameters[0];
+
+  ScopeId functionScope = model.decl(parameter).scope;
+  CHECK(model.scope(functionScope).kind == ScopeKind::Function);
+  CHECK(model.scope(functionScope).parent == model.fileScope());
+  auto *paramDecl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
+  REQUIRE(paramDecl != nullptr);
+  const TypeSpec &spec = ast.typeSpec(paramDecl->spec);
+  REQUIRE(spec.tag != nullptr);
+  StructDecl *tag = model.typeSpec(paramDecl->spec).record;
+  REQUIRE(tag != nullptr);
+  CHECK(model.bindingTag(functionScope, spec.tag) == tag);
+  CHECK(model.bindingTag(model.fileScope(), spec.tag) == nullptr);
+
+  size_t prototypes = 0;
+  for (size_t i = 0; i < model.scopeCount(); ++i) {
+    ScopeId id{static_cast<uint32_t>(i)};
+    if (model.scope(id).kind != ScopeKind::FunctionPrototype)
+      continue;
+    ++prototypes;
+    CHECK(model.scope(id).tags.empty());
+  }
+  CHECK(prototypes == 1);
+
+  std::vector<DeclId> locals = localDecls(compiler);
+  REQUIRE(locals.size() == 1);
+  auto *q = std::get_if<VarDecl>(&ast.decl(locals[0]).node);
+  REQUIRE(q != nullptr);
+  CHECK(model.decl(locals[0]).scope == functionScope);
+  CHECK(model.typeSpec(q->spec).record == tag);
+}
+
+TEST_CASE("sema keeps tentative definitions on one entity",
+          "[sema][architecture]") {
+  const std::string source = R"(
+struct S;
+struct S g;
+struct S g;
+struct S { int x; };
+)";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const AST &ast = compiler.ast();
+  const SemanticModel &model = compiler.model();
+  REQUIRE(ast.translationUnit().decls.size() == 4);
+  DeclId tagDecl = topLevelDecl(compiler, 0);
+  DeclId first = topLevelDecl(compiler, 1);
+  DeclId second = topLevelDecl(compiler, 2);
+  DeclId completion = topLevelDecl(compiler, 3);
+
+  EntityId entity = model.decl(first).entity;
+  REQUIRE(entity.valid());
+  CHECK(model.decl(second).entity == entity);
+  CHECK(model.decl(first).scope == model.fileScope());
+  CHECK(model.decl(second).scope == model.fileScope());
+
+  const Entity &object = model.entity(entity);
+  CHECK(object.kind == EntityKind::Object);
+  CHECK(object.linkage == Linkage::External);
+  CHECK(object.definition == DefinitionState::Tentative);
+  CHECK(object.declarations.size() == 2);
+  REQUIRE(object.type != nullptr);
+  CHECK(Type::isStruct(object.type));
+  REQUIRE(object.type->record != nullptr);
+  CHECK(object.type->record->complete);
+
+  StructDecl *fileTag = model.decl(tagDecl).record;
+  REQUIRE(fileTag != nullptr);
+  CHECK(fileTag == object.type->record);
+  CHECK(model.decl(completion).record == fileTag);
+  CHECK(model.lookupTag(model.fileScope(), fileTag->tag) == fileTag);
+
+  Symbol name = declName(compiler, first);
+  REQUIRE(name != nullptr);
+  CHECK(model.lookup(model.fileScope(), name) == entity);
+}
+
+TEST_CASE("sema gives shadowed locals distinct entities and scopes",
+          "[sema][architecture]") {
+  const std::string source =
+      "int main(void) { int x; { int x; x = 1; } return x; }";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const SemanticModel &model = compiler.model();
+  std::vector<DeclId> locals = localDecls(compiler);
+  REQUIRE(locals.size() == 2);
+  EntityId outer = model.decl(locals[0]).entity;
+  EntityId inner = model.decl(locals[1]).entity;
+  REQUIRE(outer.valid());
+  REQUIRE(inner.valid());
+  CHECK(outer != inner);
+  CHECK(model.entity(outer).declarations.size() == 1);
+  CHECK(model.entity(inner).declarations.size() == 1);
+
+  ScopeId outerScope = model.decl(locals[0]).scope;
+  ScopeId innerScope = model.decl(locals[1]).scope;
+  CHECK(model.scope(outerScope).kind == ScopeKind::Function);
+  CHECK(model.scope(innerScope).kind == ScopeKind::Block);
+  CHECK(model.scope(innerScope).parent == outerScope);
+
+  Symbol name = declName(compiler, locals[0]);
+  REQUIRE(name != nullptr);
+  CHECK(model.binding(outerScope, name) == outer);
+  CHECK(model.binding(innerScope, name) == inner);
+  CHECK(model.lookup(innerScope, name) == inner);
+  CHECK(model.lookup(outerScope, name) == outer);
+}
+
+TEST_CASE("sema gives shadowed struct tags distinct identities",
+          "[sema][architecture]") {
+  const std::string source = R"(
+struct S { int a; };
+int main(void) {
+  struct S *p;
+  {
+    struct S;
+    struct S *q;
+    q = q;
+  }
+  p = p;
+  return 0;
+}
+)";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const AST &ast = compiler.ast();
+  const SemanticModel &model = compiler.model();
+  REQUIRE(ast.translationUnit().decls.size() == 2);
+  DeclId fileTagDecl = topLevelDecl(compiler, 0);
+  StructDecl *fileTag = model.decl(fileTagDecl).record;
+  REQUIRE(fileTag != nullptr);
+  CHECK(fileTag->complete);
+  CHECK(model.bindingTag(model.fileScope(), fileTag->tag) == fileTag);
+
+  std::vector<DeclId> locals = localDecls(compiler);
+  REQUIRE(locals.size() == 3);
+  auto *p = std::get_if<VarDecl>(&ast.decl(locals[0]).node);
+  REQUIRE(p != nullptr);
+  StructDecl *blockTag = model.decl(locals[1]).record;
+  REQUIRE(blockTag != nullptr);
+  CHECK(blockTag != fileTag);
+  auto *q = std::get_if<VarDecl>(&ast.decl(locals[2]).node);
+  REQUIRE(q != nullptr);
+
+  ScopeId mainScope = model.decl(locals[0]).scope;
+  ScopeId blockScope = model.decl(locals[1]).scope;
+  CHECK(model.scope(mainScope).kind == ScopeKind::Function);
+  CHECK(model.scope(blockScope).kind == ScopeKind::Block);
+  CHECK(model.scope(blockScope).parent == mainScope);
+  CHECK(model.typeSpec(p->spec).record == fileTag);
+  CHECK(model.typeSpec(q->spec).record == blockTag);
+  CHECK(model.bindingTag(blockScope, blockTag->tag) == blockTag);
+  CHECK(model.lookupTag(blockScope, blockTag->tag) == blockTag);
+  CHECK(model.lookupTag(mainScope, blockTag->tag) == fileTag);
+}
+
+TEST_CASE("sema binds labels in the function scope", "[sema][architecture]") {
+  const std::string source =
+      "int main(void) { goto end; end: return 0; }";
+  TestCompiler compiler;
+  std::string error;
+  INFO(source);
+  INFO(error);
+  REQUIRE(compiler.analyze(source, &error));
+
+  const AST &ast = compiler.ast();
+  const SemanticModel &model = compiler.model();
+  REQUIRE(ast.translationUnit().decls.size() == 1);
+  auto *function =
+      std::get_if<FunctionDecl>(&ast.decl(topLevelDecl(compiler, 0)).node);
+  REQUIRE(function != nullptr);
+  auto *body = std::get_if<CompoundStmt>(&ast.stmt(function->body).node);
+  REQUIRE(body != nullptr);
+  REQUIRE(body->items.size() == 2);
+  auto *gotoStmt = std::get_if<GotoStmt>(&ast.stmt(body->items[0]).node);
+  auto *labelStmt = std::get_if<LabelStmt>(&ast.stmt(body->items[1]).node);
+  REQUIRE(gotoStmt != nullptr);
+  REQUIRE(labelStmt != nullptr);
+
+  ScopeId functionScope = onlyFunctionScope(model);
+  const LabelDecl &label = ast.label(labelStmt->label);
+  CHECK(model.lookupLabel(functionScope, label.name) == labelStmt->label);
+  CHECK(model.lookupLabel(model.fileScope(), label.name) == LabelId{});
+  CHECK(model.gotoTarget(body->items[0]) == labelStmt->label);
+  CHECK(model.label(labelStmt->label).defined);
+}

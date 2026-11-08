@@ -20,6 +20,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <exception>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -64,13 +65,14 @@ public:
     if (!parse(source, error))
       return false;
     Diagnostics diagnostics("test.c");
-    TypeContext types;
-    llvm::LLVMContext context;
-    llvm::DataLayout dataLayout("e-m:o-i64:64-i128:128-n32:64-S128");
-    TypeLayout layout(context, dataLayout);
-    SemanticModel model(ast_);
+    types_ = std::make_unique<TypeContext>();
+    context_ = std::make_unique<llvm::LLVMContext>();
+    dataLayout_ = std::make_unique<llvm::DataLayout>(
+        "e-m:o-i64:64-i128:128-n32:64-S128");
+    layout_ = std::make_unique<TypeLayout>(*context_, *dataLayout_);
+    model_ = std::make_unique<SemanticModel>(ast_);
     try {
-      Sema sema(ast_, model, types, layout, diagnostics);
+      Sema sema(ast_, *model_, *types_, *layout_, diagnostics);
       sema.analyze();
     } catch (const CompileError &) {
       if (error)
@@ -167,8 +169,16 @@ public:
 
   AST &ast() { return ast_; }
   const AST &ast() const { return ast_; }
+  const SemanticModel &model() const { return *model_; }
 
 private:
   SymbolInternalizer symbols_;
   AST ast_;
+  // Owned so the semantic model, its types and its layout stay inspectable
+  // after analyze().  Destruction runs in reverse declaration order.
+  std::unique_ptr<TypeContext> types_;
+  std::unique_ptr<llvm::LLVMContext> context_;
+  std::unique_ptr<llvm::DataLayout> dataLayout_;
+  std::unique_ptr<TypeLayout> layout_;
+  std::unique_ptr<SemanticModel> model_;
 };

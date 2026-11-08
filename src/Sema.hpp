@@ -5,7 +5,6 @@
 #include "Support.hpp"
 #include "Type.hpp"
 
-#include <memory>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -18,15 +17,11 @@ public:
   void analyze();
 
 private:
-  struct Scope {
-    Scope *parent = nullptr;
-    std::unordered_map<Symbol, DeclId> ordinary;
-    std::unordered_map<Symbol, StructDecl *> tags;
-  };
-
   struct DeclResult {
     const Type *type = nullptr;
-    DeclaratorId functionDeclarator;
+    // Prototype scope of the function type that becomes the declared type.
+    // A definition adopts this scope as its function scope.
+    ScopeId functionScope;
     std::vector<DeclId> params;
     Symbol name = nullptr;
     SourceLoc nameLoc;
@@ -35,7 +30,7 @@ private:
   struct FunctionContext {
     const Type *returnType = nullptr;
     int loopDepth = 0;
-    std::unordered_map<Symbol, LabelId> labels;
+    ScopeId scope;
     std::vector<std::pair<StmtId, Symbol>> pendingGotos;
   };
 
@@ -45,37 +40,34 @@ private:
   TypeLayout &layout_;
   Diagnostics &diagnostics_;
 
-  std::vector<std::unique_ptr<Scope>> scopes_;
-  Scope *current_ = nullptr;
+  ScopeId current_;
   FunctionContext *function_ = nullptr;
-  // Function-declarator scopes created while resolving one declared entity.
-  // A definition keeps the scope whose function type is the entity's final
-  // type, so tags from its parameter list remain visible in the body without
-  // leaking to the enclosing scope.
-  std::vector<std::pair<const Type *, Scope *>> functionScopes_;
 
-  // Functions have external linkage and therefore a single entity even when
-  // they are first declared at block scope.  Objects at file scope are
-  // tracked through the program scope's ordinary namespace.
-  std::unordered_map<Symbol, DeclId> globalFunctions_;
-  std::unordered_map<Symbol, DeclId> functionDefinitions_;
-  // File-scope tentative definitions are validated for completeness only at
-  // the end of the translation unit, when all struct tags are known.
-  std::vector<std::pair<DeclId, SourceLoc>> tentativeObjects_;
+  // Translation-unit index of external-linkage entities.  Lexical visibility
+  // lives in scope bindings; this table implements the C rule that external
+  // linkage determines entity identity even for a function first declared in a
+  // block, where the file scope has no binding for it yet.
+  std::unordered_map<Symbol, EntityId> externalEntities_;
 
-  void pushScope();
+  ScopeId pushScope(ScopeKind kind);
   void popScope();
-  Scope *programScope() const;
 
-  DeclId lookupOrdinary(Symbol name) const;
+  EntityId lookupOrdinary(Symbol name) const;
   StructDecl *lookupTag(Symbol name) const;
-  DeclId declareGlobal(Symbol name, DeclId candidate, bool isFunction,
-                       const Type *type, SourceLoc loc, bool isDefinition);
-  void declareLocal(Symbol name, DeclId decl, SourceLoc loc);
+
+  EntityId declareFileObject(DeclId id, const DeclResult &result,
+                             SourceLoc loc);
+  EntityId declareFileFunction(DeclId id, const DeclResult &result,
+                               SourceLoc loc, bool isDefinition);
+  EntityId declareLocalObject(DeclId id, const DeclResult &result,
+                              SourceLoc loc);
+  EntityId declareLocalFunction(DeclId id, const DeclResult &result,
+                                SourceLoc loc);
+  void recordDeclaration(DeclId id, EntityId entity, ScopeId scope);
 
   const Type *resolveTypeSpec(TypeSpecId id, bool declareTag = false);
   DeclResult resolveDeclarator(DeclaratorId id, const Type *base);
-  Scope *takeFunctionScope(const Type *type, Scope *outer);
+  void adoptFunctionScope(ScopeId scope, ScopeId parent);
   const Type *adjustParameterType(const Type *type, SourceLoc loc);
   void validateObjectType(const Type *type, SourceLoc loc, const char *what,
                           bool requireComplete = true) const;
@@ -85,8 +77,7 @@ private:
 
   void analyzeTopLevel(DeclId id);
   void analyzeLocalDecl(DeclId id);
-  void analyzeLocalFunction(DeclId id, const DeclResult &result);
-  void analyzeFunction(DeclId id, Scope *functionScope);
+  void analyzeFunction(DeclId id, ScopeId functionScope);
   void analyzeCompound(StmtId id, bool pushScope);
   void analyzeStmt(StmtId id);
 

@@ -77,7 +77,7 @@ Source files:
     src/SymbolInternalizer.*  string interning (Symbol = const std::string*)
     src/AST.*              vector-owned AST, typed IDs, declarator queries
     src/Type.*             interned types, TypeLayout over llvm::DataLayout
-    src/SemanticModel.*    independent per-node semantic results
+    src/SemanticModel.*    entities, scopes, and per-node semantic results
     src/Parser.*           recursive-descent / precedence-climbing parser
     src/Sema.*             scopes, declarators, type checking, labels
     src/Printer.*          reference pretty printer (task D format)
@@ -104,22 +104,52 @@ Source files:
 - If profiling showed variant size/branch overhead mattered, split pools by
   node category or use a bump allocator; the ID-based interface stays.
 
+### Semantic identities: DeclId, EntityId, ScopeId
+
+Three identities are kept distinct:
+
+- DeclId (AST.hpp) identifies a syntactic declaration node.  It never stands
+  in for a symbol.
+- EntityId (SemanticModel.hpp) identifies a declared object or function.  An
+  entity owns its canonical type, linkage, definition state, first source
+  location, the declarations that denote it, and (for a function definition)
+  its parameter declarations.  Compatible redeclarations and block-scope
+  declarations of an external function point at one entity.
+- ScopeId (SemanticModel.hpp) identifies a lexical scope.  Scopes are owned by
+  the model in stable storage, so an ID does not depend on a mutable scope
+  stack position.  Each scope has a kind (file, block, function prototype,
+  function), an explicit parent, and namespace-specific bindings: ordinary
+  identifiers bind to entities, tags bind to StructDecl records, and function
+  scopes also bind labels.  Members are not lexical bindings; they remain
+  StructDecl::fields.
+
+External linkage determines entity identity.  File-scope objects and all
+functions are external; block-scope objects and parameters have no linkage.
+Sema keeps a translation-unit index of external entities so a block-scope
+function declaration and a later file-scope definition resolve to the same
+entity, while the block binding itself stays local to its scope.
+
 ### SemanticModel
 
 Independent from AST ownership, constructed after parsing and sized from AST
 counts:
-- ExprInfo: type, value category, null-pointer-constant flag, resolved DeclId,
-  member record/index, goto label, constant value, decoded string bytes.
-- DeclInfo: type, name, definition/global/tentative flags, function parameter
-  DeclIds, struct record for tags.
-- DeclaratorInfo: resolved type and the parameter list of the outer function
-  declarator.
+- ExprInfo: type, value category, null-pointer-constant flag, resolved
+  EntityId, member record/index, goto label, constant value, decoded string
+  bytes.
+- DeclInfo: EntityId for an ordinary declaration, the ScopeId of the binding
+  introduced by that declaration, and StructDecl* for a tag declaration.
+- Entity storage: canonical type, kind, linkage, definition state, first
+  location, declarations, and definition parameters.
+- Scope storage: kind, parent, and ordinary/tag/label bindings.
 - TypeSpecInfo: resolved StructDecl*.
 - LabelInfo and per-StmtId goto targets.
 - Owns StructDecl records (tag, fields with types/offsets, completeness).
 
-Scopes and symbol tables exist only during Sema.  Labels are function-scoped
-and resolved after the function body so forward goto works.
+A function definition adopts the prototype scope of its defining declarator
+as the function scope: parameter bindings and parameter-list tags remain
+visible in the body, the scope is reparented to the declaration's enclosing
+scope, and labels are bound there.  Prototype scopes of non-defining or
+nested declarators remain dead and cannot leak names into the body.
 
 ### Type interning
 
@@ -154,11 +184,15 @@ VarDecl/FunctionDecl/TagDecl from declarator shape.
 
 ### Sema (task E)
 
-Implements the C4 semantics: ordinary/tag/label namespaces, lexical scopes,
-canonical function declarations by name, tentative file-scope object
-definitions, recursive/incomplete structs, pointer and integer checks, labels
-and goto resolution, break/continue loop checking, and first-terminal error
-locations.  Struct parameters, struct returns and struct assignment are
+Implements the C4 semantics through explicit declaration operations: file-
+scope and block-scope objects, function declarations and definitions,
+compatible redeclarations, external-linkage identity, tentative definitions,
+struct tags/forward declarations/completion, parameters, labels, recursive
+and incomplete structs, pointer and integer checks, labels and goto
+resolution, break/continue loop checking, and first-terminal error locations.
+Declarations bind names into a ScopeId; compatible declarations reuse an
+EntityId; a block-scope function declaration creates a local binding for the
+external entity.  Struct parameters, struct returns and struct assignment are
 rejected (explicitly permitted by task E); anonymous structs are supported.
 
 ### Pretty printer (task D)
@@ -243,6 +277,12 @@ while.body; the deleted branches and blocks are gone.
 6. Lexer output spelling is preserved exactly (escapes, digraphs).
 7. --compile never runs optimization; --optimize runs only mem2reg and our
    SCCP.
+8. DeclId is syntax, EntityId is semantic identity, and ScopeId is lexical
+   scope; they are never used interchangeably.
+9. Multiple DeclIds may denote one EntityId; each binding belongs to a
+   defined ScopeId.
+10. External linkage, not the syntactic declaration site, determines entity
+    identity.
 
 ## Build and test
 
@@ -257,8 +297,9 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 
 ## Verification
 
-- 54 Catch2 test cases (lexer, parser, Sema, printer, codegen, SCCP), all
-  passing.
+- 65 Catch2 test cases (lexer, parser, Sema, printer, codegen, SCCP), all
+  passing.  Nine Sema cases are architectural regressions for entity
+  identity, binding identity, and scope lifetime.
 - End-to-end suite tests/e2e/run_e2e.py: 20 accepted programs x
   {--compile, --optimize} plus 10 rejected programs; each accepted program is
   compiled to .ll, linked with clang, executed, and compared against its
@@ -266,6 +307,9 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
   clang and checked differentially.  --print-ast output is re-parsed to check
   the printer/parser round trip.  Rejected programs must exit 1, print the
   required diagnostic format, and produce no .ll.
+- Full A-G conformance harness: 720/720 cases passed, including 108/109
+  grammar alternatives (the uncovered alternative is
+  struct-declaration/without-declarator-list).
 - Manual probes verified token positions/format, the reference printer
   fixture, pointer/struct/function-pointer edge cases, and SCCP IR.
 

@@ -4,13 +4,42 @@
 #include "Support.hpp"
 #include "Type.hpp"
 
-#include <cassert>
 #include <cstdint>
+#include <deque>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 /// Value categories are semantic, not syntactic.
 enum class ValueCategory { LValue, RValue, FunctionDesignator, Void };
+
+/// Semantic identities.  A DeclId names syntax (AST.hpp); an EntityId names a
+/// declared object or function and is shared by every declaration that denotes
+/// it.  A ScopeId names a lexical scope and stays stable for the whole
+/// translation unit.
+struct EntityTag {};
+struct ScopeTag {};
+using EntityId = NodeId<EntityTag>;
+using ScopeId = NodeId<ScopeTag>;
+
+enum class EntityKind { Object, Function };
+
+/// C4 has no storage-class specifiers: file-scope objects and all functions
+/// have external linkage; block-scope objects and parameters have none.
+enum class Linkage { None, External };
+
+enum class DefinitionState {
+  Declared,  // only declarations seen so far
+  Tentative, // file-scope object declaration (C4 has no initializers)
+  Defined,   // function body or block-scope object/parameter
+};
+
+enum class ScopeKind {
+  File,
+  Block,
+  FunctionPrototype, // parameter list of a non-defining declarator
+  Function,          // definition parameters + body, and labels
+};
 
 struct FieldInfo {
   Symbol name = nullptr;
@@ -31,6 +60,32 @@ struct StructDecl {
   const Type *type = nullptr;
 };
 
+/// A declared object or function.  The entity, not any declaration, owns the
+/// canonical type, linkage and definition state; declarations only point at it.
+/// Every declaration that denotes the entity is recorded in declarations.
+struct Entity {
+  Symbol name = nullptr;
+  const Type *type = nullptr;
+  EntityKind kind = EntityKind::Object;
+  Linkage linkage = Linkage::None;
+  DefinitionState definition = DefinitionState::Declared;
+  SourceLoc loc; // first declaration, for diagnostics
+  std::vector<DeclId> declarations;
+  std::vector<DeclId> parameters; // parameter declarations of the definition
+};
+
+/// A lexical scope.  Bindings are namespace-specific: ordinary identifiers
+/// resolve to entities, tags to StructDecl records, and labels (function scope
+/// only) to label declarations.  Members are not lexical bindings; they live
+/// in StructDecl::fields.
+struct Scope {
+  ScopeKind kind = ScopeKind::Block;
+  ScopeId parent;
+  std::unordered_map<Symbol, EntityId> ordinary;
+  std::unordered_map<Symbol, StructDecl *> tags;
+  std::unordered_map<Symbol, LabelId> labels;
+};
+
 struct ExprInfo {
   const Type *type = nullptr;
   ValueCategory category = ValueCategory::RValue;
@@ -40,8 +95,8 @@ struct ExprInfo {
   bool isConstant = false;
   long long value = 0;
 
-  // Resolved identifier / called declaration.
-  DeclId decl;
+  // Resolved identifier.
+  EntityId entity;
 
   // Resolved member access.
   StructDecl *memberRecord = nullptr;
@@ -54,21 +109,14 @@ struct ExprInfo {
   std::vector<char> stringBytes;
 };
 
+/// A declaration's semantic links.  Type, name, linkage and definition state
+/// live on the entity; the scope records where this declaration's binding was
+/// introduced.  Tag declarations point at their StructDecl; fields and
+/// unnamed parameters have no ordinary binding.
 struct DeclInfo {
-  const Type *type = nullptr;
-  Symbol name = nullptr;
-  bool isFunction = false;
-  bool isGlobal = false;
-  bool isDefinition = false;
-  bool isTentative = false;
-  std::vector<DeclId> params;
+  EntityId entity;
+  ScopeId scope;
   StructDecl *record = nullptr; // TagDecl
-};
-
-struct DeclaratorInfo {
-  const Type *type = nullptr;
-  std::vector<DeclId> params; // parameters of the outer function type
-  bool isFunction = false;
 };
 
 struct TypeSpecInfo {
@@ -82,27 +130,18 @@ struct LabelInfo {
 
 /// Semantic results keyed by AST node ID.  The model never owns AST nodes and
 /// AST nodes never contain semantic results.  It is sized once from the
-/// completed AST; Sema fills it in.
+/// completed AST; Sema fills it in.  The model also owns the translation unit's
+/// entities and lexical scopes: EntityIds and ScopeIds are indices into stable
+/// storage, so they never depend on the position of a mutable scope stack.
 class SemanticModel {
 public:
-  explicit SemanticModel(const AST &ast)
-      : exprs_(ast.exprCount()), stmts_(ast.stmtCount()),
-        decls_(ast.declCount()), declarators_(ast.declaratorCount()),
-        typeSpecs_(ast.typeSpecCount()), labels_(ast.labelCount()),
-        gotoTargets_(ast.stmtCount()) {}
+  explicit SemanticModel(const AST &ast);
 
   ExprInfo &expr(ExprId id) { return exprs_.at(id.index); }
   const ExprInfo &expr(ExprId id) const { return exprs_.at(id.index); }
 
   DeclInfo &decl(DeclId id) { return decls_.at(id.index); }
   const DeclInfo &decl(DeclId id) const { return decls_.at(id.index); }
-
-  DeclaratorInfo &declarator(DeclaratorId id) {
-    return declarators_.at(id.index);
-  }
-  const DeclaratorInfo &declarator(DeclaratorId id) const {
-    return declarators_.at(id.index);
-  }
 
   TypeSpecInfo &typeSpec(TypeSpecId id) { return typeSpecs_.at(id.index); }
   const TypeSpecInfo &typeSpec(TypeSpecId id) const {
@@ -117,6 +156,29 @@ public:
     return gotoTargets_.at(id.index);
   }
 
+  EntityId addEntity(EntityKind kind, Symbol name, const Type *type,
+                     Linkage linkage, SourceLoc loc);
+  Entity &entity(EntityId id) { return entities_.at(id.index); }
+  const Entity &entity(EntityId id) const { return entities_.at(id.index); }
+  size_t entityCount() const { return entities_.size(); }
+
+  ScopeId fileScope() const { return fileScope_; }
+  ScopeId addScope(ScopeKind kind, ScopeId parent);
+  Scope &scope(ScopeId id) { return scopes_.at(id.index); }
+  const Scope &scope(ScopeId id) const { return scopes_.at(id.index); }
+  size_t scopeCount() const { return scopes_.size(); }
+
+  EntityId binding(ScopeId scope, Symbol name) const;
+  EntityId lookup(ScopeId scope, Symbol name) const;
+  bool bind(ScopeId scope, Symbol name, EntityId entity);
+
+  StructDecl *bindingTag(ScopeId scope, Symbol name) const;
+  StructDecl *lookupTag(ScopeId scope, Symbol name) const;
+  bool bindTag(ScopeId scope, Symbol name, StructDecl *record);
+
+  LabelId lookupLabel(ScopeId scope, Symbol name) const;
+  bool bindLabel(ScopeId scope, Symbol name, LabelId label);
+
   StructDecl *addStruct(Symbol tag, SourceLoc loc, bool anonymous) {
     auto owned = std::make_unique<StructDecl>();
     owned->tag = tag;
@@ -129,11 +191,15 @@ public:
 
 private:
   std::vector<ExprInfo> exprs_;
-  std::vector<StmtId> stmts_; // reserved; kept for symmetry/debugging
   std::vector<DeclInfo> decls_;
-  std::vector<DeclaratorInfo> declarators_;
   std::vector<TypeSpecInfo> typeSpecs_;
   std::vector<LabelInfo> labels_;
   std::vector<LabelId> gotoTargets_;
   std::vector<std::unique_ptr<StructDecl>> structs_;
+
+  // Stable storage: push_back does not invalidate references, and the indices
+  // are the EntityId/ScopeId values.
+  std::deque<Entity> entities_;
+  std::deque<Scope> scopes_;
+  ScopeId fileScope_;
 };

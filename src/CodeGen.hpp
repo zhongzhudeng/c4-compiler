@@ -43,21 +43,20 @@ private:
 
   llvm::Function *function_ = nullptr;
   const Type *returnType_ = nullptr;
-  std::unordered_map<uint32_t, llvm::AllocaInst *> locals_;
-  std::unordered_map<Symbol, llvm::GlobalVariable *> globals_;
-  std::unordered_map<Symbol, llvm::Function *> functions_;
-  std::unordered_map<uint32_t, llvm::BasicBlock *> labels_;
+  std::unordered_map<uint32_t, llvm::AllocaInst *> locals_; // EntityId index
+  std::unordered_map<uint32_t, llvm::GlobalVariable *> globals_; // EntityId
+  std::unordered_map<uint32_t, llvm::Function *> functions_;    // EntityId
+  std::unordered_map<uint32_t, llvm::BasicBlock *> labels_;     // LabelId
   std::vector<LoopContext> loops_;
   unsigned stringCounter_ = 0;
 
-  void createGlobalDecls();
-  void createFunctionDecls();
+  void createExternalEntities();
   void emitFunction(DeclId id, const FunctionDecl &decl);
   void collectLabels(StmtId id);
 
-  llvm::Function *functionFor(Symbol name, const Type *type);
-  llvm::GlobalVariable *globalFor(Symbol name, const Type *type);
-  llvm::Value *addressOfDecl(DeclId id);
+  llvm::Function *functionFor(EntityId id);
+  llvm::GlobalVariable *globalFor(EntityId id);
+  llvm::Value *addressOfEntity(EntityId id);
   llvm::AllocaInst *createAlloca(const Type *type, Symbol name);
 
   void emitStmt(StmtId id);

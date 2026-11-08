@@ -39,8 +39,7 @@ const Type *CodeGen::elementType(const Type *type) {
 }
 
 void CodeGen::emit() {
-  createGlobalDecls();
-  createFunctionDecls();
+  createExternalEntities();
 
   for (DeclId id : ast_.translationUnit().decls) {
     if (auto *function = std::get_if<FunctionDecl>(&ast_.decl(id).node)) {
@@ -57,61 +56,58 @@ void CodeGen::emit() {
   }
 }
 
-void CodeGen::createGlobalDecls() {
-  for (DeclId id : ast_.translationUnit().decls) {
-    if (!std::holds_alternative<VarDecl>(ast_.decl(id).node))
+void CodeGen::createExternalEntities() {
+  for (size_t i = 0; i < model_.entityCount(); ++i) {
+    EntityId id{static_cast<uint32_t>(i)};
+    const Entity &entity = model_.entity(id);
+    if (entity.linkage != Linkage::External)
       continue;
-    const DeclInfo &info = model_.decl(id);
-    if (!info.name || !info.type)
-      continue;
-    globalFor(info.name, info.type);
+    if (entity.kind == EntityKind::Function)
+      functionFor(id);
+    else
+      globalFor(id);
   }
 }
 
-void CodeGen::createFunctionDecls() {
-  for (DeclId id : ast_.translationUnit().decls) {
-    if (!std::holds_alternative<FunctionDecl>(ast_.decl(id).node))
-      continue;
-    const DeclInfo &info = model_.decl(id);
-    if (!info.name || !info.type)
-      continue;
-    functionFor(info.name, info.type);
-  }
-}
-
-llvm::Function *CodeGen::functionFor(Symbol name, const Type *type) {
-  auto it = functions_.find(name);
+llvm::Function *CodeGen::functionFor(EntityId id) {
+  auto it = functions_.find(id.index);
   if (it != functions_.end())
     return it->second;
 
-  auto *functionType = llvm::cast<llvm::FunctionType>(layout_.llvmType(type));
+  const Entity &entity = model_.entity(id);
+  assert(entity.name && "external function without a name");
+  auto *functionType =
+      llvm::cast<llvm::FunctionType>(layout_.llvmType(entity.type));
   llvm::Function *function = llvm::Function::Create(
-      functionType, llvm::GlobalValue::ExternalLinkage, *name, &module_);
-  functions_[name] = function;
+      functionType, llvm::GlobalValue::ExternalLinkage, *entity.name,
+      &module_);
+  functions_[id.index] = function;
   return function;
 }
 
-llvm::GlobalVariable *CodeGen::globalFor(Symbol name, const Type *type) {
-  auto it = globals_.find(name);
+llvm::GlobalVariable *CodeGen::globalFor(EntityId id) {
+  auto it = globals_.find(id.index);
   if (it != globals_.end())
     return it->second;
 
-  llvm::Type *llvmType = layout_.llvmType(type);
+  const Entity &entity = model_.entity(id);
+  assert(entity.name && "external object without a name");
+  llvm::Type *llvmType = layout_.llvmType(entity.type);
   auto *global = new llvm::GlobalVariable(
       module_, llvmType, /*isConstant=*/false,
       llvm::GlobalValue::ExternalLinkage, llvm::Constant::getNullValue(llvmType),
-      *name);
-  globals_[name] = global;
+      *entity.name);
+  globals_[id.index] = global;
   return global;
 }
 
-llvm::Value *CodeGen::addressOfDecl(DeclId id) {
-  const DeclInfo &info = model_.decl(id);
-  assert(info.type && "declaration without a type");
-  if (info.isFunction)
-    return functionFor(info.name, info.type);
-  if (info.isGlobal)
-    return globalFor(info.name, info.type);
+llvm::Value *CodeGen::addressOfEntity(EntityId id) {
+  const Entity &entity = model_.entity(id);
+  assert(entity.type && "declaration without a type");
+  if (entity.kind == EntityKind::Function)
+    return functionFor(id);
+  if (entity.linkage == Linkage::External)
+    return globalFor(id);
 
   auto it = locals_.find(id.index);
   if (it != locals_.end())
@@ -119,8 +115,8 @@ llvm::Value *CodeGen::addressOfDecl(DeclId id) {
 
   // A local object is always declared before its first use, so this is only a
   // defensive fallback for declarations that were not materialized.
-  assert(info.name && "local declaration without a name");
-  return globalFor(info.name, info.type);
+  assert(entity.name && "local declaration without a name");
+  return globalFor(id);
 }
 
 llvm::AllocaInst *CodeGen::createAlloca(const Type *type, Symbol name) {
@@ -135,16 +131,17 @@ llvm::AllocaInst *CodeGen::createAlloca(const Type *type, Symbol name) {
 }
 
 void CodeGen::emitFunction(DeclId id, const FunctionDecl &decl) {
-  const DeclInfo &info = model_.decl(id);
-  llvm::Function *function = functionFor(info.name, info.type);
+  EntityId entityId = model_.decl(id).entity;
+  const Entity &entity = model_.entity(entityId);
+  llvm::Function *function = functionFor(entityId);
   if (!function->empty())
     return;
 
-  if (info.params.size() != function->arg_size())
+  if (entity.parameters.size() != function->arg_size())
     throw std::runtime_error("function declaration/definition parameter mismatch");
 
   function_ = function;
-  returnType_ = info.type->result;
+  returnType_ = entity.type->result;
   locals_.clear();
   labels_.clear();
   loops_.clear();
@@ -156,11 +153,12 @@ void CodeGen::emitFunction(DeclId id, const FunctionDecl &decl) {
 
   unsigned index = 0;
   for (llvm::Argument &argument : function->args()) {
-    DeclId paramId = info.params[index];
-    const DeclInfo &param = model_.decl(paramId);
+    DeclId paramId = entity.parameters[index];
+    EntityId paramEntityId = model_.decl(paramId).entity;
+    const Entity &param = model_.entity(paramEntityId);
     llvm::AllocaInst *slot = createAlloca(param.type, param.name);
     allocaBuilder_.CreateStore(&argument, slot);
-    locals_[paramId.index] = slot;
+    locals_[paramEntityId.index] = slot;
     argument.setName(param.name ? *param.name : "arg");
     ++index;
   }
@@ -241,12 +239,13 @@ void CodeGen::emitLocalDecl(DeclId id) {
   auto *var = std::get_if<VarDecl>(&ast_.decl(id).node);
   if (!var)
     return;
-  const DeclInfo &info = model_.decl(id);
-  if (info.isGlobal)
+  EntityId entityId = model_.decl(id).entity;
+  const Entity &entity = model_.entity(entityId);
+  if (entity.linkage == Linkage::External)
     return;
-  if (locals_.count(id.index))
+  if (locals_.count(entityId.index))
     return;
-  locals_[id.index] = createAlloca(info.type, info.name);
+  locals_[entityId.index] = createAlloca(entity.type, entity.name);
 }
 
 void CodeGen::emitStmt(StmtId id) {
@@ -464,7 +463,7 @@ llvm::Value *CodeGen::emitExpr(ExprId id) {
 
   if (auto *identifier = std::get_if<IdentifierExpr>(&expr.node)) {
     (void)identifier;
-    llvm::Value *address = addressOfDecl(info.decl);
+    llvm::Value *address = addressOfEntity(info.entity);
     const Type *type = info.type;
     if (Type::isFunction(type) || Type::isArray(type) || Type::isStruct(type))
       return address;
@@ -538,7 +537,7 @@ llvm::Value *CodeGen::emitAddress(ExprId id) {
   const Expr &expr = ast_.expr(id);
 
   if (std::holds_alternative<IdentifierExpr>(expr.node))
-    return addressOfDecl(info.decl);
+    return addressOfEntity(info.entity);
 
   if (auto *string = std::get_if<StringLiteralExpr>(&expr.node))
     return emitStringLiteral(id, *string);
