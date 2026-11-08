@@ -237,6 +237,65 @@ int f(int x) { return x; }
     },
 ]
 
+
+def _generated_valid_cases():
+    """Systematic valid programs assembled from grammar productions."""
+    cases = []
+    expressions = [
+        "a", "b", "(a)", "a * b", "a + b", "a - b", "a < b", "a == b",
+        "a != b", "a && b", "a || b", "!a", "-a", "a ? b : a",
+        "sizeof a", "sizeof(int)", "sizeof(int *)", "(a = b)",
+    ]
+    for index, expression in enumerate(expressions):
+        cases.append({
+            "name": "generated-expression-%d" % index,
+            "source": "int main(void) { int a; int b; a = 1; b = 2; "
+                      "a = %s; return a; }\n" % expression,
+            "requirements": ["C-001", "C-009"],
+        })
+    pointer_expressions = [
+        ("p = q", "p"), ("p = 0", "p"), ("p == q", "a"),
+        ("p != q", "a"), ("p && q", "a"), ("!p", "a"),
+        ("p ? q : p", "p"), ("*p", "a"), ("&a", "p"),
+        ("p + 1", "p"), ("1 + p", "p"), ("p - q", "a"),
+        ("sizeof p", "a"),
+    ]
+    for index, (expression, target) in enumerate(pointer_expressions):
+        cases.append({
+            "name": "generated-pointer-%d" % index,
+            "source": "int main(void) { int a; int *p; int *q; p = &a; "
+                      "q = p; %s = %s; return a; }\n"
+                      % (target, expression),
+            "requirements": ["C-001", "C-009"],
+        })
+    statements = [
+        "a = a + b;",
+        "if (a) a = b;",
+        "if (a) a = b; else a = a;",
+        "while (a) { a = a - 1; }",
+        "{ a = b; }",
+        "goto L; L: ;",
+        "while (a) { if (b) break; continue; }",
+        "a = 1; ; a = b;",
+    ]
+    for index, statement in enumerate(statements):
+        cases.append({
+            "name": "generated-statement-%d" % index,
+            "source": "int main(void) { int a; int b; a = 0; b = 1; "
+                      "%s return a; }\n" % statement,
+            "requirements": ["C-005", "C-009"],
+        })
+    cases.append({
+        "name": "generated-parameters",
+        "source": "int f(int a, char b, int *c) { return a + b; }\n"
+                  "int main(void) { return f(1, 2, 0); }\n",
+        "requirements": ["C-004", "C-006", "C-009"],
+    })
+    return cases
+
+
+VALID_CASES.extend(_generated_valid_cases())
+
 INVALID_CASES: List[Dict[str, object]] = [
     {
         "name": "empty-translation-unit",

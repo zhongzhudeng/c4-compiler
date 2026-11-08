@@ -8,6 +8,7 @@ recorded as ambiguous in ambiguities.md.
 
 from __future__ import annotations
 
+import random
 from pathlib import Path
 from typing import Dict, List
 
@@ -125,6 +126,35 @@ ACCEPT_CASES: List[Dict[str, object]] = [
         "requirements": ["L-012", "L-015"],
     },
 ]
+
+
+def _generated_token_streams():
+    """Deterministic token streams covering every lexical token class."""
+    pool = [
+        "int", "char", "void", "struct", "if", "else", "while", "return",
+        "sizeof", "x", "_y", "z0", "0", "42", "2147483647",
+        r"'a'", r"'\n'", r"'\''", r'"abc"', r'"a\nb"',
+        "+", "-", "*", "<", "==", "!=", "&&", "||", "?", ":", ";", ",",
+        "(", ")", "{", "}", "[", "]", "<:", ":>", "<%", "%>", "%:", "%:%:",
+        "->", ".", "...", "=", "+=", "++",
+    ]
+    separators = [" ", "\t", "\n", " /* c */ ", " // c\n"]
+    cases = []
+    for seed in range(8):
+        rng = random.Random(seed)
+        parts = []
+        for _ in range(40):
+            parts.append(rng.choice(pool))
+            parts.append(rng.choice(separators))
+        cases.append({
+            "name": "generated-%d" % seed,
+            "source": "".join(parts),
+            "requirements": ["L-001", "L-002", "L-009", "L-012"],
+        })
+    return cases
+
+
+ACCEPT_CASES.extend(_generated_token_streams())
 
 REJECT_CASES: List[Dict[str, object]] = [
     {
