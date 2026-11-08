@@ -350,33 +350,62 @@ The LLVM mapping is otherwise unchanged:
 
 ### SCCP (task G)
 
-Own implementation in src/SCCP.*, operating on the SSA form produced by
-mem2reg.  No LLVM optimization pass other than mem2reg is used; LLVM's SCCP
-pass is not referenced.
+Own implementation in src/SCCP.hpp and src/SCCP.cpp, operating on the SSA form
+produced by mem2reg.  No LLVM optimization pass other than mem2reg is used;
+LLVM's SCCP pass is not referenced.
 
-Analysis:
-- Lattice Undefined < Constant(ConstantInt) < Overdefined.
-- Executable basic blocks and executable edges.
-- Monotone fixed-point sweep over executable blocks; values only move up the
-  lattice, so termination is guaranteed.
-- Instructions evaluated: binary operators (add/sub/mul/div/rem/and/or/xor/
-  shifts, with div-by-zero and undefined-shift guards), icmp, integer casts
-  (trunc/zext/sext/bitcast), select, and PHI nodes (meet over executable
-  incoming edges).  Loads, calls, allocas and GEPs are conservatively
-  Overdefined.
-- Conditional branches with a constant condition mark only the taken edge;
-  Overdefined conditions mark both edges; Undefined conditions mark none until
-  more information arrives.
+Lattice (namespace sccp in src/SCCP.hpp):
+- LatticeValue is std::variant<Unknown, Constant, Overdefined>.  A Constant
+  always holds a non-null llvm::ConstantInt*; the other alternatives carry no
+  payload.  Constants compare by bit width and APInt value, not pointer
+  identity.
+- The ordering is Unknown < Constant(c) < Overdefined.  join is the least
+  upper bound, so distinct constants join to Overdefined.
+- advance(state, next) performs state = join(state, next) and reports whether
+  the state changed.  It is the only analysis-state update, which makes
+  monotonicity structural rather than a convention.
+- constantOrOverdefined maps a failed or unsupported constant fold to
+  Overdefined; propagatedState returns Overdefined, Unknown, or nullopt for
+  an instruction whose operands are not all constants.
 
-Transform:
-1. Replace every constant-lattice instruction's uses with the constant.
-2. Rewrite constant conditional branches as unconditional branches.
-3. Recompute CFG reachability from the entry block.
+Analysis (FunctionAnalysis -> AnalysisResult):
+- AnalysisResult is an immutable snapshot for one unchanged function: the
+  lattice value of each tracked instruction, the executable basic blocks, and
+  the executable edges.  It borrows instruction and block pointers and is valid
+  only until transformation starts mutating the IR.
+- The entry block is executable.  Repeated full-function sweeps evaluate
+  executable blocks and propagate their terminators until no state changes.
+  Executable blocks and edges only grow and lattice states only advance, so
+  the fixed point terminates.  The original full-sweep algorithm is retained;
+  a worklist would not simplify these relationships for functions this size.
+- A PHI meets only incoming values whose predecessor edge is executable.
+- A conditional branch with a constant condition makes only its taken edge
+  executable, an Overdefined condition both edges, and an Unknown condition
+  no edge yet.
+- Supported folds are integer binary operators (add/sub/mul/div/rem/and/or/
+  xor/shifts, with div/rem-by-zero and undefined-shift guards), icmp, integer
+  casts (trunc/zext/sext/bitcast), select, and PHI.  APInt supplies the
+  arithmetic.  Loads, calls, allocas, GEPs and other unsupported operations
+  are conservatively Overdefined.
+
+Transformation (FunctionTransformer):
+1. Substitute uses of every constant-lattice instruction with its constant.
+   This is the only step that reads AnalysisResult.
+2. Rewrite conditional branches with constant conditions as unconditional
+   branches.  When both edges target the same block, collapse the duplicate
+   PHI entries to the value selected by the taken edge.
+3. Recompute CFG reachability from the entry block on the rewritten CFG.
 4. Remove PHI operands whose incoming block is unreachable or is no longer a
    predecessor.
-5. Replace dead blocks' terminators with unreachable and delete them.
-6. Iteratively delete trivially dead instructions (unused, no side effects).
+5. Replace dead blocks' used SSA results with poison, drop all references, and
+   erase the blocks; this is safe for dead blocks that reference each other.
+6. Iteratively delete unused, side-effect-free non-PHI, non-terminator
+   instructions.
 7. verifyModule runs on the result (driver and tests).
+
+Steps 3-6 recompute CFG facts from the rewritten IR, so no analysis pointer is
+used after mutation begins.  FunctionSCCP remains the per-function driver, and
+SCCP::run applies it to every defined function.
 
 Evidence (constant-branch program):
 
@@ -433,8 +462,8 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 
 ## Verification
 
-- 95 Catch2 test cases (lexer, parser, Sema, types/AST, printer, codegen,
-  SCCP, pipeline) plus the end-to-end harness (96 CTest tests), all passing in
+- 106 Catch2 test cases (lexer, parser, Sema, types/AST, printer, codegen,
+  SCCP, pipeline) plus the end-to-end harness (107 CTest tests), all passing in
   Debug, Release, and AddressSanitizer builds.
   Nine Sema cases are architectural regressions for entity identity, binding
   identity, and scope lifetime; eleven CodeGen cases cover typed expression
@@ -447,6 +476,13 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
   separation, the analyzed-program prerequisite, target-free frontend
   execution, failure behavior, independent invocations, per-mode stage
   composition, output naming, and default/--compile equivalence.
+  Twenty-five SCCP cases cover the lattice algebra (joins, overdefined
+  propagation, monotonic advance), executable-edge PHI inputs, constant and
+  overdefined branches, duplicate PHI edges, dead-block cycles, integer/cast/
+  select folding, side effects, unsupported operations, and cyclic-CFG fixed
+  points.  Optimized IR for the 23 end-to-end programs and the 11 SCCP
+  conformance fixtures is byte-identical to the accepted pre-redesign
+  baseline.
 - End-to-end suite tests/e2e/run_e2e.py: 23 accepted programs x
   {--compile, --optimize} plus 14 rejected programs (430 checks); each
   accepted program is compiled to .ll, linked with clang, executed, and
@@ -482,6 +518,8 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 - [x] Algebraic Type representation and AST invariant cleanup.
 - [x] Phase-oriented pipeline with explicit ownership and target-free frontend
       modes.
+- [x] Algebraic SCCP lattice with an explicit analysis result and
+      transformation boundary.
 
 ## Known limitations (within the assignment scope)
 

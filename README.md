@@ -105,7 +105,7 @@ $ echo $?
 
 make test runs:
 
-- 95 Catch2 test cases covering the lexer, parser, Sema, types/AST, pretty
+- 106 Catch2 test cases covering the lexer, parser, Sema, types/AST, pretty
   printer, code generation, SCCP, and the phase/lifetime pipeline invariants.
 - An end-to-end e2e CTest that compiles 23 accepted programs with both
   --compile and --optimize, links and runs them, compares the results with

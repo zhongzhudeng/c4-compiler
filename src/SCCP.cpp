@@ -16,53 +16,10 @@
 
 namespace {
 
-/// One element of the SCCP lattice.  Undefined is the bottom element,
-/// Overdefined the top element, and Constant a single known integer.
-struct LatticeVal {
-  enum class Kind { Undefined, Constant, Overdefined };
-
-  Kind kind = Kind::Undefined;
-  llvm::ConstantInt *constant = nullptr;
-
-  static LatticeVal undefined() { return LatticeVal{}; }
-
-  static LatticeVal overdefined() {
-    LatticeVal value;
-    value.kind = Kind::Overdefined;
-    return value;
-  }
-
-  static LatticeVal constantValue(llvm::ConstantInt *constant) {
-    LatticeVal value;
-    value.kind = Kind::Constant;
-    value.constant = constant;
-    return value;
-  }
-
-  bool operator==(const LatticeVal &other) const {
-    if (kind != other.kind)
-      return false;
-    if (kind != Kind::Constant)
-      return true;
-    if (constant == other.constant)
-      return true;
-    return constant->getBitWidth() == other.constant->getBitWidth() &&
-           constant->getValue() == other.constant->getValue();
-  }
-};
-
-LatticeVal meet(const LatticeVal &left, const LatticeVal &right) {
-  if (left.kind == LatticeVal::Kind::Undefined)
-    return right;
-  if (right.kind == LatticeVal::Kind::Undefined)
-    return left;
-  if (left.kind == LatticeVal::Kind::Overdefined ||
-      right.kind == LatticeVal::Kind::Overdefined)
-    return LatticeVal::overdefined();
-  if (left == right)
-    return left;
-  return LatticeVal::overdefined();
-}
+using sccp::Constant;
+using sccp::LatticeValue;
+using sccp::Overdefined;
+using sccp::Unknown;
 
 llvm::ConstantInt *integerConstant(llvm::Type *type, const llvm::APInt &value) {
   return llvm::cast<llvm::ConstantInt>(llvm::ConstantInt::get(type, value));
@@ -210,236 +167,282 @@ bool hasEdge(const llvm::BasicBlock *predecessor,
   return false;
 }
 
-class FunctionSCCP {
+using Edge = std::pair<const llvm::BasicBlock *, const llvm::BasicBlock *>;
+
+/// Completed SCCP analysis for one function.  The pointers refer to the
+/// function's instructions and blocks and are valid only until the
+/// transformation starts deleting or replacing them.
+struct AnalysisResult {
+  std::unordered_map<const llvm::Instruction *, LatticeValue> values;
+  std::unordered_set<const llvm::BasicBlock *> executableBlocks;
+  std::set<Edge> executableEdges;
+
+  LatticeValue stateOf(const llvm::Instruction &instruction) const {
+    auto it = values.find(&instruction);
+    if (it == values.end())
+      return LatticeValue(Unknown{});
+    return it->second;
+  }
+
+  bool isExecutable(const llvm::BasicBlock *block) const {
+    return executableBlocks.count(block) != 0;
+  }
+
+  bool isExecutableEdge(const llvm::BasicBlock *from,
+                        const llvm::BasicBlock *to) const {
+    return executableEdges.count(Edge(from, to)) != 0;
+  }
+};
+
+/// Computes the fixed point of the SCCP lattice for one function.  The
+/// function is only read: all IR mutation happens in FunctionTransformer.
+class FunctionAnalysis {
 public:
-  explicit FunctionSCCP(llvm::Function &function) : function_(function) {}
+  explicit FunctionAnalysis(const llvm::Function &function)
+      : function_(function) {}
 
-  void run() {
-    analyze();
-    transform();
-  }
-
-private:
-  using Edge = std::pair<const llvm::BasicBlock *, const llvm::BasicBlock *>;
-
-  llvm::Function &function_;
-  std::unordered_map<const llvm::Value *, LatticeVal> values_;
-  std::unordered_set<const llvm::BasicBlock *> executable_;
-  std::set<Edge> edges_;
-
-  LatticeVal latticeOf(const llvm::Value *value) const {
-    if (auto *constant = llvm::dyn_cast<llvm::ConstantInt>(value))
-      return LatticeVal::constantValue(
-          const_cast<llvm::ConstantInt *>(constant));
-    if (auto *instruction = llvm::dyn_cast<llvm::Instruction>(value)) {
-      auto it = values_.find(instruction);
-      if (it != values_.end())
-        return it->second;
-      return LatticeVal::undefined();
-    }
-    // Arguments, globals, null pointers and other constants are not tracked.
-    return LatticeVal::overdefined();
-  }
-
-  LatticeVal evaluate(const llvm::Instruction &instruction) const {
-    if (auto *binary = llvm::dyn_cast<llvm::BinaryOperator>(&instruction)) {
-      LatticeVal left = latticeOf(binary->getOperand(0));
-      LatticeVal right = latticeOf(binary->getOperand(1));
-      if (left.kind == LatticeVal::Kind::Overdefined ||
-          right.kind == LatticeVal::Kind::Overdefined)
-        return LatticeVal::overdefined();
-      if (left.kind == LatticeVal::Kind::Undefined ||
-          right.kind == LatticeVal::Kind::Undefined)
-        return LatticeVal::undefined();
-      if (auto *folded =
-              foldBinary(binary->getOpcode(), left.constant, right.constant))
-        return LatticeVal::constantValue(folded);
-      return LatticeVal::overdefined();
-    }
-
-    if (auto *compare = llvm::dyn_cast<llvm::ICmpInst>(&instruction)) {
-      LatticeVal left = latticeOf(compare->getOperand(0));
-      LatticeVal right = latticeOf(compare->getOperand(1));
-      if (left.kind == LatticeVal::Kind::Overdefined ||
-          right.kind == LatticeVal::Kind::Overdefined)
-        return LatticeVal::overdefined();
-      if (left.kind == LatticeVal::Kind::Undefined ||
-          right.kind == LatticeVal::Kind::Undefined)
-        return LatticeVal::undefined();
-      if (auto *folded = foldCompare(compare->getPredicate(), left.constant,
-                                     right.constant, function_.getContext()))
-        return LatticeVal::constantValue(folded);
-      return LatticeVal::overdefined();
-    }
-
-    if (auto *cast = llvm::dyn_cast<llvm::CastInst>(&instruction)) {
-      LatticeVal operand = latticeOf(cast->getOperand(0));
-      if (operand.kind == LatticeVal::Kind::Overdefined)
-        return LatticeVal::overdefined();
-      if (operand.kind == LatticeVal::Kind::Undefined)
-        return LatticeVal::undefined();
-      if (auto *folded =
-              foldCast(cast->getOpcode(), operand.constant, cast->getType()))
-        return LatticeVal::constantValue(folded);
-      return LatticeVal::overdefined();
-    }
-
-    if (auto *select = llvm::dyn_cast<llvm::SelectInst>(&instruction)) {
-      LatticeVal condition = latticeOf(select->getCondition());
-      LatticeVal whenTrue = latticeOf(select->getTrueValue());
-      LatticeVal whenFalse = latticeOf(select->getFalseValue());
-
-      if (condition.kind == LatticeVal::Kind::Constant)
-        return condition.constant->isZero() ? whenFalse : whenTrue;
-
-      if (condition.kind == LatticeVal::Kind::Undefined) {
-        if (whenTrue == whenFalse &&
-            whenTrue.kind == LatticeVal::Kind::Constant)
-          return whenTrue;
-        return LatticeVal::undefined();
-      }
-
-      if (whenTrue == whenFalse &&
-          whenTrue.kind == LatticeVal::Kind::Constant)
-        return whenTrue;
-      return LatticeVal::overdefined();
-    }
-
-    // Loads, calls, allocas, GEPs and anything else are opaque to this pass.
-    return LatticeVal::overdefined();
-  }
-
-  LatticeVal evaluatePhi(const llvm::PHINode &phi) const {
-    LatticeVal result = LatticeVal::undefined();
-    for (unsigned i = 0; i < phi.getNumIncomingValues(); ++i) {
-      const llvm::BasicBlock *predecessor = phi.getIncomingBlock(i);
-      if (!edges_.count(Edge(predecessor, phi.getParent())))
-        continue;
-      result = meet(result, latticeOf(phi.getIncomingValue(i)));
-    }
-    return result;
-  }
-
-  bool markEdge(const llvm::BasicBlock *from, const llvm::BasicBlock *to) {
-    bool changed = false;
-    if (edges_.insert(Edge(from, to)).second)
-      changed = true;
-    if (executable_.insert(to).second)
-      changed = true;
-    return changed;
-  }
-
-  void analyze() {
-    executable_.insert(&function_.getEntryBlock());
+  AnalysisResult run() {
+    // The entry block is executable by definition.  Executable blocks, edges
+    // and lattice states only ever move up (see sccp::advance), so repeated
+    // full sweeps terminate at a fixed point.
+    result_.executableBlocks.insert(&function_.getEntryBlock());
 
     bool changed = true;
     while (changed) {
       changed = false;
-
-      for (llvm::BasicBlock &block : function_) {
-        if (!executable_.count(&block))
+      for (const llvm::BasicBlock &block : function_) {
+        if (!result_.isExecutable(&block))
           continue;
-
-        for (llvm::Instruction &instruction : block) {
-          if (auto *phi = llvm::dyn_cast<llvm::PHINode>(&instruction)) {
-            LatticeVal value = evaluatePhi(*phi);
-            auto it = values_.find(phi);
-            if (it == values_.end() || !(it->second == value)) {
-              values_[phi] = value;
-              changed = true;
-            }
-            continue;
-          }
-
-          if (instruction.isTerminator() || instruction.getType()->isVoidTy())
-            continue;
-
-          LatticeVal value = evaluate(instruction);
-          auto it = values_.find(&instruction);
-          if (it == values_.end() || !(it->second == value)) {
-            values_[&instruction] = value;
-            changed = true;
-          }
-        }
-
-        llvm::Instruction *terminator = block.getTerminator();
-        if (auto *unconditional =
-                llvm::dyn_cast<llvm::UncondBrInst>(terminator)) {
-          changed |= markEdge(&block, unconditional->getSuccessor(0));
-          continue;
-        }
-
-        auto *conditional = llvm::dyn_cast<llvm::CondBrInst>(terminator);
-        if (!conditional)
-          continue;
-
-        LatticeVal condition = latticeOf(conditional->getCondition());
-        if (condition.kind == LatticeVal::Kind::Constant) {
-          bool taken = !condition.constant->isZero();
-          changed |=
-              markEdge(&block, conditional->getSuccessor(taken ? 0 : 1));
-        } else if (condition.kind == LatticeVal::Kind::Overdefined) {
-          for (unsigned i = 0; i < conditional->getNumSuccessors(); ++i)
-            changed |= markEdge(&block, conditional->getSuccessor(i));
-        }
+        changed |= evaluateBlock(block);
+        changed |= propagateTerminator(block);
       }
+    }
+    return std::move(result_);
+  }
+
+private:
+  const llvm::Function &function_;
+  AnalysisResult result_;
+
+  LatticeValue stateOf(const llvm::Value *value) const {
+    if (auto *constant = llvm::dyn_cast<llvm::ConstantInt>(value))
+      return Constant(const_cast<llvm::ConstantInt *>(constant));
+    if (auto *instruction = llvm::dyn_cast<llvm::Instruction>(value))
+      return result_.stateOf(*instruction);
+    // Arguments, globals, null pointers and other constants are opaque.
+    return LatticeValue(Overdefined{});
+  }
+
+  LatticeValue evaluate(const llvm::Instruction &instruction) const {
+    if (auto *binary = llvm::dyn_cast<llvm::BinaryOperator>(&instruction)) {
+      LatticeValue left = stateOf(binary->getOperand(0));
+      LatticeValue right = stateOf(binary->getOperand(1));
+      if (auto state = sccp::propagatedState({&left, &right}))
+        return *state;
+      return sccp::constantOrOverdefined(
+          foldBinary(binary->getOpcode(), sccp::constantValue(left),
+                     sccp::constantValue(right)));
+    }
+
+    if (auto *compare = llvm::dyn_cast<llvm::ICmpInst>(&instruction)) {
+      LatticeValue left = stateOf(compare->getOperand(0));
+      LatticeValue right = stateOf(compare->getOperand(1));
+      if (auto state = sccp::propagatedState({&left, &right}))
+        return *state;
+      return sccp::constantOrOverdefined(
+          foldCompare(compare->getPredicate(), sccp::constantValue(left),
+                      sccp::constantValue(right), function_.getContext()));
+    }
+
+    if (auto *cast = llvm::dyn_cast<llvm::CastInst>(&instruction)) {
+      LatticeValue operand = stateOf(cast->getOperand(0));
+      if (auto state = sccp::propagatedState({&operand}))
+        return *state;
+      return sccp::constantOrOverdefined(
+          foldCast(cast->getOpcode(), sccp::constantValue(operand),
+                   cast->getType()));
+    }
+
+    if (auto *select = llvm::dyn_cast<llvm::SelectInst>(&instruction)) {
+      LatticeValue condition = stateOf(select->getCondition());
+      LatticeValue whenTrue = stateOf(select->getTrueValue());
+      LatticeValue whenFalse = stateOf(select->getFalseValue());
+
+      if (sccp::isConstant(condition))
+        return sccp::constantValue(condition)->isZero() ? whenFalse : whenTrue;
+
+      // Equal constant arms yield that constant regardless of the condition.
+      if (sccp::isConstant(whenTrue) && whenTrue == whenFalse)
+        return whenTrue;
+
+      if (sccp::isUnknown(condition))
+        return LatticeValue(Unknown{});
+      return LatticeValue(Overdefined{});
+    }
+
+    // Loads, calls, allocas, GEPs and anything else are opaque to this pass.
+    return LatticeValue(Overdefined{});
+  }
+
+  LatticeValue evaluatePhi(const llvm::PHINode &phi) const {
+    // Only incoming edges that the analysis has proven executable contribute;
+    // a PHI may list predecessors that control flow never reaches.
+    LatticeValue result = LatticeValue(Unknown{});
+    for (unsigned i = 0; i < phi.getNumIncomingValues(); ++i) {
+      const llvm::BasicBlock *predecessor = phi.getIncomingBlock(i);
+      if (!result_.isExecutableEdge(predecessor, phi.getParent()))
+        continue;
+      result = sccp::join(result, stateOf(phi.getIncomingValue(i)));
+    }
+    return result;
+  }
+
+  bool evaluateBlock(const llvm::BasicBlock &block) {
+    bool changed = false;
+    for (const llvm::Instruction &instruction : block) {
+      if (auto *phi = llvm::dyn_cast<llvm::PHINode>(&instruction)) {
+        changed |=
+            sccp::advance(result_.values[&instruction], evaluatePhi(*phi));
+        continue;
+      }
+
+      if (instruction.isTerminator() || instruction.getType()->isVoidTy())
+        continue;
+
+      changed |=
+          sccp::advance(result_.values[&instruction], evaluate(instruction));
+    }
+    return changed;
+  }
+
+  bool propagateTerminator(const llvm::BasicBlock &block) {
+    // A constant condition makes exactly the taken edge executable, an
+    // overdefined condition both edges, and an unknown condition none: the
+    // edge is discovered once the condition's lattice state advances.
+    const llvm::Instruction *terminator = block.getTerminator();
+
+    if (auto *unconditional = llvm::dyn_cast<llvm::UncondBrInst>(terminator))
+      return markEdge(&block, unconditional->getSuccessor(0));
+
+    auto *conditional = llvm::dyn_cast<llvm::CondBrInst>(terminator);
+    if (!conditional)
+      return false;
+
+    LatticeValue condition = stateOf(conditional->getCondition());
+    if (sccp::isConstant(condition)) {
+      bool taken = !sccp::constantValue(condition)->isZero();
+      return markEdge(&block, conditional->getSuccessor(taken ? 0 : 1));
+    }
+
+    if (sccp::isOverdefined(condition)) {
+      bool changed = false;
+      for (unsigned i = 0; i < conditional->getNumSuccessors(); ++i)
+        changed |= markEdge(&block, conditional->getSuccessor(i));
+      return changed;
+    }
+
+    // An unknown condition does not make either edge executable yet.
+    return false;
+  }
+
+  bool markEdge(const llvm::BasicBlock *from, const llvm::BasicBlock *to) {
+    bool changed = false;
+    if (result_.executableEdges.insert(Edge(from, to)).second)
+      changed = true;
+    if (result_.executableBlocks.insert(to).second)
+      changed = true;
+    return changed;
+  }
+};
+
+/// Collapses duplicate PHI entries for a predecessor whose conditional branch
+/// had both edges to the same successor.  After the branch becomes
+/// unconditional only one predecessor edge remains, so only the value selected
+/// by the taken edge may remain.
+void deduplicatePhiEntries(llvm::BasicBlock &predecessor,
+                           llvm::BasicBlock &successor, unsigned keptEdge) {
+  for (llvm::PHINode &phi : successor.phis()) {
+    std::vector<unsigned> occurrences;
+    for (unsigned i = 0; i < phi.getNumIncomingValues(); ++i)
+      if (phi.getIncomingBlock(i) == &predecessor)
+        occurrences.push_back(i);
+    if (occurrences.size() <= 1)
+      continue;
+
+    unsigned keep =
+        occurrences[keptEdge < occurrences.size() ? keptEdge
+                                                  : occurrences.size() - 1];
+    llvm::Value *keptValue = phi.getIncomingValue(keep);
+    for (auto it = occurrences.rbegin(); it != occurrences.rend(); ++it)
+      phi.removeIncomingValue(*it, /*DeletePHIIfEmpty=*/false);
+    phi.addIncoming(keptValue, &predecessor);
+  }
+}
+
+/// Applies the transformations after the analysis has reached its fixed point.
+/// The analysis result is consumed only by substituteConstants; the later
+/// steps may delete the instructions and blocks it refers to, so they
+/// recompute CFG facts from the rewritten IR.
+class FunctionTransformer {
+public:
+  explicit FunctionTransformer(llvm::Function &function)
+      : function_(function) {}
+
+  void run(const AnalysisResult &analysis) {
+    // substituteConstants is the only step that consumes the analysis result;
+    // the steps below rewrite and delete IR, so they recompute CFG facts from
+    // the rewritten function instead of trusting potentially stale pointers.
+    substituteConstants(analysis);
+    simplifyConditionalBranches();
+
+    const BlockSet reachable = computeReachableBlocks();
+    repairPhiInputs(reachable);
+    deleteUnreachableBlocks(reachable);
+    removeDeadInstructions();
+  }
+
+private:
+  using BlockSet = std::unordered_set<const llvm::BasicBlock *>;
+
+  llvm::Function &function_;
+
+  void substituteConstants(const AnalysisResult &analysis) {
+    for (const auto &[value, state] : analysis.values) {
+      if (!sccp::isConstant(state))
+        continue;
+      auto *instruction = const_cast<llvm::Instruction *>(value);
+      instruction->replaceAllUsesWith(sccp::constantValue(state));
     }
   }
 
-  void transform() {
-    // 1. Replace every instruction whose lattice value is constant.
-    for (const auto &[value, lattice] : values_) {
-      if (lattice.kind != LatticeVal::Kind::Constant)
-        continue;
-      auto *instruction =
-          llvm::cast<llvm::Instruction>(const_cast<llvm::Value *>(value));
-      instruction->replaceAllUsesWith(lattice.constant);
-    }
-
-    // 2. Turn conditional branches with constant conditions into
-    //    unconditional ones.
+  void simplifyConditionalBranches() {
     for (llvm::BasicBlock &block : function_) {
       auto *branch = llvm::dyn_cast<llvm::CondBrInst>(block.getTerminator());
       if (!branch)
         continue;
+
       auto *condition =
           llvm::dyn_cast<llvm::ConstantInt>(branch->getCondition());
       if (!condition)
         continue;
-      llvm::BasicBlock *taken =
-          branch->getSuccessor(condition->isZero() ? 1 : 0);
-      if (branch->getSuccessor(0) == branch->getSuccessor(1)) {
-        // Both edges entered the same block.  Collapse the duplicate PHI
-        // entries for this predecessor to the one selected by the edge that
-        // the constant condition takes; after the branch becomes
-        // unconditional there is only one predecessor edge.
-        unsigned keptEdge = condition->isZero() ? 1 : 0;
-        for (llvm::PHINode &phi : taken->phis()) {
-          std::vector<unsigned> occurrences;
-          for (unsigned i = 0; i < phi.getNumIncomingValues(); ++i)
-            if (phi.getIncomingBlock(i) == &block)
-              occurrences.push_back(i);
-          if (occurrences.size() <= 1)
-            continue;
-          unsigned keep = occurrences[keptEdge < occurrences.size()
-                                          ? keptEdge
-                                          : occurrences.size() - 1];
-          llvm::Value *keptValue = phi.getIncomingValue(keep);
-          for (auto it = occurrences.rbegin(); it != occurrences.rend(); ++it)
-            phi.removeIncomingValue(*it, /*DeletePHIIfEmpty=*/false);
-          phi.addIncoming(keptValue, &block);
-        }
-      }
+
+      unsigned takenEdge = condition->isZero() ? 1 : 0;
+      llvm::BasicBlock *taken = branch->getSuccessor(takenEdge);
+      if (branch->getSuccessor(0) == branch->getSuccessor(1))
+        deduplicatePhiEntries(block, *taken, takenEdge);
+
       llvm::IRBuilder<> builder(&block, branch->getIterator());
       builder.CreateBr(taken);
       branch->eraseFromParent();
     }
+  }
 
-    // 3. Recompute reachability on the simplified CFG.
-    std::unordered_set<const llvm::BasicBlock *> reachable;
+  BlockSet computeReachableBlocks() const {
+    BlockSet reachable;
     std::vector<const llvm::BasicBlock *> worklist;
     reachable.insert(&function_.getEntryBlock());
     worklist.push_back(&function_.getEntryBlock());
+
     while (!worklist.empty()) {
       const llvm::BasicBlock *block = worklist.back();
       worklist.pop_back();
@@ -450,44 +453,48 @@ private:
           worklist.push_back(successor);
       }
     }
+    return reachable;
+  }
 
-    // 4. Drop PHI operands that come from unreachable blocks.
+  void repairPhiInputs(const BlockSet &reachable) {
     for (llvm::BasicBlock &block : function_) {
       if (!reachable.count(&block))
         continue;
       for (llvm::PHINode &phi : block.phis()) {
         phi.removeIncomingValueIf(
-            [&](unsigned i) {
-              const llvm::BasicBlock *incoming = phi.getIncomingBlock(i);
-              return !reachable.count(incoming) ||
-                     !hasEdge(incoming, &block);
+            [&](unsigned index) {
+              const llvm::BasicBlock *incoming = phi.getIncomingBlock(index);
+              return !reachable.count(incoming) || !hasEdge(incoming, &block);
             },
             /*DeletePHIIfEmpty=*/false);
         assert(phi.getNumIncomingValues() > 0 &&
                "reachable block with an empty PHI");
       }
     }
+  }
 
-    // 5. Delete unreachable blocks.  Replace their SSA results with poison
-    //    first: dead blocks may still refer to values defined in other dead
-    //    blocks, and destroying one block while another still uses its values
-    //    would leave dangling operands in LLVM's use lists.
+  void deleteUnreachableBlocks(const BlockSet &reachable) {
     std::vector<llvm::BasicBlock *> dead;
     for (llvm::BasicBlock &block : function_)
       if (!reachable.count(&block))
         dead.push_back(&block);
 
+    // Dead blocks may still refer to values defined in other dead blocks.
+    // Replace their results with poison before dropping references so that
+    // destroying one block cannot leave a dangling use-list entry in another.
     for (llvm::BasicBlock *block : dead)
       for (llvm::Instruction &instruction : *block)
         if (!instruction.getType()->isVoidTy() && !instruction.use_empty())
           instruction.replaceAllUsesWith(
               llvm::PoisonValue::get(instruction.getType()));
+
     for (llvm::BasicBlock *block : dead)
       block->dropAllReferences();
     for (llvm::BasicBlock *block : dead)
       block->eraseFromParent();
+  }
 
-    // 6. Remove instructions that became trivially dead.
+  void removeDeadInstructions() {
     bool changed = true;
     while (changed) {
       changed = false;
@@ -497,7 +504,8 @@ private:
           if (llvm::isa<llvm::PHINode>(instruction) ||
               instruction->isTerminator())
             continue;
-          if (instruction->use_empty() && !instruction->mayHaveSideEffects()) {
+          if (instruction->use_empty() &&
+              !instruction->mayHaveSideEffects()) {
             instruction->eraseFromParent();
             changed = true;
           }
@@ -505,6 +513,23 @@ private:
       }
     }
   }
+};
+
+/// One function's analysis followed by transformation.  Keeping the driver
+/// separate from both stages makes the ordering explicit.
+class FunctionSCCP {
+public:
+  explicit FunctionSCCP(llvm::Function &function) : function_(function) {}
+
+  void run() {
+    FunctionAnalysis analysis(function_);
+    AnalysisResult result = analysis.run();
+    FunctionTransformer transformer(function_);
+    transformer.run(result);
+  }
+
+private:
+  llvm::Function &function_;
 };
 
 } // namespace
