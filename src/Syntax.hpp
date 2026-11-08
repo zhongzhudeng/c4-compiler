@@ -54,17 +54,27 @@ using AbstractFunctionVariableDeclaratorPtr =
 class TranslationUnit;
 class Decl;
 class DeclaratorDecl;
-class NamedDeclaratorDecl;
-class LabelDecl;
+class ValuedDecl;
+class VariableDecl;
+class FunctionVariableDecl;
+class StructDefinition;
+class FunctionDecl;
 class FunctionDefinition;
-class StructDef;
 using TranslationUnitPtr = std::unique_ptr<TranslationUnit>;
 using DeclPtr = std::unique_ptr<Decl>;
 using DeclaratorDeclPtr = std::unique_ptr<DeclaratorDecl>;
-using NamedDeclaratorDeclPtr = std::unique_ptr<NamedDeclaratorDecl>;
+using ValuedDeclPtr = std::unique_ptr<ValuedDecl>;
+using VariableDeclPtr = std::unique_ptr<VariableDecl>;
+using FunctionVariableDeclPtr = std::unique_ptr<FunctionVariableDecl>;
+using StructDefinitionPtr = std::unique_ptr<StructDefinition>;
+using FunctionDeclPtr = std::unique_ptr<FunctionDecl>;
+using FunctionDefinitionPtr = std::unique_ptr<FunctionDefinition>;
+
+class LabelDecl;
 using LabelDeclPtr = std::unique_ptr<LabelDecl>;
-using FuncDefPtr = std::unique_ptr<FunctionDefinition>;
-using StructDefPtr = std::unique_ptr<StructDef>;
+
+class NamedDeclaratorDecl;
+using NamedDeclaratorDeclPtr = std::unique_ptr<NamedDeclaratorDecl>;
 
 class Stmt;
 

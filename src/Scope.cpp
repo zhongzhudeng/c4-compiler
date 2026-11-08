@@ -37,7 +37,7 @@ Scope::find_struct(Symbol iden) const {
                              : std::nullopt;
 }
 
-void Scope::insert_variable(const VariableDecl &variable) {
+void Scope::insert_variable(const ValuedDecl &variable) {
   variables.insert({variable.getIdentifier(), variable});
 }
 
@@ -47,7 +47,7 @@ void Scope::insert_function_variable(
       {function_variable.getIdentifier(), function_variable});
 }
 
-void Scope::insert_struct(const StructDef &struct_def) {
+void Scope::insert_struct(const StructDefinition &struct_def) {
   structs.insert({struct_def.getIdentifier(), struct_def});
 }
 
@@ -101,7 +101,7 @@ void ProgramScope::insert_function_definition(
   function_definitions.insert({function.getIdentifier(), function});
 }
 
-void ProgramScope::insert_function_decl(const FunctionDecl &function_decl) {
+void ProgramScope::insert_function_decl(const Function &function_decl) {
   Symbol iden = function_decl.getIdentifier();
   auto it = function_decls.find(iden);
   if (it != function_decls.end())

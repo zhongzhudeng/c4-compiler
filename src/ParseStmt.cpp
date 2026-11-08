@@ -111,7 +111,7 @@ CompStmtPtr Parser::ParseCompoundStmt() {
       break;
       DECLARATION
       Locatable l(location());
-      bil.push_back(std::make_unique<DeclStmt>(l, ParseDecl()));
+      bil.push_back(std::make_unique<DeclStmt>(l, ParseDeclaratorDecl()));
       expect(TK_SEMICOLON, "';' after declaration");
       break;
     }

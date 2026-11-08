@@ -45,7 +45,7 @@ DeclaratorPtr Sema::ActOnNonFuncDeclarator(DeclaratorPtr decl) {
   }
 }
 
-FuncDefPtr Sema::ActOnFunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
+FunctionDefinitionPtr Sema::ActOnFunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
                                          CompStmtPtr stmt) {
   assert(cur_scope == program_scope);
   Symbol iden = decl->getDeclarator().as_function_declarator().getIdentifier();
@@ -63,7 +63,8 @@ DeclaratorDeclPtr Sema::ActOnFunctionDecl(DeclaratorDeclPtr decl) {
   return decl;
 }
 
-StructDefPtr
+//TODO: add definition to current ast
+StructDefinitionPtr
 Sema::ActOnStructDefinition(Locatable loc, Token iden,
                             std::vector<DeclaratorDeclPtr> fields) {
   // 1. check if the struct already defined in this scope
@@ -79,7 +80,7 @@ Sema::ActOnStructDefinition(Locatable loc, Token iden,
                "instance of itself");
   }
   // 3. add struct definition into scope
-  return std::make_unique<StructDef>(loc, iden.Text, std::move(fields));
+  return std::make_unique<StructDefinition>(loc, iden.Text, std::move(fields));
 }
 
 StructSpecPtr Sema::ActOnStructSpec(Locatable loc, Symbol iden) {
@@ -90,7 +91,7 @@ StructSpecPtr Sema::ActOnStructSpec(Locatable loc, Symbol iden) {
     errorloc(loc, "Undefined struct ", iden, "'");
 }
 
-StructSpecPtr Sema::ActOnStructSpec(Locatable loc, StructDefPtr struct_def) {
+StructSpecPtr Sema::ActOnStructSpec(Locatable loc, StructDefinitionPtr struct_def) {
   return std::make_unique<StructSpec>(loc, std::move(struct_def));
 }
 
@@ -124,8 +125,8 @@ LabeledStmtPtr Sema::ActOnLabeledStmt(Locatable loc, LabelDeclPtr label_decl,
                                       StmtPtr stmt) {
   // push the LabelDecl * into function scope.
   // if within this function containes this label, error.
-  if (cur_func_scope->find_label(label_decl->getIdentifier()).has_value())
-    errorloc(loc, "Redefinition of label '", label_decl->getIdentifier(), "'");
+  if (cur_func_scope->find_label(label_decl->identifier()).has_value())
+    errorloc(loc, "Redefinition of label '", label_decl->identifier(), "'");
   // insert the label_decl into current function scope.
   cur_func_scope->insert_label(*label_decl);
   return std::make_unique<LabeledStmt>(loc, std::move(label_decl),

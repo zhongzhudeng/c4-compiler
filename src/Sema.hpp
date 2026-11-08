@@ -18,14 +18,14 @@ public:
                                                 ExprPtr squared_expr);
 
   DeclaratorPtr ActOnNonFuncDeclarator(DeclaratorPtr decl);
-  FuncDefPtr ActOnFunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
+  FunctionDefinitionPtr ActOnFunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
                                      CompStmtPtr stmt);
   DeclaratorDeclPtr ActOnFunctionDecl(DeclaratorDeclPtr decl);
 
-  StructDefPtr ActOnStructDefinition(Locatable loc, Token iden,
+  StructDefinitionPtr ActOnStructDefinition(Locatable loc, Token iden,
                                      std::vector<DeclaratorDeclPtr> fields);
   StructSpecPtr ActOnStructSpec(Locatable loc, Symbol iden);
-  StructSpecPtr ActOnStructSpec(Locatable loc, StructDefPtr struct_def);
+  StructSpecPtr ActOnStructSpec(Locatable loc, StructDefinitionPtr struct_def);
 
   DeclaratorDeclPtr ActOnDeclaration(Locatable loc, DeclSpecPtr spec,
                                      DeclaratorPtr decl);

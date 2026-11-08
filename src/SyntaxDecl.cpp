@@ -32,17 +32,17 @@ CharSpec::CharSpec(Locatable loc) : DeclSpec(loc, Type::Char) {}
 
 IntSpec::IntSpec(Locatable loc) : DeclSpec(loc, Type::Int) {}
 
-StructSpec::StructSpec(Locatable loc, const StructDef &ref)
+StructSpec::StructSpec(Locatable loc, const StructDefinition &ref)
     : DeclSpec(loc, Type::Struct), ref(ref), struct_def(nullptr) {}
 
-StructSpec::StructSpec(Locatable loc, StructDefPtr struct_def)
+StructSpec::StructSpec(Locatable loc, StructDefinitionPtr struct_def)
     : DeclSpec(loc, Type::Struct), ref(*struct_def),
       struct_def(std::move(struct_def)) {}
 
-Symbol StructSpec::getIdentifier() const { return ref.getIdentifier(); }
+Symbol StructSpec::getIdentifier() const { return ref.iden(); }
 bool StructSpec::has_def() const { return struct_def != nullptr; }
-const StructDef &StructSpec::getDef() const {
-  return const_cast<class StructDef &>(*struct_def);
+const StructDefinition &StructSpec::getDef() const {
+  return const_cast<class StructDefinition &>(*struct_def);
 }
 
 Declarator::Declarator(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
@@ -181,18 +181,18 @@ AbstractDeclarator::AbstractDeclarator(Locatable loc)
 
 Decl::Decl(Locatable loc, Kind kind) : loc(loc), kind(kind) {}
 Decl::~Decl() {}
-const Locatable &Decl::getLoc() const { return loc; }
+const Locatable &Decl::location() const { return loc; }
 Decl::Kind Decl::getKind() const { return kind; }
 
-bool Decl::is_function_definition() const { return kind == FuncDef; }
+bool Decl::is_function_definition() const { return kind == FunctionDefinition; }
 
 LabelDecl::LabelDecl(Locatable loc, Symbol iden)
-    : Decl(loc, Decl::LabelDecl), iden(iden) {}
-Symbol LabelDecl::getIdentifier() const { return iden; }
+    : Decl(loc, Decl::LabelDecl), iden_(iden_) {}
+Symbol LabelDecl::iden_() const { return iden_; }
 
 DeclaratorDecl::DeclaratorDecl(Locatable loc, DeclSpecPtr declSpec,
                                DeclaratorPtr declarator)
-    : Decl(loc, Decl::Declarator), declSpec(std::move(declSpec)),
+    : Decl(loc, Decl::DeclaratorDecl), declSpec(std::move(declSpec)),
       declarator(std::move(declarator)) {}
 
 DeclaratorDecl::~DeclaratorDecl() {}
@@ -225,7 +225,7 @@ const AbstractDeclarator &AbstractDecl::getDeclarator() const {
 
 FunctionDefinition::FunctionDefinition(Locatable loc, DeclaratorDeclPtr decl,
                  CompStmtPtr compoundStmt)
-    : Decl(loc, Kind::FuncDef), decl(std::move(decl)),
+    : Decl(loc, Kind::FunctionDefinition), decl(std::move(decl)),
       compoundStmt(std::move(compoundStmt)) {}
 
 const class DeclaratorDecl &FunctionDefinition::getDecl() const {
@@ -244,16 +244,16 @@ const FunctionDeclarator &FunctionDefinition::getDeclarator() const {
   return getDecl().getDeclarator().as_function_declarator();
 }
 
-StructDef::StructDef(Locatable loc, Symbol iden,
+StructDefinition::StructDefinition(Locatable loc, Symbol iden,
                      std::vector<DeclaratorDeclPtr> decls)
-    : Decl(loc, Decl::StructDef), iden(iden), field_decls(std::move(decls)) {}
+    : Decl(loc, Decl::StructDefinition), iden_(iden), field_decls(std::move(decls)) {}
 // void StructDef::add_field(DeclPtr field) {
 //   field_decls.emplace_back(std::move(field));
 // }
-Symbol StructDef::getIdentifier() const { return iden; }
+Symbol StructDefinition::iden() const { return iden_; }
 
 const std::vector<std::reference_wrapper<const DeclaratorDecl>>
-StructDef::getFieldDecls() const {
+StructDefinition::getFieldDecls() const {
   std::vector<std::reference_wrapper<const DeclaratorDecl>> res;
   for (auto &structDecl : field_decls)
     res.emplace_back(std::cref(*structDecl));

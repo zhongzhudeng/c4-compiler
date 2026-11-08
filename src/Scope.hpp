@@ -14,10 +14,10 @@ class FuncScope;
 class ProgramScope;
 
 class Scope {
-  using VariableDeclfRef = std::reference_wrapper<const VariableDecl>;
+  using VariableDeclfRef = std::reference_wrapper<const ValuedDecl>;
   using FunctionVariableDeclRef =
       std::reference_wrapper<const FunctionVariableDecl>;
-  using StructDefRef = std::reference_wrapper<const StructDef>;
+  using StructDefRef = std::reference_wrapper<const StructDefinition>;
 
 public:
   Scope(const Scope *parent = nullptr);
@@ -25,16 +25,16 @@ public:
   std::optional<FunctionVariableDeclRef>
   find_function_variable(Symbol iden) const;
   std::optional<StructDefRef> find_struct(Symbol iden) const;
-  void insert_variable(const VariableDecl &variable);
+  void insert_variable(const ValuedDecl &variable);
   void insert_function_variable(const FunctionVariableDecl &function_variable);
-  void insert_struct(const StructDef &struct_def);
+  void insert_struct(const StructDefinition &struct_def);
 
 private:
-  std::unordered_map<Symbol, std::reference_wrapper<const VariableDecl>>
+  std::unordered_map<Symbol, std::reference_wrapper<const ValuedDecl>>
       variables;
   std::unordered_map<Symbol, std::reference_wrapper<const FunctionVariableDecl>>
       function_variables;
-  std::unordered_map<Symbol, std::reference_wrapper<const StructDef>> structs;
+  std::unordered_map<Symbol, std::reference_wrapper<const StructDefinition>> structs;
   const Scope *parent;
 };
 

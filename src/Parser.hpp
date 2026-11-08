@@ -38,7 +38,7 @@ private:
   ExprPtr ParseExpr();
 
   DeclSpecPtr ParseDeclSpec();
-  DeclaratorDeclPtr ParseDecl();
+  DeclaratorDeclPtr ParseDeclaratorDecl();
   DeclaratorPtr ParseDeclarator();
   DeclaratorPtr ParseNonFuncDeclarator();
 

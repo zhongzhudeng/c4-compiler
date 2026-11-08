@@ -34,18 +34,18 @@ template <typename Derived> class DeclVisitor {
 public:
   void visit(const Decl &decl) {
     switch (decl.getKind()) {
-    case Decl::Declarator:
+    case Decl::DeclaratorDecl:
       return static_cast<Derived &>(*this).VisitDeclaratorDecl(
           static_cast<const DeclaratorDecl &>(decl));
     case Decl::LabelDecl:
       return static_cast<Derived &>(*this).VisitLabelDecl(
           static_cast<const LabelDecl &>(decl));
-    case Decl::FuncDef:
+    case Decl::FunctionDefinition:
       return static_cast<Derived &>(*this).VisitFuncDef(
           static_cast<const FunctionDefinition &>(decl));
-    case Decl::StructDef:
+    case Decl::StructDefinition:
       return static_cast<Derived &>(*this).VisitStructDef(
-          static_cast<const StructDef &>(decl));
+          static_cast<const StructDefinition &>(decl));
     }
   }
   void VisitDeclSpec(const DeclSpec &declSpec) {

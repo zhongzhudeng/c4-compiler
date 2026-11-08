@@ -120,15 +120,15 @@ public:
     VisitDeclSpec(decl.getDeclSpec());
     VisitDeclarator(decl.getDeclarator());
   }
-  void VisitLabelDecl(const LabelDecl &decl) { os << *decl.getIdentifier(); }
+  void VisitLabelDecl(const LabelDecl &decl) { os << *decl.iden(); }
   void VisitFuncDef(const FunctionDefinition &decl) {
     decl.getDecl().print(os);
     os << "\n";
     decl.getCompStmt().print(os);
     os << "\n";
   }
-  void VisitStructDef(const StructDef &decl) {
-    os << "struct " << *decl.getIdentifier() << "\n";
+  void VisitStructDef(const StructDefinition &decl) {
+    os << "struct " << *decl.iden() << "\n";
     indent();
     os << "{\n";
     indentation++;
