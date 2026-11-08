@@ -48,6 +48,11 @@ private:
   std::vector<std::unique_ptr<Scope>> scopes_;
   Scope *current_ = nullptr;
   FunctionContext *function_ = nullptr;
+  // Function-declarator scopes created while resolving one declared entity.
+  // A definition keeps the scope whose function type is the entity's final
+  // type, so tags from its parameter list remain visible in the body without
+  // leaking to the enclosing scope.
+  std::vector<std::pair<const Type *, Scope *>> functionScopes_;
 
   // Functions have external linkage and therefore a single entity even when
   // they are first declared at block scope.  Objects at file scope are
@@ -70,6 +75,7 @@ private:
 
   const Type *resolveTypeSpec(TypeSpecId id, bool declareTag = false);
   DeclResult resolveDeclarator(DeclaratorId id, const Type *base);
+  Scope *takeFunctionScope(const Type *type, Scope *outer);
   const Type *adjustParameterType(const Type *type, SourceLoc loc);
   void validateObjectType(const Type *type, SourceLoc loc, const char *what,
                           bool requireComplete = true) const;
@@ -80,7 +86,7 @@ private:
   void analyzeTopLevel(DeclId id);
   void analyzeLocalDecl(DeclId id);
   void analyzeLocalFunction(DeclId id, const DeclResult &result);
-  void analyzeFunction(DeclId id);
+  void analyzeFunction(DeclId id, Scope *functionScope);
   void analyzeCompound(StmtId id, bool pushScope);
   void analyzeStmt(StmtId id);
 

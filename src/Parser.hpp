@@ -42,7 +42,7 @@ private:
   DeclaratorId parseDeclarator(bool allowName, bool allowEmpty);
   std::vector<DeclId> parseParameterList(SourceLoc lparen, bool &explicitVoid);
   DeclId parseParameterDeclaration();
-  DeclId parseFieldDeclaration();
+  std::vector<DeclId> parseFieldDeclaration();
 
   DeclId parseExternalDeclaration();
   DeclId parseLocalDeclaration();

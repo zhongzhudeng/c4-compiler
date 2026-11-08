@@ -368,6 +368,11 @@ Sema::DeclResult Sema::resolveDeclarator(DeclaratorId id, const Type *base) {
     result = resolveDeclarator(pointer->inner, types_.pointerTo(base));
   } else if (auto *function =
                  std::get_if<FunctionDeclarator>(&declarator.node)) {
+    // C11 6.2.1p4/p7: names and tags declared in a parameter list have
+    // function prototype scope, which ends with the function declarator.
+    // Record the scope so a function definition can keep the one belonging
+    // to the function being defined; all others are discarded.
+    pushScope();
     std::vector<const Type *> parameterTypes;
     std::vector<DeclId> parameters = function->params;
     std::unordered_set<Symbol> parameterNames;
@@ -411,6 +416,8 @@ Sema::DeclResult Sema::resolveDeclarator(DeclaratorId id, const Type *base) {
       inner.functionDeclarator = id;
       inner.params = std::move(parameters);
     }
+    functionScopes_.emplace_back(functionType, current_);
+    popScope();
     result = std::move(inner);
   }
 
@@ -420,6 +427,22 @@ Sema::DeclResult Sema::resolveDeclarator(DeclaratorId id, const Type *base) {
   if (info.isFunction)
     info.params = result.params;
   return result;
+}
+
+Sema::Scope *Sema::takeFunctionScope(const Type *type, Scope *outer) {
+  for (auto it = functionScopes_.rbegin(); it != functionScopes_.rend(); ++it) {
+    if (it->first != type)
+      continue;
+    Scope *scope = it->second;
+    // The scope was created as a child of the parameter-list scope of an
+    // enclosing declarator.  The function body belongs to the scope where
+    // the definition appears instead.
+    scope->parent = outer;
+    functionScopes_.clear();
+    return scope;
+  }
+  functionScopes_.clear();
+  return nullptr;
 }
 
 const Type *Sema::adjustParameterType(const Type *type, SourceLoc loc) {
@@ -493,6 +516,7 @@ void Sema::validateFieldType(const Type *type, Symbol name,
 
 void Sema::analyzeTopLevel(DeclId id) {
   const Decl &decl = ast_.decl(id);
+  functionScopes_.clear();
 
   if (auto *var = std::get_if<VarDecl>(&decl.node)) {
     const Type *base = resolveTypeSpec(var->spec);
@@ -517,6 +541,7 @@ void Sema::analyzeTopLevel(DeclId id) {
 
   if (auto *function = std::get_if<FunctionDecl>(&decl.node)) {
     const Type *base = resolveTypeSpec(function->spec);
+    bool isDefinition = function->body.valid();
     DeclResult result = resolveDeclarator(function->declarator, base);
     SourceLoc nameLoc = result.nameLoc.line ? result.nameLoc : decl.loc;
     if (!result.name)
@@ -526,7 +551,6 @@ void Sema::analyzeTopLevel(DeclId id) {
                          "function declaration does not declare a function");
     validateFunctionType(result.type, nameLoc);
 
-    bool isDefinition = function->body.valid();
     declareGlobal(result.name, id, true, result.type, nameLoc, isDefinition);
     model_.decl(id).type = result.type;
     model_.decl(id).name = result.name;
@@ -534,12 +558,19 @@ void Sema::analyzeTopLevel(DeclId id) {
     model_.decl(id).isGlobal = true;
     model_.decl(id).isDefinition = isDefinition;
     model_.decl(id).params = result.params;
-    if (isDefinition)
-      analyzeFunction(id);
+    if (isDefinition) {
+      Scope *functionScope = takeFunctionScope(result.type, current_);
+      analyzeFunction(id, functionScope);
+    }
     return;
   }
 
   if (auto *tag = std::get_if<TagDecl>(&decl.node)) {
+    const TypeSpec &spec = ast_.typeSpec(tag->spec);
+    if (spec.hasBraces && !spec.tag) {
+      diagnostics_.error(decl.loc, "declaration does not declare anything");
+      return;
+    }
     const Type *type = resolveTypeSpec(tag->spec, /*declareTag=*/true);
     model_.decl(id).type = type;
     model_.decl(id).record = model_.typeSpec(tag->spec).record;
@@ -552,6 +583,7 @@ void Sema::analyzeTopLevel(DeclId id) {
 
 void Sema::analyzeLocalDecl(DeclId id) {
   const Decl &decl = ast_.decl(id);
+  functionScopes_.clear();
 
   if (auto *var = std::get_if<VarDecl>(&decl.node)) {
     const Type *base = resolveTypeSpec(var->spec);
@@ -583,6 +615,11 @@ void Sema::analyzeLocalDecl(DeclId id) {
   }
 
   if (auto *tag = std::get_if<TagDecl>(&decl.node)) {
+    const TypeSpec &spec = ast_.typeSpec(tag->spec);
+    if (spec.hasBraces && !spec.tag) {
+      diagnostics_.error(decl.loc, "declaration does not declare anything");
+      return;
+    }
     const Type *type = resolveTypeSpec(tag->spec, /*declareTag=*/true);
     model_.decl(id).type = type;
     model_.decl(id).record = model_.typeSpec(tag->spec).record;
@@ -654,13 +691,18 @@ void Sema::analyzeLocalFunction(DeclId id, const DeclResult &result) {
   current_->ordinary[result.name] = id;
 }
 
-void Sema::analyzeFunction(DeclId id) {
+void Sema::analyzeFunction(DeclId id, Scope *functionScope) {
   auto *function = std::get_if<FunctionDecl>(&ast_.decl(id).node);
   assert(function && function->body.valid());
   const Type *functionType = model_.decl(id).type;
   assert(Type::isFunction(functionType));
 
-  pushScope();
+  Scope *saved = functionScope ? functionScope->parent : nullptr;
+  if (functionScope) {
+    current_ = functionScope;
+  } else {
+    pushScope();
+  }
   FunctionContext context;
   context.returnType = functionType->result;
   function_ = &context;
@@ -688,7 +730,10 @@ void Sema::analyzeFunction(DeclId id) {
   }
 
   function_ = nullptr;
-  popScope();
+  if (functionScope)
+    current_ = saved;
+  else
+    popScope();
 }
 
 void Sema::analyzeCompound(StmtId id, bool push) {

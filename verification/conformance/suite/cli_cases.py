@@ -94,7 +94,10 @@ def run_cli(ctx: Context, reporter: Reporter):
         sub = work / "sub"
         sub.mkdir()
         ctx.write_source(sub / "named.c", VALID)
-        default = ctx.c4run_default = ctx.run([ctx.c4, "sub/named.c"], cwd=work)
+        default = ctx.run([ctx.c4, "sub/named.c"], cwd=work)
+        default_ir = None
+        if (work / "named.ll").is_file():
+            default_ir = (work / "named.ll").read_text(encoding="latin-1")
         checks = Checks()
         checks.check(default.returncode == 0,
                      "default mode exited %d: %s"
@@ -109,24 +112,51 @@ def run_cli(ctx: Context, reporter: Reporter):
 
         # Default mode and --compile must produce identical IR.
         explicit = ctx.c4run("--compile", "sub/named.c", work)
+        explicit_ir = None
+        if (work / "named.ll").is_file():
+            explicit_ir = (work / "named.ll").read_text(encoding="latin-1")
         checks = Checks()
         checks.check(explicit.returncode == 0,
                      "--compile exited %d" % explicit.returncode)
-        if (work / "named.ll").is_file() and explicit.returncode == 0:
-            default_ir = (work / "named.ll").read_text(encoding="latin-1")
+        checks.check(default_ir is not None and explicit_ir is not None,
+                     "default or --compile did not write named.ll")
+        if default_ir is not None and explicit_ir is not None:
+            checks.check(default_ir == explicit_ir,
+                         "default and --compile IR differ")
+
+        # Repeat the comparison in a fresh directory, capturing each output
+        # before the next invocation can overwrite it.
+        if explicit.returncode == 0:
             work2 = ctx.tempdir("cli-default-")
             try:
                 import shutil
                 shutil.copytree(str(sub), str(work2 / "sub"))
-                ctx.run([ctx.c4, "sub/named.c"], cwd=work2)
+                default2 = ctx.run([ctx.c4, "sub/named.c"], cwd=work2)
+                default2_ir = None
+                if (work2 / "named.ll").is_file():
+                    default2_ir = (work2 / "named.ll").read_text(
+                        encoding="latin-1")
                 explicit2 = ctx.run([ctx.c4, "--compile", "sub/named.c"],
                                     cwd=work2)
-                ir2 = (work2 / "named.ll").read_text(encoding="latin-1")
-                # Compare the two explicit runs, then the default run.
-                checks.check(ir2 == default_ir,
-                             "default and --compile IR differ")
+                explicit2_ir = None
+                if (work2 / "named.ll").is_file():
+                    explicit2_ir = (work2 / "named.ll").read_text(
+                        encoding="latin-1")
+                checks.check(default2.returncode == 0,
+                             "default mode failed in the second directory")
                 checks.check(explicit2.returncode == 0,
                              "--compile failed in the second directory")
+                checks.check(default2_ir is not None and
+                             explicit2_ir is not None,
+                             "default or --compile did not write named.ll "
+                             "in the second directory")
+                if default2_ir is not None and explicit2_ir is not None:
+                    checks.check(default2_ir == explicit2_ir,
+                                 "default and --compile IR differ in the "
+                                 "second directory")
+                    if default_ir is not None:
+                        checks.check(default2_ir == default_ir,
+                                     "default IR differs between directories")
             finally:
                 ctx.cleanup(work2)
         reporter.record("cli", "default-equals-compile",

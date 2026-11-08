@@ -40,7 +40,7 @@ any case fails.
 | build | binary, Makefile targets, C++ sources | A-002, A-006 |
 | cli | modes, exit codes, diagnostics, output naming | A-003–A-005, A-007, F-004, F-006 |
 | lexer | exact token streams and lexical errors against `c4ref.lexer` | L-001–L-015, A-008–A-010 |
-| parser | curated grammar cases and token-deletion mutants; may-reject classified with a C-validity oracle | C-001–C-011, A-011, A-012 |
+| parser | curated grammar cases, positive coverage of each grammar alternative, and token-deletion mutants; may-reject classified with a C-validity oracle | C-001–C-011, A-011, A-012 |
 | sema | accept/reject/exempt agreement with `c4ref.sema` and selected error locations | S-001–S-030 |
 | printer | byte-exact reference file, normalization, full parenthesization, structural round trips | D-001–D-008 |
 | codegen | `llvm-as`/verifier, i8/i32, DataLayout, differential execution in both modes | F-001–F-008 |
@@ -50,12 +50,28 @@ any case fails.
 
 Every input is one of: required C4 behaviour, invalid C that must be
 rejected, valid C outside C4 that may be rejected (and is accepted only as a
-recorded extension), or an explicit Task E exemption.  A requirement is
-`verified` when all mapped cases pass, `partial` when a case fails/skips or
-when the claim is necessarily corpus-scoped (for example differential
-execution), and stays `uncovered` when no case maps to it.  Out-of-scope
-items are `not-applicable`.  Finite agreement is evidence on the executed
-corpus, not a proof for all inputs.
+recorded extension), or an explicit Task E exemption.  A requirement whose
+mapped cases all pass is corpus-verified: the finite corpus conforms, but
+this is not a proof for untested inputs.  verified is reserved for a
+machine-checked universal claim; no requirement currently has one.  A
+requirement with a failing or skipped case is partial, one whose check
+cannot execute is blocked, and one with no mapped case stays uncovered.
+Out-of-scope items are not-applicable.
+
+The parser suite also tracks every alternative of the grammar in
+../spec/grammar.ebnf.  Each distinct positive example is a parser/grammar-*
+case; alternatives not exercised by an accepted example are listed
+explicitly in the report.
+
+## Evidence provenance
+
+The evidence JSON records the exact binary path and SHA-256, its mtime, the
+newest source mtime and a stale flag, the source revision, and the
+verification and conformance tree revisions.  A binary older than the
+sources is reported as stale rather than being presented as freshly built.
+The command line, working directory, Python version, and working-tree
+changes are also recorded.  Reproduce a run with the command in the evidence
+file after building the recorded source revision.
 
 ## Adding cases
 

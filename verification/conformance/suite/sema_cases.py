@@ -130,6 +130,81 @@ CASES: List[Dict[str, object]] = [
     {"name": "duplicate-member", "expect": "reject",
      "source": "struct S { int a; int a; };\n",
      "requirements": ["S-008"]},
+    # -- Assignment C/E findings: struct declarators and prototype scope --
+    {"name": "comma-struct-members", "expect": "accept",
+     "source": "struct S { int a, b; };\n"
+               "int main(void) { struct S s; s.a = 20; s.b = 22; "
+               "return s.a + s.b; }\n",
+     "requirements": ["C-003", "S-008"]},
+    {"name": "comma-struct-different-shapes", "expect": "accept",
+     "source": "struct S { int *p, q; };\n"
+               "int main(void) { struct S s; int x; s.p = &x; s.q = 2; "
+               "return s.q; }\n",
+     "requirements": ["C-004", "S-009"]},
+    {"name": "comma-struct-duplicate-member", "expect": "reject",
+     "source": "struct S { int a, a; };\n",
+     "requirements": ["S-008"]},
+    {"name": "bare-untagged-struct", "expect": "reject",
+     "source": "struct { int x; };\nint main(void) { return 0; }\n",
+     "requirements": ["C-003", "S-008"]},
+    {"name": "no-declarator-member", "expect": "reject",
+     "source": "struct S { int; };\n",
+     "requirements": ["S-008"]},
+    {"name": "tag-only-member", "expect": "reject",
+     "source": "struct S { struct T; };\n",
+     "requirements": ["S-008"]},
+    {"name": "tag-forward-valid", "expect": "accept",
+     "source": "struct S;\nint main(void) { return 0; }\n",
+     "requirements": ["C-003", "S-007"]},
+    {"name": "tag-definition-valid", "expect": "accept",
+     "source": "struct S { int x; };\nint main(void) { return 0; }\n",
+     "requirements": ["C-003", "S-007"]},
+    {"name": "untagged-struct-declarator-valid", "expect": "accept",
+     "source": "struct { int x; } s;\n"
+               "int main(void) { s.x = 1; return s.x; }\n",
+     "requirements": ["C-003", "S-008"]},
+    {"name": "prototype-tag-scope-leak", "expect": "reject",
+     "source": "int f(struct S *p);\nstruct S { int x; };\n"
+               "int f(struct S *p) { return 0; }\n",
+     "requirements": ["S-001", "S-005", "S-007"]},
+    {"name": "prototype-tag-visible", "expect": "accept",
+     "source": "struct S;\nint f(struct S *p);\nstruct S { int x; };\n"
+               "int f(struct S *p) { return 0; }\n",
+     "requirements": ["S-001", "S-005", "S-007"]},
+    {"name": "prototype-tag-repeated", "expect": "reject",
+     "source": "int f(struct S *p);\nint f(struct S *p);\n",
+     "requirements": ["S-005", "S-007"]},
+    {"name": "prototype-tag-definition-visible", "expect": "accept",
+     "source": "int f(struct S *p) { struct S *q; return 0; }\n",
+     "requirements": ["S-001", "S-007"]},
+    {"name": "nested-prototype-tag-scope", "expect": "reject",
+     "source": "int f(int (*g)(struct S *), struct S *p);\n"
+               "struct S { int x; };\n"
+               "int f(int (*g)(struct S *), struct S *p) { return 0; }\n",
+     "requirements": ["S-001", "S-005", "S-007"]},
+    {"name": "nested-prototype-tag-visible", "expect": "accept",
+     "source": "struct S;\n"
+               "int f(int (*g)(struct S *), struct S *p);\n"
+               "struct S { int x; };\n"
+               "int f(int (*g)(struct S *), struct S *p) { return 0; }\n",
+     "requirements": ["S-001", "S-005", "S-007"]},
+    {"name": "comma-struct-shared-nested-spec", "expect": "accept",
+     "source": "struct S { struct T { int x; } a, b; };\n"
+               "int main(void) { struct S s; s.a.x = 1; s.b.x = 2; "
+               "return s.a.x + s.b.x; }\n",
+     "requirements": ["C-003", "S-008"]},
+    {"name": "nested-function-definition-tag-visible", "expect": "accept",
+     "source": "int (*f(struct S *p))(int) { struct S *q; q = p; "
+               "return 0; }\n",
+     "requirements": ["S-001", "S-007", "S-009"]},
+    {"name": "nested-return-tag-hidden", "expect": "reject",
+     "source": "int (*f(struct S *p))(struct T { int x; } *) { "
+               "struct T *r; r->x = 1; return 0; }\n",
+     "requirements": ["S-001", "S-007", "S-009"]},
+    {"name": "nested-parameter-tag-hidden", "expect": "reject",
+     "source": "int f(int g(struct T { int x; } *p)) { "
+               "struct T *r; r->x = 1; return 0; }\n",
+     "requirements": ["S-001", "S-007", "S-010"]},
     {"name": "member-incomplete", "expect": "reject",
      "source": "struct S;\nstruct T { struct S s; };\n",
      "requirements": ["S-008"]},
@@ -160,6 +235,15 @@ CASES: List[Dict[str, object]] = [
     {"name": "incomplete-parameter", "expect": "exempt",
      "source": "struct S;\nint f(struct S s) { return 0; }\n",
      "requirements": ["S-010", "S-029", "A-013"]},
+    {"name": "duplicate-parameter-prototype", "expect": "reject",
+     "source": "int f(int a, int a);\n",
+     "requirements": ["S-010"]},
+    {"name": "duplicate-parameter-definition", "expect": "reject",
+     "source": "int f(int a, int a) { return 0; }\n",
+     "requirements": ["S-010"]},
+    {"name": "duplicate-parameter-unnamed", "expect": "accept",
+     "source": "int f(int, int);\n",
+     "requirements": ["S-010"]},
 
     # -- S-011..S-014 types, conversions, null pointer ----------------
     {"name": "char-to-int", "expect": "accept",

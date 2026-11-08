@@ -13,7 +13,10 @@ frontend in c4ref.  Results are written as JSON and summarised on stdout.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
+import platform
 import subprocess
 import sys
 from collections import defaultdict
@@ -59,16 +62,79 @@ def git_dirty(root: Path) -> bool:
         return False
 
 
+def git_tree_hash(root: Path, path: str) -> str:
+    try:
+        return subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "HEAD:" + path],
+            capture_output=True, text=True, check=True).stdout.strip()
+    except Exception:
+        return "unknown"
+
+
+def git_status_paths(root: Path):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "status", "--porcelain"],
+            capture_output=True, text=True, check=True)
+    except Exception:
+        return []
+    paths = []
+    for line in result.stdout.splitlines():
+        if len(line) > 3:
+            paths.append(line[3:])
+    return paths
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def iso_mtime(path: Path) -> str:
+    return datetime.fromtimestamp(
+        path.stat().st_mtime, timezone.utc).isoformat()
+
+
+def binary_provenance(c4: Path, root: Path):
+    sources = [root / "CMakeLists.txt"]
+    sources.extend(sorted((root / "src").glob("*")))
+    sources = [path for path in sources if path.is_file()]
+    newest = max(sources, key=lambda path: path.stat().st_mtime) if sources \
+        else None
+    stat = c4.stat()
+    stale = bool(newest and stat.st_mtime < newest.stat().st_mtime)
+    try:
+        relative = str(c4.relative_to(root))
+    except ValueError:
+        relative = str(c4)
+    return {
+        "path": relative,
+        "absolute_path": str(c4),
+        "sha256": file_sha256(c4),
+        "size": stat.st_size,
+        "mtime": iso_mtime(c4),
+        "newest_source": (str(newest.relative_to(root)) if newest else None),
+        "newest_source_mtime": iso_mtime(newest) if newest else None,
+        "stale": stale,
+    }
+
+
 def aggregate(results):
     by_requirement = defaultdict(lambda: {"cases": 0, "failed": 0,
-                                          "skipped": 0, "passed": 0,
+                                          "skipped": 0, "blocked": 0,
+                                          "passed": 0,
                                           "names": []})
     for result in results:
         for requirement in result.requirements:
             entry = by_requirement[requirement]
             entry["cases"] += 1
             entry["names"].append(result.suite + "/" + result.case)
-            if result.skipped:
+            if result.blocked:
+                entry["blocked"] += 1
+            elif result.skipped:
                 entry["skipped"] += 1
             elif result.passed:
                 entry["passed"] += 1
@@ -109,6 +175,18 @@ def main(argv=None) -> int:
 
     context = Context(c4, root, keep=args.keep)
     reporter = Reporter(verbose=args.verbose)
+    provenance = binary_provenance(c4, root)
+    status_paths = git_status_paths(root)
+    generated = ("verification/conformance/results/",
+                 "verification/COVERAGE.md")
+    dirty_paths = [path for path in status_paths
+                   if not any(marker in path for marker in generated)]
+    verification_dirty = any(path.startswith("verification/")
+                             for path in dirty_paths)
+    if provenance["stale"]:
+        print("WARNING: c4 binary %s is older than %s; the evidence "
+              "records it as stale" % (provenance["path"],
+                                       provenance["newest_source"]))
 
     # Imported lazily so a missing optional suite does not break others.
     from suite import (build_cases, cli_cases, lexer_cases, parser_cases,
@@ -129,24 +207,47 @@ def main(argv=None) -> int:
         modules[name](context, reporter)
 
     results = reporter.results
-    passed = sum(1 for r in results if r.passed and not r.skipped)
-    failed = sum(1 for r in results if not r.passed and not r.skipped)
+    passed = sum(1 for r in results
+                 if r.passed and not r.skipped and not r.blocked)
+    failed = sum(1 for r in results
+                 if not r.passed and not r.skipped and not r.blocked)
     skipped = sum(1 for r in results if r.skipped)
+    blocked = sum(1 for r in results if r.blocked)
     evidence = {
         "schema": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "c4": context.rel(c4),
+        "evidence_path": (str(args.json.resolve().relative_to(root))
+                          if args.json.resolve().is_relative_to(root)
+                          else str(args.json)),
         "c4_commit": git_commit(root),
         "working_tree_dirty": git_dirty(root),
+        "provenance": {
+            "c4_binary": provenance,
+            "source_revision": git_commit(root),
+            "source_revision_short": git_commit(root)[:12],
+            "verification_revision": git_tree_hash(root, "verification"),
+            "conformance_revision": git_tree_hash(
+                root, "verification/conformance"),
+            "verification_dirty": verification_dirty,
+            "working_tree_dirty": git_dirty(root),
+            "dirty_paths": dirty_paths[:100],
+            "command": " ".join(sys.argv),
+            "cwd": str(Path.cwd()),
+            "python_version": platform.python_version(),
+        },
         "root": ".",
         "suites": selected,
         "summary": {"cases": len(results), "passed": passed,
-                    "failed": failed, "skipped": skipped},
+                    "failed": failed, "skipped": skipped,
+                    "blocked": blocked},
+        "grammar_coverage": reporter.metadata.get("grammar_coverage"),
         "results": [
             {"suite": r.suite, "case": r.case,
              "requirements": list(r.requirements),
-             "status": ("skipped" if r.skipped else
-                        ("pass" if r.passed else "fail")),
+             "status": ("blocked" if r.blocked else
+                        "skipped" if r.skipped else
+                        "pass" if r.passed else "fail"),
              "detail": r.detail}
             for r in results
         ],

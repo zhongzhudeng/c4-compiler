@@ -67,6 +67,23 @@ TEST_CASE("sema handles structs and tags", "[sema]") {
   requireValid("struct S { int x; }; "
                "void f(struct S *p) { p->x = 1; } "
                "int main(void) { struct S s; f(&s); return s.x; }");
+  requireValid("struct S { int a, b; }; "
+               "int main(void) { struct S s; s.a = 1; s.b = 2; "
+               "return s.a + s.b; }");
+  requireValid("struct S { int *p, q; }; "
+               "int main(void) { struct S s; int x; s.p = &x; s.q = 2; "
+               "return s.q; }");
+  requireValid("int f(struct S *p) { struct S *q; return 0; }");
+  requireValid("struct S; int f(struct S *p); struct S { int x; }; "
+               "int f(struct S *p) { return 0; }");
+  requireValid("struct S { struct T { int x; } a, b; }; "
+               "int main(void) { struct S s; s.a.x = 1; s.b.x = 2; "
+               "return s.a.x + s.b.x; }");
+  requireValid("int (*f(struct S *p))(int) { struct S *q; q = p; "
+               "return 0; }");
+  requireValid("struct S; int f(int (*g)(struct S *), struct S *p); "
+               "struct S { int x; }; "
+               "int f(int (*g)(struct S *), struct S *p) { return 0; }");
 }
 
 TEST_CASE("sema handles labels, loops, and returns", "[sema]") {
@@ -138,6 +155,22 @@ TEST_CASE("sema rejects invalid programs", "[sema]") {
   requireInvalid("struct S; int main(void) { struct S s; return 0; }");
   requireInvalid("struct S { struct S s; }; int main(void) { return 0; }");
   requireInvalid("struct S { int x; int x; }; int main(void) { return 0; }");
+  requireInvalid("struct S { int a, a; }; int main(void) { return 0; }");
+  requireInvalid("struct { int x; }; int main(void) { return 0; }");
+  requireInvalid("int f(struct S *p); struct S { int x; }; "
+                 "int f(struct S *p) { return 0; }");
+  requireInvalid("int f(struct S *p); int f(struct S *p);");
+  requireInvalid("int f(int (*g)(struct S *), struct S *p); "
+                 "struct S { int x; }; "
+                 "int f(int (*g)(struct S *), struct S *p) { return 0; }");
+  // A tag in the return type's parameter list has prototype scope and must
+  // not be visible in the function body.
+  requireInvalid("int (*f(struct S *p))(struct T { int x; } *) { "
+                 "struct T *r; r->x = 1; return 0; }");
+  // A tag declared in a nested parameter declarator must not leak into the
+  // enclosing function's body either.
+  requireInvalid("int f(int g(struct T { int x; } *p)) { "
+                 "struct T *r; r->x = 1; return 0; }");
   requireInvalid("struct S { int x; }; struct S { int y; }; "
                  "int main(void) { return 0; }");
   requireInvalid("struct S { }; int main(void) { return 0; }");

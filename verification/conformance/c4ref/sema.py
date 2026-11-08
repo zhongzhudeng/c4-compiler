@@ -217,15 +217,28 @@ class Sema:
         self.tentative: List[Tuple[Symbol, Loc]] = []
         self.function: Optional[FunctionContext] = None
         self.struct_counter = 0
+        # A type specifier shared by several declarators (for example the
+        # "int" in "struct S { int a, b; };") denotes one type.  Caching the
+        # resolved type also prevents a nested tagged struct definition from
+        # being treated as a redefinition on the second declarator.
+        self.spec_cache: Dict[int, Type] = {}
+        # Function-declarator scopes created while resolving one declared
+        # entity, paired with the function type they belong to.  A definition
+        # keeps the scope whose type is the entity's final type.
+        self.function_scopes: List[Tuple[Type, Scope]] = []
 
     # -- scope helpers -------------------------------------------------
     def push_scope(self):
-        self.scopes.append(Scope(self.current, len(self.scopes)))
+        depth = self.current.depth + 1 if self.current is not None else 0
+        self.scopes.append(Scope(self.current, depth))
         self.current = self.scopes[-1]
 
     def pop_scope(self):
-        self.scopes.pop()
-        self.current = self.scopes[-1] if self.scopes else None
+        # A retained function scope is no longer on the stack, so restore the
+        # parent recorded in the scope rather than the last pushed scope.
+        scope = self.current
+        self.current = scope.parent
+        self.scopes.remove(scope)
 
     def at_file_scope(self) -> bool:
         return self.current is not None and self.current.depth == 0
@@ -279,8 +292,13 @@ class Sema:
             spec.tag, spec.loc, self.current)
 
     def resolve_type_spec(self, spec: TypeSpec) -> Type:
+        cached = self.spec_cache.get(id(spec))
+        if cached is not None:
+            return cached
         if spec.kind in ("void", "char", "int"):
-            return Type(spec.kind)
+            t = Type(spec.kind)
+            self.spec_cache[id(spec)] = t
+            return t
         if spec.kind != "struct":
             self.error(spec.loc, "unknown type specifier")
         if spec.has_braces:
@@ -302,8 +320,17 @@ class Sema:
             for field_decl in spec.fields:
                 field_spec_type = self.resolve_type_spec(field_decl.spec)
                 if field_decl.declarator is None:
-                    self.exempt(field_decl.loc,
-                                "anonymous struct member is exempted by Task E")
+                    # C11 6.7.2.1p1: only an anonymous structure member may
+                    # omit the declarator list; "int;" and "struct T;" inside
+                    # a structure declare nothing.
+                    if (field_decl.spec.kind == "struct"
+                            and field_decl.spec.has_braces
+                            and field_decl.spec.tag is None):
+                        self.exempt(
+                            field_decl.loc,
+                            "anonymous struct member is exempted by Task E")
+                    self.error(field_decl.loc,
+                               "struct declaration requires a declarator")
                 ftype = self.resolve_declarator(field_decl.declarator,
                                                 field_spec_type)
                 if not is_complete(ftype):
@@ -324,14 +351,18 @@ class Sema:
                 self.error(spec.loc, "struct has no named members")
             info.fields = fields
             info.complete = True
-            return struct_type(info)
+            t = struct_type(info)
+            self.spec_cache[id(spec)] = t
+            return t
         # A reference or forward declaration.
         assert spec.tag is not None
         info = self.current.lookup_tag(spec.tag)
         if info is None:
             info = self.new_struct(spec.tag, spec.loc, self.current)
             self.current.tags[spec.tag] = info
-        return struct_type(info)
+        t = struct_type(info)
+        self.spec_cache[id(spec)] = t
+        return t
 
     # -- declarators ---------------------------------------------------
     def resolve_declarator(self, declarator: Declarator, base: Type) -> Type:
@@ -349,12 +380,20 @@ class Sema:
         if result.kind in ("function", "array"):
             self.error(params[0].loc if params else Loc(1, 1),
                        "function cannot return %s type" % result.kind)
+        # C11 6.2.1p4/p7: names and tags declared in a parameter list have
+        # function prototype scope.  A function definition retains the scope
+        # for its body; a mere prototype discards it with the declarator.
+        self.push_scope()
         # The special (void) parameter list.
         if len(params) == 1 and params[0].declarator is None:
             ptype = self.resolve_type_spec(params[0].spec)
             if ptype.kind == "void":
-                return func(result, ())
+                t = func(result, ())
+                self.function_scopes.append((t, self.current))
+                self.pop_scope()
+                return t
         adjusted: List[Type] = []
+        names = set()
         for p in params:
             ptype = self.resolve_type_spec(p.spec)
             if p.declarator is not None:
@@ -365,11 +404,36 @@ class Sema:
                 ptype = ptr(ptype)
             if ptype.kind == "array":
                 ptype = ptr(ptype.elem)
+            if p.declarator is not None and p.declarator.name is not None:
+                if p.declarator.name in names:
+                    self.error(p.declarator.loc,
+                               "duplicate parameter '%s'"
+                               % p.declarator.name)
+                names.add(p.declarator.name)
             adjusted.append(ptype)
-        return func(result, tuple(adjusted))
+        t = func(result, tuple(adjusted))
+        self.function_scopes.append((t, self.current))
+        self.pop_scope()
+        return t
+
+    def take_function_scope(self, t: Type, outer: Scope) -> Optional[Scope]:
+        for scope_type, scope in reversed(self.function_scopes):
+            if scope_type is not t:
+                continue
+            # The scope was created inside the parameter-list scope of an
+            # enclosing declarator; the body belongs to the enclosing scope.
+            scope.parent = outer
+            self.function_scopes.clear()
+            return scope
+        self.function_scopes.clear()
+        return None
 
     # -- declarations --------------------------------------------------
     def analyze_declaration(self, decl: Decl, is_global: bool):
+        self.function_scopes.clear()
+        if (decl.declarator is None and decl.spec.kind == "struct"
+                and decl.spec.has_braces and decl.spec.tag is None):
+            self.error(decl.loc, "declaration does not declare anything")
         base = self.resolve_type_spec(decl.spec)
         if decl.declarator is None:
             if decl.spec.kind == "struct" and decl.spec.has_braces:
@@ -472,7 +536,10 @@ class Sema:
         name = declarator.name
         if name is None:
             self.error(decl.loc, "function definition has no name")
+        outer = self.current
+        self.function_scopes.clear()
         t = self.resolve_declarator(declarator, base)
+        retained = self.take_function_scope(t, outer)
         if t.kind != "function":
             self.error(decl.loc, "function definition does not declare a function")
         if t.result.kind == "struct":
@@ -487,14 +554,20 @@ class Sema:
 
         # The function name is visible in the body.
         self.function = FunctionContext(t.result)
-        self.push_scope()
+        if retained is not None:
+            self.current = retained
+        else:
+            self.push_scope()
         self.bind_parameters(declarator, t)
         assert decl.body is not None
         self.analyze_compound(decl.body, push=False)
         for target, loc in self.function.pending_gotos:
             if target not in self.function.labels:
                 self.error(loc, "use of undeclared label '%s'" % target)
-        self.pop_scope()
+        if retained is not None:
+            self.current = outer
+        else:
+            self.pop_scope()
         self.function = None
 
     def bind_parameters(self, declarator: Declarator, t: Type):

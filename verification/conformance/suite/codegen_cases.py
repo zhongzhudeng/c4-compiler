@@ -159,12 +159,12 @@ def _check_default_equals_compile(ctx: Context, reporter: Reporter):
 
 def run_codegen(ctx: Context, reporter: Reporter):
     if ctx.llvm_as is None:
-        reporter.skip("codegen", "llvm-tools", ["F-007"],
-                      "llvm-as is not available")
+        reporter.block("codegen", "llvm-tools", ["F-007"],
+                       "llvm-as is not available")
         return
     if ctx.clang is None:
-        reporter.skip("codegen", "clang", ["F-008"],
-                      "clang is not available")
+        reporter.block("codegen", "clang", ["F-008"],
+                       "clang is not available")
         return
 
     _check_types_and_layout(ctx, reporter)

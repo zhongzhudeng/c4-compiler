@@ -115,7 +115,8 @@ TypeSpecId Parser::parseTypeSpec() {
       while (!check(TK_RBRACE)) {
         if (atEnd())
           error(loc(), "expected '}' in struct declaration");
-        spec.fields.push_back(parseFieldDeclaration());
+        std::vector<DeclId> fields = parseFieldDeclaration();
+        spec.fields.insert(spec.fields.end(), fields.begin(), fields.end());
       }
       expect(TK_RBRACE, "'}'");
     } else if (!spec.tag) {
@@ -205,16 +206,20 @@ DeclId Parser::parseParameterDeclaration() {
   return ast_.addDecl(start, ParamDecl{spec, declarator});
 }
 
-DeclId Parser::parseFieldDeclaration() {
+std::vector<DeclId> Parser::parseFieldDeclaration() {
   SourceLoc start = loc();
   TypeSpecId spec = parseTypeSpec();
   if (!isDeclaratorStart())
     error(loc(), "expected struct member declarator");
-  DeclaratorId declarator = parseDeclarator(true, false);
-  if (!declaratorHasName(ast_, declarator))
-    error(start, "expected struct member name");
+  std::vector<DeclId> fields;
+  do {
+    DeclaratorId declarator = parseDeclarator(true, false);
+    if (!declaratorHasName(ast_, declarator))
+      error(start, "expected struct member name");
+    fields.push_back(ast_.addDecl(start, FieldDecl{spec, declarator}));
+  } while (accept(TK_COMMA));
   expect(TK_SEMICOLON, "';' after struct member");
-  return ast_.addDecl(start, FieldDecl{spec, declarator});
+  return fields;
 }
 
 DeclId Parser::parseExternalDeclaration() {

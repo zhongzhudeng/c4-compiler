@@ -226,11 +226,11 @@ def _source_scan(ctx: Context, checks: Checks):
 
 def run_sccp(ctx: Context, reporter: Reporter):
     if ctx.llvm_as is None or ctx.opt is None:
-        reporter.skip("sccp", "llvm-tools", ["G-008"],
-                      "llvm-as/opt are not available")
+        reporter.block("sccp", "llvm-tools", ["G-008"],
+                       "llvm-as/opt are not available")
         return
     if ctx.clang is None:
-        reporter.skip("sccp", "clang", ["G-009"], "clang is not available")
+        reporter.block("sccp", "clang", ["G-009"], "clang is not available")
         return
 
     checks = Checks()

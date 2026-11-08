@@ -4,9 +4,11 @@ Status policy (see verification/COVERAGE.md):
 
 * out-of-scope requirements are not-applicable;
 * a requirement with no mapped case stays uncovered;
-* a requirement with a failing or skipped case is partial;
-* a passing requirement whose claim is necessarily corpus-scoped is partial;
-* every other passing requirement is verified for the stated corpus.
+* a requirement with a failing, skipped, or blocked case is partial/blocked;
+* a passing requirement is corpus-verified: the finite corpus conforms, but
+  the result is not a proof for untested programs;
+* only a machine-checked universal claim may be verified.  No current
+  requirement has such a claim, so the set below is empty by construction.
 """
 
 from __future__ import annotations
@@ -16,17 +18,10 @@ import re
 from pathlib import Path
 from typing import Dict, Tuple
 
-# These claims are universal over all programs.  The suite supplies
-# counterexample-free evidence on a corpus, which is not a proof; the
-# status therefore stays partial by construction.
-CORPUS_SCOPED = {
-    "A-001",  # acceptance boundary over all C programs
-    "A-012",  # every invalid C program is rejected
-    "D-008",  # round-trip stability over all printable programs
-    "F-008",  # differential execution over all defined C4 programs
-    "G-009",  # behavior preservation over all defined programs
-    "L-014",  # asymptotic linear running time
-}
+# Requirements backed by a machine-checked universal claim rather than a
+# finite test corpus.  Keep this set empty until such a check exists: a
+# passing finite corpus must never be promoted to "verified".
+MACHINE_CHECKED_UNIVERSAL = set()
 
 ID_RE = re.compile(r"^- id: (\S+)\s*$")
 STATUS_RE = re.compile(r"^  status: .*$")
@@ -50,16 +45,20 @@ def requirement_status(requirement, evidence_entry) -> Tuple[str, str]:
     cases = evidence_entry["cases"]
     failed = evidence_entry["failed"]
     skipped = evidence_entry["skipped"]
+    blocked = evidence_entry.get("blocked", 0)
     names = ", ".join(evidence_entry["names"][:4])
     if len(evidence_entry["names"]) > 4:
         names += ", ..."
     summary = ("run_conformance.py: %d case(s), %d failed, %d skipped "
                "(%s)" % (cases, failed, skipped, names))
+    if blocked:
+        return "blocked", summary + "; %d blocked check(s)" % blocked
     if failed or skipped:
         return "partial", summary
-    if identifier in CORPUS_SCOPED:
-        return "partial", summary + "; corpus-scoped, not a universal proof"
-    return "verified", summary
+    if identifier in MACHINE_CHECKED_UNIVERSAL:
+        return "verified", summary + "; machine-checked universal claim"
+    return ("corpus-verified",
+            summary + "; finite corpus conformance, not a universal proof")
 
 
 def compute_statuses(evidence, requirements):

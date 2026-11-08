@@ -19,9 +19,38 @@ TEST_CASE("parser accepts the restricted C4 grammar", "[parser]") {
   REQUIRE(compiler.parse("int main(void) { return sizeof(int (*)(int)); }"));
 }
 
+TEST_CASE("parser expands comma-separated struct members", "[parser]") {
+  TestCompiler compiler;
+  REQUIRE(compiler.parse("struct S { int a, *p, b; };"));
+
+  const AST &ast = compiler.ast();
+  const auto &declarations = ast.translationUnit().decls;
+  REQUIRE(declarations.size() == 1);
+
+  auto *tag = std::get_if<TagDecl>(&ast.decl(declarations[0]).node);
+  REQUIRE(tag != nullptr);
+  const TypeSpec &spec = ast.typeSpec(tag->spec);
+  REQUIRE(spec.fields.size() == 3);
+
+  const char *names[] = {"a", "p", "b"};
+  TypeSpecId memberSpec =
+      std::get<FieldDecl>(ast.decl(spec.fields[0]).node).spec;
+  for (size_t i = 0; i < spec.fields.size(); ++i) {
+    auto *field = std::get_if<FieldDecl>(&ast.decl(spec.fields[i]).node);
+    REQUIRE(field != nullptr);
+    REQUIRE(field->spec == memberSpec);
+    REQUIRE(*declaratorName(ast, field->declarator) == names[i]);
+  }
+  REQUIRE(std::holds_alternative<PointerDeclarator>(
+      ast.declarator(
+          std::get<FieldDecl>(ast.decl(spec.fields[1]).node).declarator)
+          .node));
+}
+
 TEST_CASE("parser rejects words outside the restricted grammar", "[parser]") {
   TestCompiler compiler;
   REQUIRE_FALSE(compiler.parse("int main(void) { return 0 }"));
+  REQUIRE_FALSE(compiler.parse("int a, b;"));
   REQUIRE_FALSE(compiler.parse("int main(void) { a || b = c; }"));
   REQUIRE_FALSE(compiler.parse("int f(;"));
   REQUIRE_FALSE(compiler.parse("int main(void) { int f(void) { return 0; } }"));

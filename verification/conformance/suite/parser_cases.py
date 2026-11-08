@@ -291,10 +291,186 @@ def _generated_valid_cases():
                   "int main(void) { return f(1, 2, 0); }\n",
         "requirements": ["C-004", "C-006", "C-009"],
     })
+    cases.append({
+        "name": "generated-nested-declarators",
+        "source": "int (*f(void))(int);\n"
+                  "struct S { int (*g)(int); };\n"
+                  "int main(void) { return 0; }\n",
+        "requirements": ["C-004", "C-006", "C-009"],
+    })
+    return cases
+
+
+# Every alternative of every production in verification/spec/grammar.ebnf.
+# A source is an accepted example that exercises the alternative; None marks
+# an alternative the current positive corpus does not cover.  The parser
+# suite turns each distinct source into a case and records the coverage keys
+# it exercises, so a regression such as rejecting "int a, b;" in a struct
+# leaves struct-declarator-list/comma explicitly uncovered.
+def _main(body):
+    return "int main(void) { " + body + " }\n"
+
+
+GRAMMAR_COVERAGE = [
+    ("translation-unit/external-declaration", "int x;\n"),
+    ("translation-unit/translation-unit-external-declaration",
+     "int x;\nint y;\n"),
+    ("external-declaration/function-definition",
+     "int f(void) { return 0; }\n"),
+    ("external-declaration/declaration", "int x;\n"),
+    ("function-definition", "int f(void) { return 0; }\n"),
+    ("declaration/with-init-declarator", "int x;\n"),
+    ("declaration/without-init-declarator", "struct S;\n"),
+    ("declaration-specifiers/type-specifier", "int x;\n"),
+    ("type-specifier/void", "void f(void);\n"),
+    ("type-specifier/char", "char c;\n"),
+    ("type-specifier/int", "int x;\n"),
+    ("type-specifier/struct", "struct S;\n"),
+    ("struct-or-union-specifier/anonymous", "struct { int x; } s;\n"),
+    ("struct-or-union-specifier/tagged-definition", "struct S { int x; };\n"),
+    ("struct-or-union-specifier/tag", "struct S;\n"),
+    ("struct-declaration-list/single", "struct S { int a; };\n"),
+    ("struct-declaration-list/multiple", "struct S { int a; int b; };\n"),
+    ("struct-declaration/with-declarator-list", "struct S { int a; };\n"),
+    ("struct-declaration/without-declarator-list", None),
+    ("struct-declarator-list/single", "struct S { int a; };\n"),
+    ("struct-declarator-list/comma", "struct S { int a, b; };\n"),
+    ("struct-declarator", "struct S { int a; };\n"),
+    ("init-declarator", "int x;\n"),
+    ("declarator/without-pointer", "int x;\n"),
+    ("declarator/with-pointer", "int *p;\n"),
+    ("direct-declarator/identifier", "int x;\n"),
+    ("direct-declarator/parenthesized", "int (x);\n"),
+    ("direct-declarator/function", "int f(void);\n"),
+    ("pointer/single", "int *p;\n"),
+    ("pointer/recursive", "int **pp;\n"),
+    ("parameter-type-list", "int f(int x);\n"),
+    ("parameter-list/single", "int f(int x);\n"),
+    ("parameter-list/comma", "int f(int x, char y);\n"),
+    ("parameter-declaration/with-declarator", "int f(int x);\n"),
+    ("parameter-declaration/without-declarator", "int f(int);\n"),
+    ("abstract-declarator/pointer", _main("return sizeof(int *);")),
+    ("abstract-declarator/parenthesized", _main("return sizeof(int (*));")),
+    ("abstract-declarator/parenthesized-function",
+     _main("return sizeof(int (*)(int));")),
+    ("direct-abstract-declarator/parenthesized",
+     _main("return sizeof(int (*));")),
+    ("direct-abstract-declarator/parameter-list", "int f(int (int));\n"),
+    ("direct-abstract-declarator/postfix",
+     _main("return sizeof(int (*)(int));")),
+    ("type-name/without-abstract", _main("return sizeof(int);")),
+    ("type-name/with-abstract", _main("return sizeof(int *);")),
+    ("primary-expression/identifier", _main("int a; a = 1; return a;")),
+    ("primary-expression/constant", _main("return 1;")),
+    ("primary-expression/string-literal",
+     _main("char *p; p = \"x\"; return 0;")),
+    ("primary-expression/parenthesized",
+     _main("int a; a = 1; a = (a); return a;")),
+    ("postfix-expression/primary", _main("int a; a = 1; return a;")),
+    ("postfix-expression/subscript",
+     _main("char *p; p = \"x\"; return p[0];")),
+    ("postfix-expression/call-without-args",
+     "int f(void) { return 0; }\n" + _main("return f();")),
+    ("postfix-expression/call-with-args",
+     "int f(int x) { return x; }\n" + _main("return f(1);")),
+    ("postfix-expression/member",
+     "struct S { int x; };\n" + _main("struct S s; s.x = 1; return s.x;")),
+    ("postfix-expression/arrow",
+     "struct S { int x; };\n" +
+     _main("struct S s; struct S *p; p = &s; p->x = 1; return p->x;")),
+    ("argument-expression-list/single",
+     "int f(int x) { return x; }\n" + _main("return f(1);")),
+    ("argument-expression-list/comma",
+     "int f(int x, int y) { return x + y; }\n" + _main("return f(1, 2);")),
+    ("unary-expression/postfix", _main("int a; a = 1; return a;")),
+    ("unary-expression/address", _main("int a; int *p; p = &a; return 0;")),
+    ("unary-expression/dereference",
+     _main("int a; int *p; p = &a; *p = 1; return *p;")),
+    ("unary-expression/minus", _main("return -1;")),
+    ("unary-expression/not", _main("return !0;")),
+    ("unary-expression/sizeof-expression", _main("int a; return sizeof a;")),
+    ("unary-expression/sizeof-type", _main("return sizeof(int);")),
+    ("cast-expression", _main("int a; a = 1; return a;")),
+    ("multiplicative-expression/base", _main("int a; a = 1; return a;")),
+    ("multiplicative-expression/mul", _main("return 2 * 3 * 4;")),
+    ("additive-expression/base", _main("int a; a = 1; return a;")),
+    ("additive-expression/plus", _main("return 1 + 2 * 3;")),
+    ("additive-expression/minus", _main("return 10 - 1 - 2;")),
+    ("shift-expression", _main("return 1;")),
+    ("relational-expression/base", _main("return 1;")),
+    ("relational-expression/less", _main("return 1 < 2 < 3;")),
+    ("equality-expression/base", _main("return 1;")),
+    ("equality-expression/eq", _main("return 1 == 2 == 0;")),
+    ("equality-expression/ne", _main("return 1 != 2;")),
+    ("AND-expression", _main("return 1;")),
+    ("exclusive-OR-expression", _main("return 1;")),
+    ("inclusive-OR-expression", _main("return 1;")),
+    ("logical-AND-expression/base", _main("return 1;")),
+    ("logical-AND-expression/and", _main("return 1 && 2 && 3;")),
+    ("logical-OR-expression/base", _main("return 1;")),
+    ("logical-OR-expression/or", _main("return 1 || 2 || 3;")),
+    ("conditional-expression/base", _main("return 1;")),
+    ("conditional-expression/conditional", _main("return 1 ? 2 : 3 ? 4 : 5;")),
+    ("assignment-expression/base", _main("return 1;")),
+    ("assignment-expression/assign",
+     _main("int a; int b; a = b = 1; return a;")),
+    ("expression", _main("return 1;")),
+    ("statement/labeled", _main("L: ; return 0;")),
+    ("statement/compound", _main("{ } return 0;")),
+    ("statement/expression", _main("; return 0;")),
+    ("statement/selection", _main("if (1) return 0; return 1;")),
+    ("statement/iteration", _main("while (0) { } return 0;")),
+    ("statement/jump", _main("return 0;")),
+    ("labeled-statement", _main("L: ; return 0;")),
+    ("compound-statement/without-block-items", _main("{ } return 0;")),
+    ("compound-statement/with-block-items", _main("{ ; } return 0;")),
+    ("block-item-list/single", _main("{ ; } return 0;")),
+    ("block-item-list/multiple", _main("{ ; ; } return 0;")),
+    ("block-item/declaration", _main("{ int x; } return 0;")),
+    ("block-item/statement", _main("{ ; } return 0;")),
+    ("expression-statement/with-expression", _main("1; return 0;")),
+    ("expression-statement/without-expression", _main("; return 0;")),
+    ("selection-statement/if", _main("if (1) return 0; return 1;")),
+    ("selection-statement/if-else",
+     _main("if (1) return 0; else return 1;")),
+    ("iteration-statement/while", _main("while (0) { } return 0;")),
+    ("jump-statement/goto", _main("goto L; L: ; return 0;")),
+    ("jump-statement/continue", _main("while (1) { continue; } return 0;")),
+    ("jump-statement/break", _main("while (1) { break; } return 0;")),
+    ("jump-statement/return-expression", _main("return 0;")),
+    ("jump-statement/return-void",
+     "void f(void) { return; }\n" + _main("f(); return 0;")),
+]
+
+GRAMMAR_UNCOVERED_NOTES = {
+    "struct-declaration/without-declarator-list":
+        "No positive C4 example: C11 6.7.2.1p1 requires a struct-declarator-"
+        "list unless the declaration declares an anonymous structure or "
+        "union, which is outside the C4 grammar; C4 rejects "
+        "'struct S { int; };'.",
+}
+
+
+def _grammar_coverage_cases():
+    """One positive parser case per distinct grammar-coverage example."""
+    by_source = {}
+    for key, source in GRAMMAR_COVERAGE:
+        if source is not None:
+            by_source.setdefault(source, []).append(key)
+    cases = []
+    for index, (source, keys) in enumerate(by_source.items()):
+        cases.append({
+            "name": "grammar-%02d-%s"
+                    % (index, keys[0].replace("/", "-")),
+            "source": source,
+            "requirements": ["C-009"],
+            "covers": keys,
+        })
     return cases
 
 
 VALID_CASES.extend(_generated_valid_cases())
+VALID_CASES.extend(_grammar_coverage_cases())
 
 INVALID_CASES: List[Dict[str, object]] = [
     {
@@ -548,6 +724,7 @@ def _report_reject(ctx, reporter, name, requirements, source, kind):
 
 
 def run_parser(ctx: Context, reporter: Reporter):
+    covered = set()
     for case in VALID_CASES:
         name = str(case["name"])
         source = str(case["source"])
@@ -562,8 +739,11 @@ def run_parser(ctx: Context, reporter: Reporter):
             checks.check(proc.returncode == 0,
                          "c4 exited %d: %s"
                          % (proc.returncode, proc.stderr.strip()[:200]))
-            reporter.record("parser", name, requirements, checks.ok,
+            passed = checks.ok
+            reporter.record("parser", name, requirements, passed,
                             checks.detail())
+            if passed:
+                covered.update(case.get("covers", []))
         finally:
             ctx.cleanup(work)
 
@@ -619,3 +799,19 @@ def run_parser(ctx: Context, reporter: Reporter):
             finally:
                 ctx.cleanup(work)
     print("[parser] %d deletion mutants rejected by both frontends" % mutants)
+
+    alternatives = [key for key, _ in GRAMMAR_COVERAGE]
+    uncovered = sorted(set(alternatives) - covered)
+    reporter.metadata["grammar_coverage"] = {
+        "alternatives": len(alternatives),
+        "covered": len(alternatives) - len(uncovered),
+        "uncovered": uncovered,
+        "uncovered_notes": {
+            key: GRAMMAR_UNCOVERED_NOTES[key]
+            for key in uncovered if key in GRAMMAR_UNCOVERED_NOTES
+        },
+    }
+    print("[parser] grammar coverage: %d/%d alternatives covered"
+          % (len(alternatives) - len(uncovered), len(alternatives)))
+    if uncovered:
+        print("[parser] uncovered alternatives: " + ", ".join(uncovered))

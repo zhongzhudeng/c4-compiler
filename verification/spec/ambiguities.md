@@ -109,12 +109,15 @@ declarations without tags are still part of our language subset)."
 **Interpretation:** \`struct { int x; };\` (no declarator, no tag) is
 syntactically derivable from the restricted grammar but violates C11
 §6.7p2 because it declares no declarator and no tag.  The reference checker
-rejects it.  C4's behavior is measured; a difference is classified as an
-ambiguity unless it also accepts an invalid-C construct that the assignment
-requires to be rejected.
+and C4 both reject it.  The earlier text claimed the reference checker
+rejected it, but the reference implementation actually accepted it until the
+model was corrected; the correction has a focused regression.  The valid
+forms \`struct S;\`, \`struct S { int x; };\`, and
+\`struct { int x; } s;\` remain accepted.
 
 **Evidence:** C11 §6.7p2; CD.pdf allows \`init-declarator-list\` with at most
-one init-declarator but does not explicitly require at least one.
+one init-declarator but does not explicitly require at least one; reference
+regression \`sema/bare-untagged-struct\`.
 
 ## I-011 — Declaration with no declarator
 
@@ -195,13 +198,18 @@ recorded as ambiguous unless the assignment gives a specific example.
 
 ## I-019 — Duplicate parameter names in prototypes
 
-**Interpretation:** the assignment does not state a rule.  The reference
-checker does not reject duplicate parameter names in a prototype solely for
-duplication; it checks each parameter's type.  C4's behavior is measured and
-recorded, not treated as a required rule.
+**Interpretation:** duplicate parameter names in one prototype scope are two
+declarations of the same identifier in the same scope and name space.  Such
+an identifier has no linkage, so C11 §6.7p3 permits at most one declaration.
+The reference checker and C4 therefore reject \`int f(int a, int a);\`.
+Unnamed duplicate parameters such as \`int f(int, int);\` remain valid because
+no identifier is declared.  The earlier text treated this as unconstrained;
+the reference model and this entry were corrected together.
 
-**Evidence:** C11 does not contain an explicit constraint forbidding
-duplicate parameter names in a prototype; the names have prototype scope.
+**Evidence:** C11 §6.2.1p4 (function prototype scope) and §6.7p3 (no more
+than one declaration of an identifier with no linkage in the same scope and
+name space); reference regressions \`sema/duplicate-parameter-prototype\` and
+\`sema/duplicate-parameter-unnamed\`.
 
 ## I-020 — LLVM version
 

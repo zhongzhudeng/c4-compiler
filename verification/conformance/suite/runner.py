@@ -53,19 +53,25 @@ class CaseResult:
     passed: bool
     detail: str = ""
     skipped: bool = False
+    blocked: bool = False
 
 
 class Reporter:
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
         self.results: List[CaseResult] = []
+        self.metadata: Dict[str, object] = {}
 
     def record(self, suite: str, case: str, requirements: Iterable[str],
-               passed: bool, detail: str = "", skipped: bool = False):
+               passed: bool, detail: str = "", skipped: bool = False,
+               blocked: bool = False):
         result = CaseResult(suite, case, tuple(requirements), passed,
-                            detail, skipped)
+                            detail, skipped, blocked)
         self.results.append(result)
-        if skipped:
+        if blocked:
+            if self.verbose:
+                print("block %s/%s: %s" % (suite, case, detail))
+        elif skipped:
             if self.verbose:
                 print("skip %s/%s: %s" % (suite, case, detail))
         elif passed:
@@ -83,6 +89,11 @@ class Reporter:
              detail: str):
         return self.record(suite, case, requirements, True, detail,
                            skipped=True)
+
+    def block(self, suite: str, case: str, requirements: Iterable[str],
+              detail: str):
+        return self.record(suite, case, requirements, True, detail,
+                           blocked=True)
 
 
 class Checks:

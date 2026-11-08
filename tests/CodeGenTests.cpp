@@ -60,6 +60,31 @@ int main(void) { struct S s; s.a = 1; s.b = 'x'; return s.a; }
   REQUIRE(contains(ir, "getelementptr inbounds nuw { i32, i8 }"));
 }
 
+TEST_CASE("codegen lays out comma-separated struct members", "[codegen]") {
+  const std::string source = R"(
+struct S { int a, b; };
+struct T { int *p, q; };
+int main(void) {
+  struct S s;
+  struct T t;
+  int x;
+  s.a = 1;
+  s.b = 2;
+  t.p = &x;
+  t.q = 3;
+  *t.p = 4;
+  return s.a + s.b + t.q + x;
+}
+)";
+  std::string ir = compileOrFail(source);
+  REQUIRE(contains(ir, "alloca { i32, i32 }"));
+  REQUIRE(contains(ir, "alloca { ptr, i32 }"));
+  REQUIRE(contains(ir, "getelementptr inbounds nuw { i32, i32 }"));
+
+  std::string optimized = compileOrFail(source, true);
+  REQUIRE(!optimized.empty());
+}
+
 TEST_CASE("codegen materializes string literals", "[codegen]") {
   std::string ir = compileOrFail(R"(
 int main(void) { char *s; s = "hi"; return *s; }

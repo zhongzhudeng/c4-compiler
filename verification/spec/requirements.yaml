@@ -15,6 +15,7 @@ classifications:
 - implementation-constraint
 statuses:
 - verified
+- corpus-verified
 - partial
 - uncovered
 - blocked
@@ -28,8 +29,8 @@ requirements:
   formalization: contracts.md#A-001; requirements.yaml classification
   interface: src/Compiler.cpp; src/Sema.cpp
   verification: codegen.differential, parser.valid, sema.reference
-  status: partial
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/acceptance-boundary); corpus-scoped, not a universal proof"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/acceptance-boundary); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-002
   title: Buildable c4 executable
@@ -39,8 +40,8 @@ requirements:
   formalization: contracts.md#A-002
   interface: Makefile; CMakeLists.txt
   verification: build
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (build/c4-binary, build/makefile)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (build/c4-binary, build/makefile); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-003
   title: Acceptance exit code
@@ -50,8 +51,8 @@ requirements:
   formalization: contracts.md#A-003
   interface: src/main.cpp
   verification: cli
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/parse-accepts)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/parse-accepts); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-004
   title: Rejection exit code and diagnostic format
@@ -61,8 +62,8 @@ requirements:
   formalization: contracts.md#A-003
   interface: src/Support.cpp (Diagnostics); src/main.cpp
   verification: cli, lexer, parser, sema
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (cli/parse-rejects, lexer/invalid-character)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (cli/parse-rejects, lexer/invalid-character); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-005
   title: CLI modes
@@ -72,8 +73,8 @@ requirements:
   formalization: contracts.md#A-004
   interface: src/main.cpp; src/Compiler.cpp
   verification: cli
-  status: verified
-  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (build/c4-binary, cli/parse-accepts, cli/mode-tokenize, cli/mode-parse, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (build/c4-binary, cli/parse-accepts, cli/mode-tokenize, cli/mode-parse, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-006
   title: Compiler written in C++
@@ -83,8 +84,8 @@ requirements:
   formalization: contracts.md#A-002
   interface: src/*.cpp, src/*.hpp
   verification: build
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (build/cpp-sources)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (build/cpp-sources); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-007
   title: Error locations
@@ -94,8 +95,8 @@ requirements:
   formalization: lexer.md#L-013; contracts.md#A-005; sema.md#S-018
   interface: src/Lexer.cpp; src/Parser.cpp; src/Sema.cpp
   verification: lexer, parser, sema
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (cli/parse-rejects, lexer/invalid-character, sema/location-binary-operator, sema/location-if-keyword, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (cli/parse-rejects, lexer/invalid-character, sema/location-binary-operator, sema/location-if-keyword, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-008
   title: ISO-8859-1 input encoding
@@ -105,8 +106,8 @@ requirements:
   formalization: lexer.md#L-001
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/latin1-strings-and-comments)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/latin1-strings-and-comments); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-009
   title: No preprocessor
@@ -116,8 +117,8 @@ requirements:
   formalization: lexer.md#L-001
   interface: src/Lexer.cpp
   verification: lexer, parser
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (lexer/hash-is-a-punctuator, lexer/no-preprocessor-header-name)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (lexer/hash-is-a-punctuator, lexer/no-preprocessor-header-name); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-010
   title: Translation phases
@@ -127,8 +128,8 @@ requirements:
   formalization: lexer.md#L-001; ambiguities.md#I-001
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/no-trigraph-replacement, lexer/no-line-splicing, lexer/no-adjacent-string-concatenation)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/no-trigraph-replacement, lexer/no-line-splicing, lexer/no-adjacent-string-concatenation); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-011
   title: Valid C outside C4 may be rejected
@@ -138,8 +139,8 @@ requirements:
   formalization: contracts.md#A-001
   interface: src/Parser.cpp; src/Sema.cpp
   verification: parser, sema
-  status: verified
-  evidence: "run_conformance.py: 30 case(s), 0 failed, 0 skipped (lexer/latin1-identifier, parser/empty-parameter-list, parser/initializer, parser/multiple-declarators, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 30 case(s), 0 failed, 0 skipped (lexer/latin1-identifier, parser/empty-parameter-list, parser/initializer, parser/multiple-declarators, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-012
   title: Invalid C must be rejected
@@ -149,8 +150,8 @@ requirements:
   formalization: contracts.md#A-001
   interface: src/Lexer.cpp; src/Parser.cpp; src/Sema.cpp
   verification: lexer, parser, sema
-  status: partial
-  evidence: "run_conformance.py: 172 case(s), 0 failed, 0 skipped (parser/empty-translation-unit, parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace, ...); corpus-scoped, not a universal proof"
+  status: corpus-verified
+  evidence: "run_conformance.py: 172 case(s), 0 failed, 0 skipped (parser/empty-translation-unit, parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: A-013
   title: Task E exemptions
@@ -160,8 +161,8 @@ requirements:
   formalization: sema.md#S-019; ambiguities.md#I-013
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/incomplete-parameter, sema/incomplete-return-type, sema/exempt-struct-assignment, sema/exempt-struct-parameter, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/incomplete-parameter, sema/incomplete-return-type, sema/exempt-struct-assignment, sema/exempt-struct-parameter, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-001
   title: Token classes
@@ -171,8 +172,8 @@ requirements:
   formalization: lexer.md#L-004
   interface: src/TokenKinds.def
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (lexer/assignment-example, lexer/keywords, lexer/identifiers, lexer/generated-0, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (lexer/assignment-example, lexer/keywords, lexer/identifiers, lexer/generated-0, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-002
   title: Maximal munch
@@ -182,8 +183,8 @@ requirements:
   formalization: 'lexer.md#L-010, #L-011'
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (lexer/identifiers, lexer/punctuators, lexer/maximal-munch, lexer/generated-0, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (lexer/identifiers, lexer/punctuators, lexer/maximal-munch, lexer/generated-0, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-003
   title: Keywords
@@ -193,8 +194,8 @@ requirements:
   formalization: lexer.md#L-005
   interface: src/KeyWords.def
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/keywords)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/keywords); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-004
   title: Identifiers
@@ -204,8 +205,8 @@ requirements:
   formalization: lexer.md#L-006; ambiguities.md#I-006
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/assignment-example, lexer/identifiers, lexer/latin1-identifier)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/assignment-example, lexer/identifiers, lexer/latin1-identifier); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-005
   title: Integer constants
@@ -215,8 +216,8 @@ requirements:
   formalization: lexer.md#L-007; ambiguities.md#I-005
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (lexer/decimal-constants, lexer/leading-zero-octal, lexer/leading-zero-nine, lexer/hexadecimal-constant, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (lexer/decimal-constants, lexer/leading-zero-octal, lexer/leading-zero-nine, lexer/hexadecimal-constant, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-006
   title: Character constants
@@ -226,8 +227,8 @@ requirements:
   formalization: lexer.md#L-008
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/character-constants, lexer/empty-character-constant, lexer/multi-character-constant)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/character-constants, lexer/empty-character-constant, lexer/multi-character-constant); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-007
   title: String literals
@@ -237,8 +238,8 @@ requirements:
   formalization: lexer.md#L-009; ambiguities.md#I-021
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (lexer/string-literals, lexer/latin1-strings-and-comments, lexer/no-adjacent-string-concatenation, lexer/unterminated-string, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (lexer/string-literals, lexer/latin1-strings-and-comments, lexer/no-adjacent-string-concatenation, lexer/unterminated-string, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-008
   title: Escape sequences and UCNs
@@ -248,8 +249,8 @@ requirements:
   formalization: 'lexer.md#L-008, #L-009'
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (lexer/character-constants, lexer/string-literals, lexer/octal-escape-in-character, lexer/hex-escape-in-character, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (lexer/character-constants, lexer/string-literals, lexer/octal-escape-in-character, lexer/hex-escape-in-character, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-009
   title: Punctuators and digraphs
@@ -259,8 +260,8 @@ requirements:
   formalization: lexer.md#L-010; ambiguities.md#I-022
   interface: src/Lexer.cpp; src/Token.cpp
   verification: lexer, parser, printer
-  status: verified
-  evidence: "run_conformance.py: 14 case(s), 0 failed, 0 skipped (lexer/punctuators, lexer/digraph-spellings, lexer/maximal-munch, lexer/hash-is-a-punctuator, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 14 case(s), 0 failed, 0 skipped (lexer/punctuators, lexer/digraph-spellings, lexer/maximal-munch, lexer/hash-is-a-punctuator, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-010
   title: Whitespace and comments
@@ -270,8 +271,8 @@ requirements:
   formalization: lexer.md#L-003; ambiguities.md#I-003
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/whitespace-and-comments, lexer/comments-do-not-nest, lexer/unterminated-block-comment)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/whitespace-and-comments, lexer/comments-do-not-nest, lexer/unterminated-block-comment); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-011
   title: Source positions
@@ -281,8 +282,8 @@ requirements:
   formalization: lexer.md#L-002; ambiguities.md#I-002
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/positions-tabs-and-newlines)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/positions-tabs-and-newlines); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-012
   title: --tokenize output
@@ -292,8 +293,8 @@ requirements:
   formalization: 'lexer.md#L-012, #L-015'
   interface: src/Token.cpp; src/Compiler.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (cli/mode-tokenize, lexer/assignment-example, lexer/empty-file, lexer/generated-0, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (cli/mode-tokenize, lexer/assignment-example, lexer/empty-file, lexer/generated-0, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-013
   title: Lexical error locations
@@ -303,8 +304,8 @@ requirements:
   formalization: 'lexer.md#L-013; ambiguities.md#I-003, #I-004'
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 15 case(s), 0 failed, 0 skipped (lexer/invalid-character, lexer/leading-zero-octal, lexer/leading-zero-nine, lexer/hexadecimal-constant, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 15 case(s), 0 failed, 0 skipped (lexer/invalid-character, lexer/leading-zero-octal, lexer/leading-zero-nine, lexer/hexadecimal-constant, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-014
   title: Linear lexer running time
@@ -314,8 +315,8 @@ requirements:
   formalization: lexer.md#L-014
   interface: src/Lexer.cpp
   verification: lexer
-  status: partial
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/linear-time); corpus-scoped, not a universal proof"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/linear-time); finite corpus conformance, not a universal proof"
   notes: ''
 - id: L-015
   title: EOF token internal
@@ -325,8 +326,8 @@ requirements:
   formalization: lexer.md#L-012
   interface: src/Lexer.cpp
   verification: lexer
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/empty-file)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/empty-file); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-001
   title: Expression subset
@@ -336,8 +337,8 @@ requirements:
   formalization: grammar.ebnf; contracts.md
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 38 case(s), 0 failed, 0 skipped (parser/declarations, parser/expressions, parser/struct-member-chain, parser/function-pointer-call, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 38 case(s), 0 failed, 0 skipped (parser/declarations, parser/expressions, parser/struct-member-chain, parser/function-pointer-call, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-002
   title: Other expressions only chain productions
@@ -347,8 +348,8 @@ requirements:
   formalization: grammar.ebnf
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (parser/cast-expression, parser/division, parser/less-equal, parser/shift, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (parser/cast-expression, parser/division, parser/less-equal, parser/shift, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-003
   title: Declaration restrictions
@@ -358,8 +359,8 @@ requirements:
   formalization: grammar.ebnf; sema.md#S-003
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (parser/declarations, parser/forward-pointer, parser/tentative-definitions, parser/block-function-declaration, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 16 case(s), 0 failed, 0 skipped (parser/declarations, parser/forward-pointer, parser/tentative-definitions, parser/block-function-declaration, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-004
   title: Declarators
@@ -369,8 +370,8 @@ requirements:
   formalization: grammar.ebnf; sema.md#S-005
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-pointer-call, parser/block-function-declaration, parser/prototype-scope, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-pointer-call, parser/block-function-declaration, parser/prototype-scope, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-005
   title: Statements
@@ -380,8 +381,8 @@ requirements:
   formalization: grammar.ebnf
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 17 case(s), 0 failed, 0 skipped (parser/statements, parser/break-and-continue, parser/dangling-else, parser/null-statements-and-labels, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 17 case(s), 0 failed, 0 skipped (parser/statements, parser/break-and-continue, parser/dangling-else, parser/null-statements-and-labels, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-006
   title: External definitions
@@ -391,8 +392,8 @@ requirements:
   formalization: grammar.ebnf
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/generated-parameters)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/generated-parameters); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-007
   title: --parse mode
@@ -402,8 +403,8 @@ requirements:
   formalization: contracts.md#A-004
   interface: src/Compiler.cpp
   verification: parser, sema
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (cli/parse-accepts, cli/mode-parse)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (cli/parse-accepts, cli/mode-parse); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-008
   title: Reject non-derivable token sequences
@@ -413,8 +414,8 @@ requirements:
   formalization: grammar.ebnf
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 181 case(s), 0 failed, 0 skipped (parser/empty-translation-unit, parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 181 case(s), 0 failed, 0 skipped (parser/empty-translation-unit, parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-009
   title: Accept restricted grammar
@@ -424,8 +425,8 @@ requirements:
   formalization: grammar.ebnf
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 59 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/expressions, parser/statements, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 121 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/expressions, parser/statements, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-010
   title: Parser error locations
@@ -435,8 +436,8 @@ requirements:
   formalization: contracts.md#A-005
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-011
   title: Dangling else
@@ -446,8 +447,8 @@ requirements:
   formalization: grammar.ebnf; sema.md#S-016
   interface: src/Parser.cpp
   verification: parser
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (parser/dangling-else)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (parser/dangling-else); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-012
   title: Grammar adjustment freedom
@@ -479,8 +480,8 @@ requirements:
   formalization: contracts.md#D-001
   interface: src/Printer.cpp; src/Compiler.cpp
   verification: printer
-  status: verified
-  evidence: "run_conformance.py: 83 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 146 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-002
   title: Reference output
@@ -490,8 +491,8 @@ requirements:
   formalization: contracts.md#D-002
   interface: src/Printer.cpp
   verification: printer
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (printer/reference-file)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (printer/reference-file); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-003
   title: Original order
@@ -501,8 +502,8 @@ requirements:
   formalization: contracts.md#D-003
   interface: src/Printer.cpp
   verification: printer
-  status: verified
-  evidence: "run_conformance.py: 82 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 145 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-004
   title: Tabs and line wrapping
@@ -512,8 +513,8 @@ requirements:
   formalization: contracts.md#D-003
   interface: src/Printer.cpp
   verification: printer
-  status: verified
-  evidence: "run_conformance.py: 80 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 143 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-005
   title: Full parenthesization
@@ -523,8 +524,8 @@ requirements:
   formalization: contracts.md#D-003
   interface: src/Printer.cpp
   verification: printer
-  status: verified
-  evidence: "run_conformance.py: 83 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 146 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-006
   title: No digraphs
@@ -534,8 +535,8 @@ requirements:
   formalization: contracts.md#D-003
   interface: src/Printer.cpp
   verification: printer
-  status: verified
-  evidence: "run_conformance.py: 81 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 144 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-007
   title: No reassociation
@@ -545,8 +546,8 @@ requirements:
   formalization: contracts.md#D-003
   interface: src/Printer.cpp
   verification: printer
-  status: verified
-  evidence: "run_conformance.py: 82 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 145 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-008
   title: Structural round trip
@@ -556,8 +557,8 @@ requirements:
   formalization: contracts.md#D-003
   interface: src/Printer.cpp; src/Parser.cpp
   verification: printer
-  status: partial
-  evidence: "run_conformance.py: 80 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); corpus-scoped, not a universal proof"
+  status: corpus-verified
+  evidence: "run_conformance.py: 143 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-001
   title: Scopes
@@ -567,8 +568,8 @@ requirements:
   formalization: sema.md#S-001
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/file-var-visible, sema/block-shadow, sema/outer-restored, sema/use-before-declaration, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 12 case(s), 0 failed, 0 skipped (sema/file-var-visible, sema/block-shadow, sema/outer-restored, sema/use-before-declaration, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-002
   title: Namespaces
@@ -578,8 +579,8 @@ requirements:
   formalization: sema.md#S-001
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/tag-vs-ordinary, sema/label-vs-ordinary, sema/member-vs-ordinary)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/tag-vs-ordinary, sema/label-vs-ordinary, sema/member-vs-ordinary); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-003
   title: Shadowing
@@ -589,8 +590,8 @@ requirements:
   formalization: sema.md#S-001
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/block-shadow, sema/outer-restored)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/block-shadow, sema/outer-restored); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-004
   title: Linkage
@@ -600,8 +601,8 @@ requirements:
   formalization: sema.md#S-002
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (sema/block-function-declaration)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (sema/block-function-declaration); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-005
   title: Redeclarations and compatibility
@@ -611,8 +612,8 @@ requirements:
   formalization: sema.md#S-003; ambiguities.md#I-019
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/compatible-function-redecl, sema/incompatible-function-redecl, sema/incompatible-object-redecl, sema/block-redeclaration)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 9 case(s), 0 failed, 0 skipped (sema/compatible-function-redecl, sema/incompatible-function-redecl, sema/incompatible-object-redecl, sema/block-redeclaration, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-006
   title: Tentative definitions
@@ -622,8 +623,8 @@ requirements:
   formalization: sema.md#S-003; ambiguities.md#I-014
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/tentative-coalesce, sema/tentative-incomplete)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/tentative-coalesce, sema/tentative-incomplete); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-007
   title: Tag identity
@@ -633,8 +634,8 @@ requirements:
   formalization: sema.md#S-004
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, sema/distinct-tag-pointer, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 13 case(s), 0 failed, 0 skipped (sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, sema/distinct-tag-pointer, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-008
   title: Struct completeness
@@ -644,8 +645,8 @@ requirements:
   formalization: sema.md#S-004
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 9 case(s), 0 failed, 0 skipped (sema/tentative-incomplete, sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 13 case(s), 0 failed, 0 skipped (sema/tentative-incomplete, sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-009
   title: Declarator-derived types
@@ -655,8 +656,8 @@ requirements:
   formalization: sema.md#S-005
   interface: src/Sema.cpp; src/Type.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/function-returning-pointer, sema/pointer-to-function, sema/function-returning-function, sema/parenthesized-declarator, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sema/comma-struct-different-shapes, sema/function-returning-pointer, sema/pointer-to-function, sema/function-returning-function, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-010
   title: Parameter rules
@@ -666,8 +667,8 @@ requirements:
   formalization: 'sema.md#S-005, #S-001'
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/parameter-function-adjusted, sema/definition-param-name-required, sema/void-only-parameter, sema/incomplete-parameter)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/parameter-function-adjusted, sema/definition-param-name-required, sema/void-only-parameter, sema/incomplete-parameter, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-011
   title: Type categories
@@ -677,8 +678,8 @@ requirements:
   formalization: 'sema.md#S-006, #S-007'
   interface: src/Type.cpp; src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sema/char-to-int, sema/int-to-char, sema/string-decay, sema/function-decay, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sema/char-to-int, sema/int-to-char, sema/string-decay, sema/function-decay, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-012
   title: Type compatibility equals equality
@@ -688,8 +689,8 @@ requirements:
   formalization: 'sema.md#S-006, #S-007'
   interface: src/Type.cpp; src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/type-equality-function, sema/type-equality-pointer, sema/type-inequality-pointer, sema/type-equality-function-pointer)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/type-equality-function, sema/type-equality-pointer, sema/type-inequality-pointer, sema/type-equality-function-pointer); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-013
   title: Value categories and conversions
@@ -699,8 +700,8 @@ requirements:
   formalization: sema.md#S-008
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/char-to-int, sema/int-to-char, sema/pointer-to-int, sema/int-to-pointer, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/char-to-int, sema/int-to-char, sema/pointer-to-int, sema/int-to-pointer, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-014
   title: Null pointer constant
@@ -710,8 +711,8 @@ requirements:
   formalization: sema.md#S-009; ambiguities.md#I-012
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/int-to-pointer, sema/null-literal, sema/null-parenthesized, sema/return-null-pointer)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/int-to-pointer, sema/null-literal, sema/null-parenthesized, sema/return-null-pointer); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-015
   title: Primary expressions
@@ -721,8 +722,8 @@ requirements:
   formalization: sema.md#S-010
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/undeclared-identifier, sema/parenthesized-lvalue)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/undeclared-identifier, sema/parenthesized-lvalue); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-016
   title: Postfix expressions
@@ -732,8 +733,8 @@ requirements:
   formalization: sema.md#S-011
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sema/subscript-pointer, sema/subscript-integer, sema/call-arity, sema/call-argument-type, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sema/subscript-pointer, sema/subscript-integer, sema/call-arity, sema/call-argument-type, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-017
   title: Unary expressions
@@ -743,8 +744,8 @@ requirements:
   formalization: sema.md#S-012
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/address-of-rvalue, sema/deref-nonpointer, sema/negate-pointer, sema/not-struct, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/address-of-rvalue, sema/deref-nonpointer, sema/negate-pointer, sema/not-struct, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-018
   title: Binary operators
@@ -754,8 +755,8 @@ requirements:
   formalization: sema.md#S-013
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/pointer-plus-int, sema/pointer-plus-pointer, sema/multiply-pointer, sema/compare-pointer-int, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/pointer-plus-int, sema/pointer-plus-pointer, sema/multiply-pointer, sema/compare-pointer-int, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-019
   title: Conditional expression
@@ -765,8 +766,8 @@ requirements:
   formalization: sema.md#S-014
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/conditional-int, sema/conditional-pointer-null, sema/conditional-pointer-int, sema/conditional-void, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/conditional-int, sema/conditional-pointer-null, sema/conditional-pointer-int, sema/conditional-void, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-020
   title: Assignment
@@ -776,8 +777,8 @@ requirements:
   formalization: sema.md#S-015
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/pointer-to-int, sema/int-to-pointer, sema/assign-to-rvalue, sema/assign-to-expression, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/pointer-to-int, sema/int-to-pointer, sema/assign-to-rvalue, sema/assign-to-expression, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-021
   title: Statements and control flow
@@ -787,8 +788,8 @@ requirements:
   formalization: sema.md#S-016
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/struct-not-scalar, sema/if-pointer-condition, sema/while-pointer-condition, sema/while-struct-condition)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/struct-not-scalar, sema/if-pointer-condition, sema/while-pointer-condition, sema/while-struct-condition); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-022
   title: Labels and goto
@@ -798,8 +799,8 @@ requirements:
   formalization: sema.md#S-016
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/label-function-scope, sema/goto-missing-label, sema/duplicate-label)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/label-function-scope, sema/goto-missing-label, sema/duplicate-label); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-023
   title: break and continue
@@ -809,8 +810,8 @@ requirements:
   formalization: sema.md#S-016
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/break-outside-loop, sema/continue-outside-loop, sema/break-inside-loop, sema/continue-inside-loop)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/break-outside-loop, sema/continue-outside-loop, sema/break-inside-loop, sema/continue-inside-loop); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-024
   title: return
@@ -820,8 +821,8 @@ requirements:
   formalization: sema.md#S-016
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/return-value-in-void, sema/bare-return-in-nonvoid, sema/bare-return-in-void, sema/return-null-pointer, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/return-value-in-void, sema/bare-return-in-nonvoid, sema/bare-return-in-void, sema/return-null-pointer, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-025
   title: Function definitions
@@ -831,8 +832,8 @@ requirements:
   formalization: sema.md#S-017
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/definition-not-a-function, sema/incomplete-return-type)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/definition-not-a-function, sema/incomplete-return-type); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-026
   title: Function calls
@@ -842,8 +843,8 @@ requirements:
   formalization: sema.md#S-017
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/call-arity, sema/call-argument-type, sema/call-nonfunction, sema/call-recursive)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/call-arity, sema/call-argument-type, sema/call-nonfunction, sema/call-recursive); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-027
   title: Struct members
@@ -853,8 +854,8 @@ requirements:
   formalization: 'sema.md#S-011, #S-004'
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/member-missing, sema/arrow-on-struct, sema/member-lvalue, sema/arrow-member-lvalue, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/member-missing, sema/arrow-on-struct, sema/member-lvalue, sema/arrow-member-lvalue, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-028
   title: Sema error locations
@@ -864,8 +865,8 @@ requirements:
   formalization: 'sema.md#S-018; ambiguities.md#I-017, #I-018'
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/location-binary-operator, sema/location-if-keyword, sema/location-assignment)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/location-binary-operator, sema/location-if-keyword, sema/location-assignment); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-029
   title: Exemptions
@@ -875,8 +876,8 @@ requirements:
   formalization: sema.md#S-019
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/incomplete-parameter, sema/incomplete-return-type, sema/exempt-struct-assignment, sema/exempt-struct-parameter, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/incomplete-parameter, sema/incomplete-return-type, sema/exempt-struct-assignment, sema/exempt-struct-parameter, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-030
   title: No expression evaluation
@@ -886,8 +887,8 @@ requirements:
   formalization: sema.md#S-019
   interface: src/Sema.cpp
   verification: sema
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/no-evaluation, sema/no-overflow-evaluation)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/no-evaluation, sema/no-overflow-evaluation); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-001
   title: Systematic IR construction
@@ -897,8 +898,8 @@ requirements:
   formalization: contracts.md#F-001
   interface: src/CodeGen.cpp
   verification: codegen
-  status: verified
-  evidence: "run_conformance.py: 41 case(s), 0 failed, 0 skipped (cli/mode-compile, codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 43 case(s), 0 failed, 0 skipped (cli/mode-compile, codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-002
   title: char/int LLVM types
@@ -908,8 +909,8 @@ requirements:
   formalization: contracts.md#F-001
   interface: src/CodeGen.cpp; src/Type.cpp
   verification: codegen
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (codegen/i8-i32-and-datalayout)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (codegen/i8-i32-and-datalayout); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-003
   title: DataLayout sizes
@@ -919,8 +920,8 @@ requirements:
   formalization: contracts.md#F-001
   interface: src/Type.cpp; src/CodeGen.cpp
   verification: codegen
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (codegen/i8-i32-and-datalayout)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (codegen/i8-i32-and-datalayout); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-004
   title: Output file naming
@@ -930,8 +931,8 @@ requirements:
   formalization: contracts.md#F-001
   interface: src/Compiler.cpp
   verification: codegen
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/default-and-naming)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/default-and-naming); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-005
   title: Human-readable IR
@@ -941,8 +942,8 @@ requirements:
   formalization: contracts.md#F-001
   interface: src/Compiler.cpp
   verification: codegen
-  status: verified
-  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-006
   title: Default compile mode
@@ -952,8 +953,8 @@ requirements:
   formalization: contracts.md#A-004
   interface: src/main.cpp
   verification: cli, codegen
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (cli/default-and-naming, cli/default-equals-compile, codegen/default-equals-compile)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (cli/default-and-naming, cli/default-equals-compile, codegen/default-equals-compile); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-007
   title: IR well-formedness
@@ -963,8 +964,8 @@ requirements:
   formalization: contracts.md#F-001
   interface: src/Compiler.cpp
   verification: codegen
-  status: verified
-  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-008
   title: Differential execution
@@ -974,8 +975,8 @@ requirements:
   formalization: contracts.md#F-002
   interface: src/CodeGen.cpp
   verification: codegen
-  status: partial
-  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); corpus-scoped, not a universal proof"
+  status: corpus-verified
+  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-009
   title: LLVM 15 environment deviation
@@ -996,8 +997,8 @@ requirements:
   formalization: contracts.md#G-001
   interface: src/Compiler.cpp
   verification: sccp
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/mode-optimize)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/mode-optimize); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-002
   title: SCCP analysis
@@ -1007,8 +1008,8 @@ requirements:
   formalization: contracts.md#G-001
   interface: src/SCCP.cpp
   verification: sccp
-  status: verified
-  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-003
   title: Constant substitution
@@ -1018,8 +1019,8 @@ requirements:
   formalization: contracts.md#G-002
   interface: src/SCCP.cpp
   verification: sccp
-  status: verified
-  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/phi-constant-fold, sccp/compare-fold, sccp/select-fold, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/phi-constant-fold, sccp/compare-fold, sccp/select-fold, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-004
   title: Branch simplification
@@ -1029,8 +1030,8 @@ requirements:
   formalization: contracts.md#G-002
   interface: src/SCCP.cpp
   verification: sccp
-  status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sccp/branch-simplification, sccp/phi-constant-fold, sccp/select-fold)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sccp/branch-simplification, sccp/phi-constant-fold, sccp/select-fold); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-005
   title: Dead instruction elimination
@@ -1040,8 +1041,8 @@ requirements:
   formalization: contracts.md#G-002
   interface: src/SCCP.cpp
   verification: sccp
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sccp/dead-instruction-elimination, sccp/dead-after-return)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sccp/dead-instruction-elimination, sccp/dead-after-return); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-006
   title: Unreachable block elimination
@@ -1051,8 +1052,8 @@ requirements:
   formalization: contracts.md#G-002
   interface: src/SCCP.cpp
   verification: sccp
-  status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sccp/unreachable-block-elimination, sccp/dead-after-return)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sccp/unreachable-block-elimination, sccp/dead-after-return); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-007
   title: Only mem2reg allowed
@@ -1062,8 +1063,8 @@ requirements:
   formalization: contracts.md#G-001
   interface: src/Optimizer.cpp; src/Compiler.cpp
   verification: sccp
-  status: verified
-  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (sccp/only-mem2reg)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (sccp/only-mem2reg); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-008
   title: Post-SCCP IR validity
@@ -1073,8 +1074,8 @@ requirements:
   formalization: contracts.md#G-002
   interface: src/Compiler.cpp; src/SCCP.cpp
   verification: sccp
-  status: verified
-  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...)"
+  status: corpus-verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-009
   title: Behavior preservation on defined programs
@@ -1084,8 +1085,8 @@ requirements:
   formalization: contracts.md#G-002
   interface: src/SCCP.cpp
   verification: sccp, codegen
-  status: partial
-  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...); corpus-scoped, not a universal proof"
+  status: corpus-verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: G-010
   title: Pre/post IR capture

@@ -48,6 +48,11 @@ C11 §6.2.1, §6.2.3.
   it can be shadowed in an enclosed block.
 - A parameter name in a prototype has prototype scope and does not conflict
   with a file-scope declaration of the same spelling.
+- Tags declared in a function prototype's parameter list, including tags in
+  nested function declarators, also have function-prototype scope and do not
+  leak into the enclosing scope.  Tags declared in a function definition's
+  parameter list have block scope of the function body.  Duplicate parameter
+  names in one prototype scope violate C11 §6.7p3.
 
 ## S-002 — Linkage
 
