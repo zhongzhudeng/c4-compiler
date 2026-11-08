@@ -2,6 +2,7 @@ add_executable(c4_tests
   LexerTests.cpp
   ParserTests.cpp
   SemaTests.cpp
+  TypeTests.cpp
   PrinterTests.cpp
   CodeGenTests.cpp
   SCCPTests.cpp)

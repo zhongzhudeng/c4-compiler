@@ -505,12 +505,14 @@ int main(void) { struct P *q; return 0; }
   auto *paramDecl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
   REQUIRE(paramDecl != nullptr);
   const TypeSpec &spec = ast.typeSpec(paramDecl->spec);
-  REQUIRE(spec.tag != nullptr);
+  auto *structure = std::get_if<TypeSpec::Struct>(&spec.node);
+  REQUIRE(structure != nullptr);
+  REQUIRE(structure->tag != nullptr);
   StructDecl *prototypeTag = model.typeSpec(paramDecl->spec).record;
   REQUIRE(prototypeTag != nullptr);
-  CHECK(model.bindingTag(prototype, spec.tag) == prototypeTag);
-  CHECK(model.bindingTag(model.fileScope(), spec.tag) == nullptr);
-  CHECK(model.lookupTag(model.fileScope(), spec.tag) == nullptr);
+  CHECK(model.bindingTag(prototype, structure->tag) == prototypeTag);
+  CHECK(model.bindingTag(model.fileScope(), structure->tag) == nullptr);
+  CHECK(model.lookupTag(model.fileScope(), structure->tag) == nullptr);
 
   std::vector<DeclId> locals = localDecls(compiler);
   REQUIRE(locals.size() == 1);
@@ -521,8 +523,8 @@ int main(void) { struct P *q; return 0; }
   CHECK(mainTag != prototypeTag);
   ScopeId mainScope = model.decl(locals[0]).scope;
   CHECK(model.scope(mainScope).kind == ScopeKind::Function);
-  CHECK(model.bindingTag(mainScope, spec.tag) == mainTag);
-  CHECK(model.lookupTag(mainScope, spec.tag) == mainTag);
+  CHECK(model.bindingTag(mainScope, structure->tag) == mainTag);
+  CHECK(model.lookupTag(mainScope, structure->tag) == mainTag);
 }
 
 TEST_CASE("sema keeps definition parameter tags in the function scope",
@@ -556,12 +558,14 @@ int f(struct S { int x; } *p) {
   auto *paramDecl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
   REQUIRE(paramDecl != nullptr);
   const TypeSpec &spec = ast.typeSpec(paramDecl->spec);
-  REQUIRE(spec.tag != nullptr);
+  auto *structure = std::get_if<TypeSpec::Struct>(&spec.node);
+  REQUIRE(structure != nullptr);
+  REQUIRE(structure->tag != nullptr);
   StructDecl *tag = model.typeSpec(paramDecl->spec).record;
   REQUIRE(tag != nullptr);
   CHECK(tag->complete);
-  CHECK(model.bindingTag(functionScope, spec.tag) == tag);
-  CHECK(model.bindingTag(model.fileScope(), spec.tag) == nullptr);
+  CHECK(model.bindingTag(functionScope, structure->tag) == tag);
+  CHECK(model.bindingTag(model.fileScope(), structure->tag) == nullptr);
 
   EntityId entityId = model.decl(definition).entity;
   REQUIRE(entityId.valid());
@@ -615,11 +619,13 @@ int (*f(struct S *p))(int) {
   auto *paramDecl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
   REQUIRE(paramDecl != nullptr);
   const TypeSpec &spec = ast.typeSpec(paramDecl->spec);
-  REQUIRE(spec.tag != nullptr);
+  auto *structure = std::get_if<TypeSpec::Struct>(&spec.node);
+  REQUIRE(structure != nullptr);
+  REQUIRE(structure->tag != nullptr);
   StructDecl *tag = model.typeSpec(paramDecl->spec).record;
   REQUIRE(tag != nullptr);
-  CHECK(model.bindingTag(functionScope, spec.tag) == tag);
-  CHECK(model.bindingTag(model.fileScope(), spec.tag) == nullptr);
+  CHECK(model.bindingTag(functionScope, structure->tag) == tag);
+  CHECK(model.bindingTag(model.fileScope(), structure->tag) == nullptr);
 
   size_t prototypes = 0;
   for (size_t i = 0; i < model.scopeCount(); ++i) {
@@ -674,12 +680,12 @@ struct S { int x; };
   CHECK(object.declarations.size() == 2);
   REQUIRE(object.type != nullptr);
   CHECK(Type::isStruct(object.type));
-  REQUIRE(object.type->record != nullptr);
-  CHECK(object.type->record->complete);
+  REQUIRE(object.type->record() != nullptr);
+  CHECK(object.type->record()->complete);
 
   StructDecl *fileTag = model.decl(tagDecl).record;
   REQUIRE(fileTag != nullptr);
-  CHECK(fileTag == object.type->record);
+  CHECK(fileTag == object.type->record());
   CHECK(model.decl(completion).record == fileTag);
   CHECK(model.lookupTag(model.fileScope(), fileTag->tag) == fileTag);
 

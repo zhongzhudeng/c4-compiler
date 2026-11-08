@@ -305,44 +305,42 @@ EntityId Sema::declareLocalFunction(DeclId id, const DeclResult &result,
 
 const Type *Sema::resolveTypeSpec(TypeSpecId id, bool declareTag) {
   const TypeSpec &spec = ast_.typeSpec(id);
-  switch (spec.kind) {
-  case TypeSpec::Kind::Void:
+  if (std::holds_alternative<TypeSpec::Void>(spec.node))
     return types_.voidType();
-  case TypeSpec::Kind::Char:
+  if (std::holds_alternative<TypeSpec::Char>(spec.node))
     return types_.charType();
-  case TypeSpec::Kind::Int:
+  if (std::holds_alternative<TypeSpec::Int>(spec.node))
     return types_.intType();
-  case TypeSpec::Kind::Struct:
-    break;
-  }
 
+  const TypeSpec::Struct &structSpec = std::get<TypeSpec::Struct>(spec.node);
   StructDecl *record = model_.typeSpec(id).record;
   if (record)
     return types_.structType(record);
 
-  if (spec.hasBraces) {
-    if (spec.tag) {
-      record = model_.bindingTag(current_, spec.tag);
+  if (structSpec.hasBraces) {
+    if (structSpec.tag) {
+      record = model_.bindingTag(current_, structSpec.tag);
       if (record) {
         if (record->complete)
           diagnostics_.error(spec.loc,
-                             "redefinition of 'struct " + *spec.tag + "'");
+                             "redefinition of 'struct " + *structSpec.tag +
+                                 "'");
       } else {
-        record = model_.addStruct(spec.tag, spec.loc, false);
-        model_.bindTag(current_, spec.tag, record);
+        record = model_.addStruct(structSpec.tag, spec.loc, false);
+        model_.bindTag(current_, structSpec.tag, record);
       }
     } else {
       record = model_.addStruct(nullptr, spec.loc, true);
     }
 
     record->loc = spec.loc;
-    record->anonymous = !spec.tag;
+    record->anonymous = !structSpec.tag;
     record->type = types_.structType(record);
     record->fields.clear();
     model_.typeSpec(id).record = record;
 
     std::unordered_set<Symbol> fieldNames;
-    for (DeclId fieldId : spec.fields) {
+    for (DeclId fieldId : structSpec.fields) {
       const Decl &field = ast_.decl(fieldId);
       auto *fieldDecl = std::get_if<FieldDecl>(&field.node);
       if (!fieldDecl)
@@ -374,24 +372,24 @@ const Type *Sema::resolveTypeSpec(TypeSpecId id, bool declareTag) {
     return record->type;
   }
 
-  if (!spec.tag)
+  if (!structSpec.tag)
     diagnostics_.error(spec.loc, "expected struct tag or declaration");
 
   if (declareTag) {
     // A declaration of the form "struct S;" declares the tag in the current
     // scope even when an outer scope already declares a tag with that name.
-    record = model_.bindingTag(current_, spec.tag);
+    record = model_.bindingTag(current_, structSpec.tag);
     if (!record) {
-      record = model_.addStruct(spec.tag, spec.loc, false);
+      record = model_.addStruct(structSpec.tag, spec.loc, false);
       record->type = types_.structType(record);
-      model_.bindTag(current_, spec.tag, record);
+      model_.bindTag(current_, structSpec.tag, record);
     }
   } else {
-    record = lookupTag(spec.tag);
+    record = lookupTag(structSpec.tag);
     if (!record) {
-      record = model_.addStruct(spec.tag, spec.loc, false);
+      record = model_.addStruct(structSpec.tag, spec.loc, false);
       record->type = types_.structType(record);
-      model_.bindTag(current_, spec.tag, record);
+      model_.bindTag(current_, structSpec.tag, record);
     }
   }
   model_.typeSpec(id).record = record;
@@ -478,7 +476,7 @@ void Sema::adoptFunctionScope(ScopeId scope, ScopeId parent) {
 const Type *Sema::adjustParameterType(const Type *type, SourceLoc loc) {
   (void)loc;
   if (Type::isArray(type))
-    return types_.pointerTo(type->element);
+    return types_.pointerTo(type->element());
   if (Type::isFunction(type))
     return types_.pointerTo(type);
   return type;
@@ -488,9 +486,9 @@ bool Sema::isCompleteObject(const Type *type) const {
   if (!type || !Type::isObject(type))
     return false;
   if (Type::isStruct(type))
-    return type->record && type->record->complete;
+    return type->record() && type->record()->complete;
   if (Type::isArray(type))
-    return isCompleteObject(type->element);
+    return isCompleteObject(type->element());
   return true;
 }
 
@@ -508,21 +506,21 @@ void Sema::validateObjectType(const Type *type, SourceLoc loc, const char *what,
 
 void Sema::validateFunctionType(const Type *type, SourceLoc loc) const {
   assert(Type::isFunction(type));
-  const Type *result = type->result;
+  const Type *result = type->result();
   if (Type::isFunction(result) || Type::isArray(result))
     diagnostics_.error(loc, "function cannot return a function or array type");
   if (Type::isStruct(result)) {
-    if (!result->record || !result->record->complete)
+    if (!result->record() || !result->record()->complete)
       diagnostics_.error(loc, "function returns an incomplete struct type");
     diagnostics_.error(loc, "functions returning struct are not supported");
   }
-  for (const Type *param : type->params) {
+  for (const Type *param : type->params()) {
     if (Type::isVoid(param))
       diagnostics_.error(loc, "parameter has incomplete type 'void'");
     if (Type::isFunction(param) || Type::isArray(param))
       diagnostics_.error(loc, "parameter has an invalid type");
     if (Type::isStruct(param)) {
-      if (!param->record || !param->record->complete)
+      if (!param->record() || !param->record()->complete)
         diagnostics_.error(loc, "parameter has incomplete struct type");
       diagnostics_.error(loc, "struct parameters are not supported");
     }
@@ -583,7 +581,8 @@ void Sema::analyzeTopLevel(DeclId id) {
 
   if (auto *tag = std::get_if<TagDecl>(&decl.node)) {
     const TypeSpec &spec = ast_.typeSpec(tag->spec);
-    if (spec.hasBraces && !spec.tag) {
+    const auto *structSpec = std::get_if<TypeSpec::Struct>(&spec.node);
+    if (structSpec && structSpec->hasBraces && !structSpec->tag) {
       diagnostics_.error(decl.loc, "declaration does not declare anything");
       return;
     }
@@ -627,7 +626,8 @@ void Sema::analyzeLocalDecl(DeclId id) {
 
   if (auto *tag = std::get_if<TagDecl>(&decl.node)) {
     const TypeSpec &spec = ast_.typeSpec(tag->spec);
-    if (spec.hasBraces && !spec.tag) {
+    const auto *structSpec = std::get_if<TypeSpec::Struct>(&spec.node);
+    if (structSpec && structSpec->hasBraces && !structSpec->tag) {
       diagnostics_.error(decl.loc, "declaration does not declare anything");
       return;
     }
@@ -664,7 +664,7 @@ void Sema::analyzeFunction(DeclId id, ScopeId functionScope) {
   current_ = functionScope;
 
   FunctionContext context;
-  context.returnType = functionType->result;
+  context.returnType = functionType->result();
   context.scope = functionScope;
   function_ = &context;
 
@@ -795,7 +795,7 @@ const Type *Sema::decayedType(const ExprInfo &info) {
   if (!type)
     return nullptr;
   if (Type::isArray(type))
-    return types_.pointerTo(type->element);
+    return types_.pointerTo(type->element());
   if (Type::isFunction(type))
     return types_.pointerTo(type);
   return type;
@@ -812,20 +812,22 @@ void Sema::setIntConstant(ExprInfo &info, long long value) const {
 bool Sema::compatibleObjectPointers(const Type *a, const Type *b) const {
   if (!Type::isPointer(a) || !Type::isPointer(b))
     return false;
-  if (a->element != b->element)
+  if (a->pointee() != b->pointee())
     return false;
-  return Type::isObject(a->element) && Type::isObject(b->element);
+  return Type::isObject(a->pointee()) && Type::isObject(b->pointee());
 }
 
 bool Sema::compatibleEqualityPointers(const Type *a, const Type *b) const {
   if (!Type::isPointer(a) || !Type::isPointer(b))
     return false;
-  if (a->element == b->element)
+  const Type *aPointee = a->pointee();
+  const Type *bPointee = b->pointee();
+  if (aPointee == bPointee)
     return true;
-  bool aVoid = Type::isVoid(a->element);
-  bool bVoid = Type::isVoid(b->element);
-  bool aObject = Type::isObject(a->element);
-  bool bObject = Type::isObject(b->element);
+  bool aVoid = Type::isVoid(aPointee);
+  bool bVoid = Type::isVoid(bPointee);
+  bool aObject = Type::isObject(aPointee);
+  bool bObject = Type::isObject(bPointee);
   if (aVoid && bObject)
     return true;
   if (bVoid && aObject)
@@ -836,7 +838,7 @@ bool Sema::compatibleEqualityPointers(const Type *a, const Type *b) const {
 void Sema::checkPointerArithmetic(const Type *pointer, SourceLoc loc) const {
   if (!Type::isPointer(pointer))
     diagnostics_.error(loc, "pointer arithmetic requires a pointer operand");
-  const Type *element = pointer->element;
+  const Type *element = pointer->pointee();
   if (Type::isVoid(element))
     diagnostics_.error(loc, "arithmetic on a pointer to void");
   if (Type::isFunction(element))
@@ -858,12 +860,12 @@ bool Sema::assignable(const Type *to, ExprId from) {
       return true;
     if (!Type::isPointer(fromType))
       return false;
-    if (to->element == fromType->element)
+    if (to->pointee() == fromType->pointee())
       return true;
-    bool toVoid = Type::isVoid(to->element);
-    bool fromVoid = Type::isVoid(fromType->element);
-    bool toObject = Type::isObject(to->element);
-    bool fromObject = Type::isObject(fromType->element);
+    bool toVoid = Type::isVoid(to->pointee());
+    bool fromVoid = Type::isVoid(fromType->pointee());
+    bool toObject = Type::isObject(to->pointee());
+    bool fromObject = Type::isObject(fromType->pointee());
     if (toVoid && fromObject)
       return true;
     if (fromVoid && toObject)
@@ -985,10 +987,10 @@ ExprInfo &Sema::checkExpr(ExprId id) {
     case UnaryExpr::Op::Deref:
       if (!Type::isPointer(type))
         diagnostics_.error(loc, "indirection requires a pointer operand");
-      if (Type::isVoid(type->element))
+      if (Type::isVoid(type->pointee()))
         diagnostics_.error(loc, "cannot dereference a pointer to void");
-      info.type = type->element;
-      info.category = Type::isFunction(type->element)
+      info.type = type->pointee();
+      info.category = Type::isFunction(type->pointee())
                           ? ValueCategory::FunctionDesignator
                           : ValueCategory::LValue;
       break;
@@ -1059,8 +1061,8 @@ ExprInfo &Sema::checkExpr(ExprId id) {
                  Type::isPointer(rightType)) {
         if (!compatibleObjectPointers(leftType, rightType))
           diagnostics_.error(loc, "invalid operands to binary '-'");
-        if (!isCompleteObject(leftType->element) ||
-            !isCompleteObject(rightType->element))
+        if (!isCompleteObject(leftType->pointee()) ||
+            !isCompleteObject(rightType->pointee()))
           diagnostics_.error(
               loc, "subtraction of pointers to incomplete type");
         info.type = types_.intType();
@@ -1195,9 +1197,9 @@ ExprInfo &Sema::checkExpr(ExprId id) {
       if (!compatibleEqualityPointers(thenType, elseType))
         diagnostics_.error(
             loc, "incompatible operand types in conditional expression");
-      if (Type::isVoid(thenType->element))
+      if (Type::isVoid(thenType->pointee()))
         info.type = thenType;
-      else if (Type::isVoid(elseType->element))
+      else if (Type::isVoid(elseType->pointee()))
         info.type = elseType;
       else
         info.type = thenType;
@@ -1223,22 +1225,22 @@ ExprInfo &Sema::checkExpr(ExprId id) {
     if (Type::isFunction(calleeType))
       functionType = calleeType;
     else if (Type::isPointer(calleeType) &&
-             Type::isFunction(calleeType->element))
-      functionType = calleeType->element;
+             Type::isFunction(calleeType->pointee()))
+      functionType = calleeType->pointee();
     else
       diagnostics_.error(
           loc, "called object is not a function or function pointer");
 
-    if (call->args.size() != functionType->params.size())
+    if (call->args.size() != functionType->params().size())
       diagnostics_.error(
           loc, "function call has " + std::to_string(call->args.size()) +
                    " arguments but " +
-                   std::to_string(functionType->params.size()) +
+                   std::to_string(functionType->params().size()) +
                    " are required");
 
     for (size_t i = 0; i < call->args.size(); ++i) {
       checkExpr(call->args[i]);
-      if (!assignable(functionType->params[i], call->args[i]))
+      if (!assignable(functionType->params()[i], call->args[i]))
         diagnostics_.error(
             ast_.expr(call->args[i]).loc,
             "argument " + std::to_string(i + 1) + " has incompatible type '" +
@@ -1247,8 +1249,8 @@ ExprInfo &Sema::checkExpr(ExprId id) {
                 "'");
     }
 
-    info.type = functionType->result;
-    info.category = Type::isVoid(functionType->result)
+    info.type = functionType->result();
+    info.category = Type::isVoid(functionType->result())
                         ? ValueCategory::Void
                         : ValueCategory::RValue;
     return info;
@@ -1268,7 +1270,7 @@ ExprInfo &Sema::checkExpr(ExprId id) {
       diagnostics_.error(
           loc, "subscripted value is not a pointer or array");
     checkPointerArithmetic(pointerType, loc);
-    info.type = pointerType->element;
+    info.type = pointerType->pointee();
     info.category = ValueCategory::LValue;
     return info;
   }
@@ -1280,16 +1282,16 @@ ExprInfo &Sema::checkExpr(ExprId id) {
     if (member->arrow) {
       const Type *baseType = decayedType(base);
       if (!Type::isPointer(baseType) ||
-          !Type::isStruct(baseType->element))
+          !Type::isStruct(baseType->pointee()))
         diagnostics_.error(
             loc, "member reference type is not a pointer to struct");
-      record = baseType->element->record;
+      record = baseType->pointee()->record();
       category = ValueCategory::LValue;
     } else {
       if (!Type::isStruct(base.type))
         diagnostics_.error(loc,
                            "member reference base type is not a struct");
-      record = base.type->record;
+      record = base.type->record();
       category = base.category == ValueCategory::LValue
                      ? ValueCategory::LValue
                      : ValueCategory::RValue;
@@ -1315,13 +1317,13 @@ ExprInfo &Sema::checkExpr(ExprId id) {
   }
 
   if (auto *sizeOf = std::get_if<SizeofExpr>(&expr.node)) {
-    if (sizeOf->isType) {
-      const Type *base = resolveTypeSpec(sizeOf->typeSpec);
-      DeclResult result =
-          resolveDeclarator(sizeOf->typeDeclarator, base);
+    if (auto *typeName =
+            std::get_if<SizeofExpr::TypeName>(&sizeOf->target)) {
+      const Type *base = resolveTypeSpec(typeName->spec);
+      DeclResult result = resolveDeclarator(typeName->declarator, base);
       checkSizeofType(result.type, loc, info);
     } else {
-      ExprInfo &operand = checkExpr(sizeOf->operand);
+      ExprInfo &operand = checkExpr(std::get<ExprId>(sizeOf->target));
       checkSizeofType(operand.type, loc, info);
     }
     return info;

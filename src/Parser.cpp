@@ -84,28 +84,14 @@ bool Parser::isParameterListAhead() const {
 
 TypeSpecId Parser::parseTypeSpec() {
   SourceLoc start = loc();
-  if (accept(TK_VOID)) {
-    TypeSpec spec;
-    spec.kind = TypeSpec::Kind::Void;
-    spec.loc = start;
-    return ast_.addTypeSpec(std::move(spec));
-  }
-  if (accept(TK_CHAR)) {
-    TypeSpec spec;
-    spec.kind = TypeSpec::Kind::Char;
-    spec.loc = start;
-    return ast_.addTypeSpec(std::move(spec));
-  }
-  if (accept(TK_INT)) {
-    TypeSpec spec;
-    spec.kind = TypeSpec::Kind::Int;
-    spec.loc = start;
-    return ast_.addTypeSpec(std::move(spec));
-  }
+  if (accept(TK_VOID))
+    return ast_.addTypeSpec(TypeSpec{start, TypeSpec::Void{}});
+  if (accept(TK_CHAR))
+    return ast_.addTypeSpec(TypeSpec{start, TypeSpec::Char{}});
+  if (accept(TK_INT))
+    return ast_.addTypeSpec(TypeSpec{start, TypeSpec::Int{}});
   if (accept(TK_STRUCT)) {
-    TypeSpec spec;
-    spec.kind = TypeSpec::Kind::Struct;
-    spec.loc = start;
+    TypeSpec::Struct spec;
     if (check(TK_IDENTIFIER)) {
       spec.tag = current().Text;
       advance();
@@ -122,7 +108,7 @@ TypeSpecId Parser::parseTypeSpec() {
     } else if (!spec.tag) {
       error(loc(), "expected struct tag or declaration");
     }
-    return ast_.addTypeSpec(std::move(spec));
+    return ast_.addTypeSpec(TypeSpec{start, std::move(spec)});
   }
   error(start, "expected type specifier");
 }
@@ -228,7 +214,7 @@ DeclId Parser::parseExternalDeclaration() {
 
   if (!isDeclaratorStart()) {
     const TypeSpec &ts = ast_.typeSpec(spec);
-    if (ts.kind == TypeSpec::Kind::Struct) {
+    if (std::holds_alternative<TypeSpec::Struct>(ts.node)) {
       expect(TK_SEMICOLON, "';' after struct declaration");
       return ast_.addDecl(start, TagDecl{spec});
     }
@@ -258,7 +244,7 @@ DeclId Parser::parseLocalDeclaration() {
 
   if (!isDeclaratorStart()) {
     const TypeSpec &ts = ast_.typeSpec(spec);
-    if (ts.kind == TypeSpec::Kind::Struct) {
+    if (std::holds_alternative<TypeSpec::Struct>(ts.node)) {
       expect(TK_SEMICOLON, "';' after struct declaration");
       return ast_.addDecl(start, TagDecl{spec});
     }
@@ -469,12 +455,11 @@ ExprId Parser::parseUnary() {
       TypeSpecId spec = parseTypeSpec();
       DeclaratorId declarator = parseDeclarator(false, true);
       expect(TK_RPAREN, "')' after type name in sizeof");
-      return ast_.addExpr(
-          sizeofLoc, SizeofExpr{ExprId{}, spec, declarator, true});
+      return ast_.addExpr(sizeofLoc,
+                          SizeofExpr{SizeofExpr::TypeName{spec, declarator}});
     }
     ExprId operand = parseUnary();
-    return ast_.addExpr(sizeofLoc,
-                        SizeofExpr{operand, TypeSpecId{}, DeclaratorId{}, false});
+    return ast_.addExpr(sizeofLoc, SizeofExpr{operand});
   }
 
   return parsePostfix();

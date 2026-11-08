@@ -7,16 +7,18 @@
 #include "llvm/IR/LLVMContext.h"
 
 #include <cassert>
-#include <sstream>
+#include <stdexcept>
 
 TypeContext::TypeContext() {
-  Type v; v.kind = Type::Kind::Void; void_ = allocate(std::move(v));
-  Type c; c.kind = Type::Kind::Char; char_ = allocate(std::move(c));
-  Type i; i.kind = Type::Kind::Int; int_ = allocate(std::move(i));
+  void_ = allocate(Type::Void{});
+  char_ = allocate(Type::Char{});
+  int_ = allocate(Type::Int{});
 }
 
-const Type *TypeContext::allocate(Type type) {
-  auto owned = std::make_unique<Type>(std::move(type));
+const Type *TypeContext::allocate(Type::Node node) {
+  // std::make_unique cannot call the private constructor because the
+  // allocation happens inside the library template, not in TypeContext.
+  std::unique_ptr<Type> owned(new Type(std::move(node)));
   const Type *result = owned.get();
   types_.push_back(std::move(owned));
   return result;
@@ -26,10 +28,7 @@ const Type *TypeContext::pointerTo(const Type *element) {
   auto it = pointers_.find(element);
   if (it != pointers_.end())
     return it->second;
-  Type t;
-  t.kind = Type::Kind::Pointer;
-  t.element = element;
-  const Type *result = allocate(std::move(t));
+  const Type *result = allocate(Type::Pointer{element});
   pointers_[element] = result;
   return result;
 }
@@ -40,12 +39,8 @@ const Type *TypeContext::functionOf(const Type *result,
   auto it = functions_.find(key);
   if (it != functions_.end())
     return it->second;
-  Type t;
-  t.kind = Type::Kind::Function;
-  t.result = key.first;
-  t.params = key.second;
-  const Type *allocated = allocate(std::move(t));
-  functions_[std::move(key)] = allocated;
+  const Type *allocated = allocate(Type::Function{key.first, key.second});
+  functions_.emplace(std::move(key), allocated);
   return allocated;
 }
 
@@ -54,11 +49,7 @@ const Type *TypeContext::arrayOf(const Type *element, uint64_t count) {
   auto it = arrays_.find(key);
   if (it != arrays_.end())
     return it->second;
-  Type t;
-  t.kind = Type::Kind::Array;
-  t.element = element;
-  t.arrayCount = count;
-  const Type *result = allocate(std::move(t));
+  const Type *result = allocate(Type::Array{element, count});
   arrays_[key] = result;
   return result;
 }
@@ -67,10 +58,7 @@ const Type *TypeContext::structType(StructDecl *record) {
   auto it = structs_.find(record);
   if (it != structs_.end())
     return it->second;
-  Type t;
-  t.kind = Type::Kind::Struct;
-  t.record = record;
-  const Type *result = allocate(std::move(t));
+  const Type *result = allocate(Type::Struct{record});
   structs_[record] = result;
   return result;
 }
@@ -78,62 +66,58 @@ const Type *TypeContext::structType(StructDecl *record) {
 std::string TypeContext::toString(const Type *type) {
   if (!type)
     return "<null>";
-  switch (type->kind) {
-  case Type::Kind::Void:
+  if (type->is<Type::Void>())
     return "void";
-  case Type::Kind::Char:
+  if (type->is<Type::Char>())
     return "char";
-  case Type::Kind::Int:
+  if (type->is<Type::Int>())
     return "int";
-  case Type::Kind::Pointer:
-    return toString(type->element) + " *";
-  case Type::Kind::Array:
-    return toString(type->element) + "[" + std::to_string(type->arrayCount) + "]";
-  case Type::Kind::Function: {
-    std::string s = toString(type->result) + " (";
-    for (size_t i = 0; i < type->params.size(); ++i) {
+  if (const auto *pointer = type->getIf<Type::Pointer>())
+    return toString(pointer->pointee) + " *";
+  if (const auto *array = type->getIf<Type::Array>())
+    return toString(array->element) + "[" + std::to_string(array->count) + "]";
+  if (const auto *function = type->getIf<Type::Function>()) {
+    std::string s = toString(function->result) + " (";
+    for (size_t i = 0; i < function->params.size(); ++i) {
       if (i)
         s += ", ";
-      s += toString(type->params[i]);
+      s += toString(function->params[i]);
     }
-    if (type->params.empty())
+    if (function->params.empty())
       s += "void";
     s += ")";
     return s;
   }
-  case Type::Kind::Struct: {
-    if (type->record && type->record->tag)
-      return "struct " + *type->record->tag;
+  if (const auto *structure = type->getIf<Type::Struct>()) {
+    if (structure->record && structure->record->tag)
+      return "struct " + *structure->record->tag;
     return "struct <anonymous>";
-  }
   }
   return "<type>";
 }
 
 llvm::Type *TypeLayout::llvmType(const Type *type) const {
   assert(type && "missing C4 type");
-  switch (type->kind) {
-  case Type::Kind::Void:
+  if (type->is<Type::Void>())
     return llvm::Type::getVoidTy(context_);
-  case Type::Kind::Char:
+  if (type->is<Type::Char>())
     return llvm::Type::getInt8Ty(context_);
-  case Type::Kind::Int:
+  if (type->is<Type::Int>())
     return llvm::Type::getInt32Ty(context_);
-  case Type::Kind::Pointer:
+  if (type->is<Type::Pointer>())
     return llvm::PointerType::get(context_, 0);
-  case Type::Kind::Array:
-    return llvm::ArrayType::get(llvmType(type->element), type->arrayCount);
-  case Type::Kind::Function: {
+  if (const auto *array = type->getIf<Type::Array>())
+    return llvm::ArrayType::get(llvmType(array->element), array->count);
+  if (const auto *function = type->getIf<Type::Function>()) {
     std::vector<llvm::Type *> params;
-    params.reserve(type->params.size());
-    for (const Type *p : type->params)
+    params.reserve(function->params.size());
+    for (const Type *p : function->params)
       params.push_back(llvmType(p));
-    return llvm::FunctionType::get(llvmType(type->result), params, false);
+    return llvm::FunctionType::get(llvmType(function->result), params, false);
   }
-  case Type::Kind::Struct:
-    return llvmStruct(type->record);
-  }
-  return nullptr;
+  if (const auto *structure = type->getIf<Type::Struct>())
+    return llvmStruct(structure->record);
+  throw std::logic_error("type: unhandled type category");
 }
 
 llvm::StructType *TypeLayout::llvmStruct(StructDecl *record) const {

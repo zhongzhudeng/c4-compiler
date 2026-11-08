@@ -244,7 +244,7 @@ void CodeGen::FunctionEmitter::emit() {
          "' declaration/definition parameter mismatch");
 
   function_ = function;
-  returnType_ = entity.type->result;
+  returnType_ = entity.type->result();
 
   llvm::BasicBlock *entry =
       llvm::BasicBlock::Create(context_, "entry", function_);
@@ -566,7 +566,7 @@ CodeGen::FunctionEmitter::emitExpr(ExprId id) {
       if (!pointer.value->getType()->isPointerTy())
         fail("dereference of a non-pointer LLVM value");
       const Type *pointee = info.type;
-      if (!pointee || pointee != pointer.type->element)
+      if (!pointee || pointee != pointer.type->pointee())
         fail("dereference type disagrees with pointer element type");
       if (Type::isFunction(pointee))
         return FunctionDesignator{pointer.value, pointee};
@@ -612,13 +612,13 @@ CodeGen::FunctionEmitter::emitExpr(ExprId id) {
       fail("subscript base is not a pointer LLVM value");
     if (!Type::isInteger(index.type))
       fail("subscript index is not an integer");
-    if (!info.type || info.type != pointer.type->element)
+    if (!info.type || info.type != pointer.type->pointee())
       fail("subscript type disagrees with pointer element type");
     llvm::Value *offset = builder_.CreateSExt(
         index.value, llvm::Type::getInt64Ty(context_), "idx");
     llvm::Value *indices[] = {offset};
     llvm::Value *address =
-        builder_.CreateGEP(layout_.llvmType(pointer.type->element),
+        builder_.CreateGEP(layout_.llvmType(pointer.type->pointee()),
                            pointer.value, indices, "index");
     return Place{address, info.type};
   }
@@ -701,7 +701,7 @@ CodeGen::FunctionEmitter::RValue CodeGen::FunctionEmitter::decay(Place place) {
     fail("decay of a non-array place");
   if (!place.address || !place.address->getType()->isPointerTy())
     fail("decay of a non-pointer address");
-  return RValue{place.address, types_.pointerTo(place.type->element)};
+  return RValue{place.address, types_.pointerTo(place.type->element())};
 }
 
 CodeGen::FunctionEmitter::RValue
@@ -838,7 +838,7 @@ CodeGen::FunctionEmitter::emitPointerOffset(ExprId pointerId, ExprId indexId,
     offset = builder_.CreateNeg(offset, "neg.idx");
   llvm::Value *indices[] = {offset};
   llvm::Value *address = builder_.CreateGEP(
-      layout_.llvmType(pointer.type->element), pointer.value, indices, name);
+      layout_.llvmType(pointer.type->pointee()), pointer.value, indices, name);
   return RValue{address, pointer.type};
 }
 
@@ -903,7 +903,7 @@ CodeGen::FunctionEmitter::emitBinary(ExprId id, const BinaryExpr &binary) {
           right.value, llvm::Type::getInt64Ty(context_), "right.int");
       llvm::Value *difference =
           builder_.CreateSub(leftInt, rightInt, "ptr.diff");
-      uint64_t size = layout_.sizeOf(left.type->element);
+      uint64_t size = layout_.sizeOf(left.type->pointee());
       if (size > 1)
         difference = builder_.CreateSDiv(
             difference,
@@ -1060,8 +1060,8 @@ CodeGen::FunctionEmitter::emitCall(ExprId id, const CallExpr &call) {
   if (Type::isFunction(calleeInfo.type))
     functionType = calleeInfo.type;
   else if (Type::isPointer(calleeInfo.type) &&
-           Type::isFunction(calleeInfo.type->element))
-    functionType = calleeInfo.type->element;
+           Type::isFunction(calleeInfo.type->pointee()))
+    functionType = calleeInfo.type->pointee();
   else
     fail("call to a non-function value");
 
@@ -1083,12 +1083,12 @@ CodeGen::FunctionEmitter::emitCall(ExprId id, const CallExpr &call) {
   std::vector<llvm::Value *> arguments;
   arguments.reserve(call.args.size());
   for (size_t i = 0; i < call.args.size(); ++i) {
-    if (i >= functionType->params.size())
+    if (i >= functionType->params().size())
       fail("call has more arguments than parameters");
     arguments.push_back(
-        convertExpr(call.args[i], functionType->params[i]).value);
+        convertExpr(call.args[i], functionType->params()[i]).value);
   }
-  if (arguments.size() != functionType->params.size())
+  if (arguments.size() != functionType->params().size())
     fail("call argument count mismatch");
 
   llvm::FunctionType *llvmFunctionType =
@@ -1096,9 +1096,9 @@ CodeGen::FunctionEmitter::emitCall(ExprId id, const CallExpr &call) {
   llvm::CallInst *callInst =
       builder_.CreateCall(llvmFunctionType, callee, arguments);
 
-  if (Type::isVoid(functionType->result))
+  if (Type::isVoid(functionType->result()))
     return VoidResult{};
-  if (!Type::isScalar(functionType->result))
+  if (!Type::isScalar(functionType->result()))
     fail("function result is not a scalar value");
-  return RValue{callInst, functionType->result};
+  return RValue{callInst, functionType->result()};
 }

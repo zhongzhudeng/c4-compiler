@@ -89,23 +89,20 @@ std::string Printer::parameterString(DeclId id) const {
 
 std::string Printer::typeSpecFlat(TypeSpecId id) const {
   const TypeSpec &spec = ast_.typeSpec(id);
-  switch (spec.kind) {
-  case TypeSpec::Kind::Void:
+  if (std::holds_alternative<TypeSpec::Void>(spec.node))
     return "void";
-  case TypeSpec::Kind::Char:
+  if (std::holds_alternative<TypeSpec::Char>(spec.node))
     return "char";
-  case TypeSpec::Kind::Int:
+  if (std::holds_alternative<TypeSpec::Int>(spec.node))
     return "int";
-  case TypeSpec::Kind::Struct:
-    break;
-  }
 
+  const TypeSpec::Struct &structure = std::get<TypeSpec::Struct>(spec.node);
   std::string result = "struct";
-  if (spec.tag)
-    result += " " + *spec.tag;
-  if (spec.hasBraces) {
+  if (structure.tag)
+    result += " " + *structure.tag;
+  if (structure.hasBraces) {
     result += " {";
-    for (DeclId field : spec.fields)
+    for (DeclId field : structure.fields)
       result += " " + fieldFlat(field);
     result += " }";
   }
@@ -194,40 +191,41 @@ std::string Printer::expressionString(ExprId id) const {
 
   auto *sizeOf = std::get_if<SizeofExpr>(&expr.node);
   assert(sizeOf && "unknown expression kind");
-  if (!sizeOf->isType)
-    return "(sizeof " + expressionString(sizeOf->operand) + ")";
-
-  std::string typeName = typeSpecFlat(sizeOf->typeSpec);
-  std::string declarator = declaratorString(sizeOf->typeDeclarator);
-  if (!declarator.empty())
-    typeName += " " + declarator;
-  return "(sizeof(" + typeName + "))";
+  if (auto *typeName = std::get_if<SizeofExpr::TypeName>(&sizeOf->target)) {
+    std::string spelling = typeSpecFlat(typeName->spec);
+    std::string declarator = declaratorString(typeName->declarator);
+    if (!declarator.empty())
+      spelling += " " + declarator;
+    return "(sizeof(" + spelling + "))";
+  }
+  return "(sizeof " + expressionString(std::get<ExprId>(sizeOf->target)) +
+         ")";
 }
 
 void Printer::printTypeSpec(TypeSpecId id, int level) {
   const TypeSpec &spec = ast_.typeSpec(id);
-  switch (spec.kind) {
-  case TypeSpec::Kind::Void:
+  if (std::holds_alternative<TypeSpec::Void>(spec.node)) {
     out_ << "void";
     return;
-  case TypeSpec::Kind::Char:
+  }
+  if (std::holds_alternative<TypeSpec::Char>(spec.node)) {
     out_ << "char";
     return;
-  case TypeSpec::Kind::Int:
+  }
+  if (std::holds_alternative<TypeSpec::Int>(spec.node)) {
     out_ << "int";
     return;
-  case TypeSpec::Kind::Struct:
-    break;
   }
 
+  const TypeSpec::Struct &structure = std::get<TypeSpec::Struct>(spec.node);
   out_ << "struct";
-  if (spec.tag)
-    out_ << ' ' << *spec.tag;
-  if (spec.hasBraces) {
+  if (structure.tag)
+    out_ << ' ' << *structure.tag;
+  if (structure.hasBraces) {
     out_ << '\n';
     indent(level);
     out_ << "{\n";
-    for (DeclId field : spec.fields)
+    for (DeclId field : structure.fields)
       printDecl(field, level + 1);
     indent(level);
     out_ << "}";

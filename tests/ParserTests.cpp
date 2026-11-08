@@ -30,20 +30,22 @@ TEST_CASE("parser expands comma-separated struct members", "[parser]") {
   auto *tag = std::get_if<TagDecl>(&ast.decl(declarations[0]).node);
   REQUIRE(tag != nullptr);
   const TypeSpec &spec = ast.typeSpec(tag->spec);
-  REQUIRE(spec.fields.size() == 3);
+  auto *structure = std::get_if<TypeSpec::Struct>(&spec.node);
+  REQUIRE(structure != nullptr);
+  REQUIRE(structure->fields.size() == 3);
 
   const char *names[] = {"a", "p", "b"};
   TypeSpecId memberSpec =
-      std::get<FieldDecl>(ast.decl(spec.fields[0]).node).spec;
-  for (size_t i = 0; i < spec.fields.size(); ++i) {
-    auto *field = std::get_if<FieldDecl>(&ast.decl(spec.fields[i]).node);
+      std::get<FieldDecl>(ast.decl(structure->fields[0]).node).spec;
+  for (size_t i = 0; i < structure->fields.size(); ++i) {
+    auto *field = std::get_if<FieldDecl>(&ast.decl(structure->fields[i]).node);
     REQUIRE(field != nullptr);
     REQUIRE(field->spec == memberSpec);
     REQUIRE(*declaratorName(ast, field->declarator) == names[i]);
   }
   REQUIRE(std::holds_alternative<PointerDeclarator>(
       ast.declarator(
-          std::get<FieldDecl>(ast.decl(spec.fields[1]).node).declarator)
+          std::get<FieldDecl>(ast.decl(structure->fields[1]).node).declarator)
           .node));
 }
 
@@ -103,10 +105,11 @@ TEST_CASE("parser keeps abstract pointer declarators", "[parser]") {
   REQUIRE(returnStmt != nullptr);
   auto *sizeOf = std::get_if<SizeofExpr>(&ast.expr(returnStmt->expr).node);
   REQUIRE(sizeOf != nullptr);
-  REQUIRE(sizeOf->isType);
-  REQUIRE(sizeOf->typeDeclarator.valid());
+  auto *typeName = std::get_if<SizeofExpr::TypeName>(&sizeOf->target);
+  REQUIRE(typeName != nullptr);
+  REQUIRE(typeName->declarator.valid());
   REQUIRE(std::holds_alternative<PointerDeclarator>(
-      ast.declarator(sizeOf->typeDeclarator).node));
+      ast.declarator(typeName->declarator).node));
 }
 
 TEST_CASE("parser classifies function declarators by their name shape",

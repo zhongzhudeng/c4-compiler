@@ -76,7 +76,7 @@ Source files:
     src/Lexer.*            maximal-munch lexer, comments, constants, escapes
     src/SymbolInternalizer.*  string interning (Symbol = const std::string*)
     src/AST.*              vector-owned AST, typed IDs, declarator queries
-    src/Type.*             interned types, TypeLayout over llvm::DataLayout
+    src/Type.*             interned algebraic types, TypeLayout over DataLayout
     src/SemanticModel.*    entities, scopes, and per-node semantic results
     src/Parser.*           recursive-descent / precedence-climbing parser
     src/Sema.*             scopes, declarators, type checking, labels
@@ -97,6 +97,10 @@ Source files:
 - Node kinds are std::variant alternatives (ExprNode, StmtNode, DeclNode,
   DeclaratorNode).  The source location lives in the wrapper (Expr, Stmt,
   Decl, Declarator).
+- TypeSpec is a variant of Void/Char/Int/Struct, and SizeofExpr is a variant
+  of an expression operand or a type-name form.  Struct-only tag/field data
+  exists only on TypeSpec::Struct, and neither sizeof form can carry the
+  other form's payload.
 - No code holds pointers/references into AST vectors across an insertion.
   Parsing finishes before Sema/CodeGen, so later phases obtain short-lived
   references through ast.expr(id) etc.
@@ -151,12 +155,33 @@ visible in the body, the scope is reparented to the declaration's enclosing
 scope, and labels are bound there.  Prototype scopes of non-defining or
 nested declarators remain dead and cannot leak names into the body.
 
-### Type interning
+### Type representation and interning
 
-TypeContext interns canonical Type objects; type equality is pointer equality.
-Type supports void, char, int, pointer, function, struct, and an array type
-used only for string literals (C4 has no array declarators).  Struct types
-point to a mutable StructDecl, enabling recursive/incomplete types.
+Type is a discriminated union (std::variant) with one alternative per C4
+category:
+
+- Void, Char, Int: no payload.
+- Pointer{pointee}.
+- Function{result, params}.
+- Struct{record}: a semantic StructDecl*, not a tag spelling.
+- Array{element, count}: used only for string literals (C4 has no array
+  declarators).
+
+There is no separate Kind field.  Category-specific data is reached through
+checked accessors (pointee(), element(), count(), result(), params(),
+record()), each of which uses std::get and therefore fails loudly on a
+mismatched access.  is<T>()/getIf<T>() provide category inspection; the
+static predicates (isInteger, isPointer, isFunction, isObject, ...) are thin
+queries over the variant.  Type objects are immutable once interned.
+
+TypeContext remains the canonical interner: structurally identical pointer,
+function, and array types share one Type object; struct types are keyed by
+their StructDecl identity; primitive types are singletons.  Type objects are
+owned by TypeContext in stable heap storage, so const Type* is a stable
+canonical handle.  Incomplete and completed references to the same struct
+retain the same Type, recursive structs through pointers work, and shadowed
+tags have distinct identities.
+
 TypeLayout maps types to LLVM types and uses the host llvm::DataLayout for
 sizes, alignment, and field offsets; Sema and CodeGen share it, so sizeof
 cannot drift from the generated layout.
@@ -330,6 +355,10 @@ while.body; the deleted branches and blocks are gone.
     an internal error, never a synthesized global.
 13. FunctionEmitter state has exactly one function-definition lifetime; no
     module-level mutable function state exists.
+14. Type categories are variant alternatives; category data is reachable only
+    through checked accessors, and canonical Type* identity is preserved.
+15. TypeSpec and SizeofExpr encode their mutually exclusive syntactic forms
+    directly; an absent abstract declarator remains representable.
 
 ## Build and test
 
@@ -344,12 +373,16 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 
 ## Verification
 
-- 76 Catch2 test cases (lexer, parser, Sema, printer, codegen, SCCP) plus the
-  end-to-end harness (77 CTest tests), all passing in Debug and Release.
+- 84 Catch2 test cases (lexer, parser, Sema, types/AST, printer, codegen,
+  SCCP) plus the end-to-end harness (85 CTest tests), all passing in Debug and
+  Release.
   Nine Sema cases are architectural regressions for entity identity, binding
   identity, and scope lifetime; eleven CodeGen cases cover typed expression
   results, missing local storage, conversions, calls, control flow, and
-  function-state isolation.
+  function-state isolation; eight Type/AST cases cover canonical
+  primitive/pointer/function/array/struct identity, incomplete-to-complete
+  struct identity, predicates and printing, TypeLayout sizes and offsets, both
+  sizeof forms, TypeSpec alternatives, and checked category access.
 - End-to-end suite tests/e2e/run_e2e.py: 23 accepted programs x
   {--compile, --optimize} plus 14 rejected programs (430 checks); each
   accepted program is compiled to .ll, linked with clang, executed, and
@@ -382,6 +415,7 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 - [x] End-to-end and differential tests.
 - [x] Full CTest verification.
 - [x] CodeGen redesign: typed expression results and function-scoped emitters.
+- [x] Algebraic Type representation and AST invariant cleanup.
 
 ## Known limitations (within the assignment scope)
 

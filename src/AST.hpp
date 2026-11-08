@@ -113,12 +113,17 @@ struct MemberExpr {
 };
 
 struct SizeofExpr {
-  // For sizeof unary-expression, operand is valid.  For sizeof(type-name),
-  // typeSpec is valid and operand is invalid.
-  ExprId operand;
-  TypeSpecId typeSpec;
-  DeclaratorId typeDeclarator;
-  bool isType = false;
+  // sizeof unary-expression or sizeof(type-name).  The variant makes the two
+  // syntactic forms mutually exclusive: an expression form cannot carry a
+  // type-name payload, and a type-name form cannot carry an operand.  The
+  // expression alternative always holds a valid ExprId; the type-name form's
+  // declarator is invalid for an abstract type name.
+  struct TypeName {
+    TypeSpecId spec;
+    DeclaratorId declarator; // invalid for an abstract type name
+  };
+
+  std::variant<ExprId, TypeName> target;
 };
 
 using ExprNode = std::variant<IdentifierExpr, ConstantExpr, StringLiteralExpr,
@@ -219,12 +224,22 @@ struct Declarator {
 };
 
 struct TypeSpec {
-  enum class Kind { Void, Char, Int, Struct };
-  Kind kind = Kind::Void;
+  struct Void {};
+  struct Char {};
+  struct Int {};
+
+  struct Struct {
+    Symbol tag = nullptr;          // struct tag; may be null
+    std::vector<DeclId> fields;    // field declarations
+    bool hasBraces = false;        // syntactically contains { ... }
+  };
+
+  using Node = std::variant<Void, Char, Int, Struct>;
+
   SourceLoc loc;
-  Symbol tag = nullptr;              // struct tag; may be null
-  std::vector<DeclId> fields;        // field declarations
-  bool hasBraces = false;            // syntactically contains { ... }
+  Node node;
+
+  TypeSpec(SourceLoc location, Node n) : loc(location), node(std::move(n)) {}
 };
 
 // ---------------------------------------------------------------------------
