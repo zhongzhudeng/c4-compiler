@@ -143,3 +143,34 @@ TEST_CASE("codegen accepts the reference pretty fixture", "[codegen]") {
   REQUIRE(compiler.compile(buffer.str(), /*optimize=*/false, &ir, &error));
   REQUIRE(contains(ir, "define i32 @main"));
 }
+
+TEST_CASE("codegen coerces conditional arms in their predecessor blocks",
+          "[codegen]") {
+  const std::string thenArm =
+      "int f(int x) { char c; c = 1; return x ? c : 2; }";
+  std::string ir = compileOrFail(thenArm);
+  size_t thenBlock = ir.find("cond.then:");
+  size_t thenSext = ir.find("sext i8", thenBlock);
+  size_t thenBranch = ir.find("br label %cond.end", thenBlock);
+  REQUIRE(thenBlock != std::string::npos);
+  REQUIRE(thenSext != std::string::npos);
+  REQUIRE(thenBranch != std::string::npos);
+  REQUIRE(thenSext < thenBranch);
+
+  const std::string elseArm =
+      "int f(int x) { char c; c = 3; return x ? 2 : c; }";
+  ir = compileOrFail(elseArm);
+  size_t elseBlock = ir.find("cond.else:");
+  size_t elseSext = ir.find("sext i8", elseBlock);
+  size_t elseBranch = ir.find("br label %cond.end", elseBlock);
+  REQUIRE(elseBlock != std::string::npos);
+  REQUIRE(elseSext != std::string::npos);
+  REQUIRE(elseBranch != std::string::npos);
+  REQUIRE(elseSext < elseBranch);
+
+  const std::string nested =
+      "int f(int x) { char c; c = 4; "
+      "return x ? (x ? c : 2) : c; }";
+  compileOrFail(nested);
+  compileOrFail(nested, /*optimize=*/true);
+}

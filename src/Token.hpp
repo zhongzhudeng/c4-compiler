@@ -27,11 +27,12 @@ struct Token {
   TokenKind Kind = TK_EOI;
   Symbol Text = nullptr;
   SourceLoc Loc;
-  std::string FileName;
+  // Interned; the token stream does not own a copy of the filename.
+  Symbol FileName = nullptr;
 
   Token() = default;
-  Token(SourceLoc loc, TokenKind kind, Symbol text, std::string filename)
-      : Kind(kind), Text(text), Loc(loc), FileName(std::move(filename)) {}
+  Token(SourceLoc loc, TokenKind kind, Symbol text, Symbol filename)
+      : Kind(kind), Text(text), Loc(loc), FileName(filename) {}
 
   bool is(TokenKind kind) const { return Kind == kind; }
   bool isCanonical(TokenKind kind) const {

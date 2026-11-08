@@ -78,6 +78,7 @@ constexpr Punctuator kPunctuators[] = {
 Lexer::Lexer(std::string filename, SymbolInternalizer &symbols)
     : filename_(std::move(filename)), symbols_(symbols),
       diagnostics_(filename_) {
+  filenameSymbol_ = symbols_.internalize(filename_);
   std::ifstream stream(filename_, std::ios::binary);
   if (!stream) {
     diagnostics_.error(SourceLoc{1, 1}, "cannot open input file");
@@ -89,7 +90,9 @@ Lexer::Lexer(std::string filename, SymbolInternalizer &symbols)
 Lexer::Lexer(std::string filename, std::string source,
              SymbolInternalizer &symbols)
     : filename_(std::move(filename)), source_(std::move(source)),
-      symbols_(symbols), diagnostics_(filename_) {}
+      symbols_(symbols), diagnostics_(filename_) {
+  filenameSymbol_ = symbols_.internalize(filename_);
+}
 
 int Lexer::peek(size_t offset) const {
   if (pos_ + offset >= source_.size())
@@ -188,7 +191,7 @@ void Lexer::fail(SourceLoc loc, const std::string &message) const {
 
 Token Lexer::makeToken(TokenKind kind, SourceLoc start, size_t begin) const {
   std::string_view spelling(source_.data() + begin, pos_ - begin);
-  return Token(start, kind, symbols_.internalize(spelling), filename_);
+  return Token(start, kind, symbols_.internalize(spelling), filenameSymbol_);
 }
 
 TokenKind Lexer::lexNumber() {
@@ -327,7 +330,7 @@ std::vector<Token> Lexer::tokenize() {
     SourceLoc start = here();
     if (eof()) {
       tokens.push_back(
-          Token(start, TK_EOI, symbols_.internalize(""), filename_));
+          Token(start, TK_EOI, symbols_.internalize(""), filenameSymbol_));
       return tokens;
     }
     tokens.push_back(lexToken());

@@ -35,6 +35,7 @@ private:
   uint32_t column_ = 1;
   SymbolInternalizer &symbols_;
   Diagnostics diagnostics_;
+  Symbol filenameSymbol_ = nullptr;
 
   int peek(size_t offset = 0) const;
   bool eof(size_t offset = 0) const;

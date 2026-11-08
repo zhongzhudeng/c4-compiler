@@ -12,7 +12,7 @@
 
 class Sema {
 public:
-  Sema(AST &ast, SemanticModel &model, TypeContext &types,
+  Sema(const AST &ast, SemanticModel &model, TypeContext &types,
        TypeLayout &layout, Diagnostics &diagnostics);
 
   void analyze();
@@ -39,7 +39,7 @@ private:
     std::vector<std::pair<StmtId, Symbol>> pendingGotos;
   };
 
-  AST &ast_;
+  const AST &ast_;
   SemanticModel &model_;
   TypeContext &types_;
   TypeLayout &layout_;
@@ -54,6 +54,9 @@ private:
   // tracked through the program scope's ordinary namespace.
   std::unordered_map<Symbol, DeclId> globalFunctions_;
   std::unordered_map<Symbol, DeclId> functionDefinitions_;
+  // File-scope tentative definitions are validated for completeness only at
+  // the end of the translation unit, when all struct tags are known.
+  std::vector<std::pair<DeclId, SourceLoc>> tentativeObjects_;
 
   void pushScope();
   void popScope();
@@ -65,11 +68,11 @@ private:
                        const Type *type, SourceLoc loc, bool isDefinition);
   void declareLocal(Symbol name, DeclId decl, SourceLoc loc);
 
-  const Type *resolveTypeSpec(TypeSpecId id);
+  const Type *resolveTypeSpec(TypeSpecId id, bool declareTag = false);
   DeclResult resolveDeclarator(DeclaratorId id, const Type *base);
   const Type *adjustParameterType(const Type *type, SourceLoc loc);
-  void validateObjectType(const Type *type, SourceLoc loc,
-                          const char *what) const;
+  void validateObjectType(const Type *type, SourceLoc loc, const char *what,
+                          bool requireComplete = true) const;
   void validateFunctionType(const Type *type, SourceLoc loc) const;
   void validateFieldType(const Type *type, Symbol name, SourceLoc loc) const;
   bool isCompleteObject(const Type *type) const;

@@ -549,6 +549,8 @@ bool Parser::isAssignmentLHS(ExprId id) const {
 }
 
 void Parser::parseTranslationUnit() {
+  if (atEnd())
+    error(loc(), "expected external declaration");
   while (!atEnd())
     ast_.translationUnit().decls.push_back(parseExternalDeclaration());
 }

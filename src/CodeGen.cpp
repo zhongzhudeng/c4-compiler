@@ -710,6 +710,8 @@ llvm::Value *CodeGen::emitLogical(ExprId id, const BinaryExpr &binary,
 
 llvm::Value *CodeGen::emitConditional(ExprId id,
                                       const ConditionalExpr &conditional) {
+  const Type *type = model_.expr(id).type;
+  SourceLoc loc = ast_.expr(id).loc;
   llvm::Value *condition = toBool(conditional.cond);
   llvm::BasicBlock *thenBlock =
       llvm::BasicBlock::Create(context_, "cond.then", function_);
@@ -720,26 +722,26 @@ llvm::Value *CodeGen::emitConditional(ExprId id,
   builder_.CreateCondBr(condition, thenBlock, elseBlock);
 
   builder_.SetInsertPoint(thenBlock);
-  llvm::Value *thenValue = emitExpr(conditional.thenExpr);
+  llvm::Value *thenValue =
+      coerce(emitExpr(conditional.thenExpr), type, loc);
   llvm::BasicBlock *thenEnd = builder_.GetInsertBlock();
   builder_.CreateBr(endBlock);
 
   builder_.SetInsertPoint(elseBlock);
-  llvm::Value *elseValue = emitExpr(conditional.elseExpr);
+  llvm::Value *elseValue =
+      coerce(emitExpr(conditional.elseExpr), type, loc);
   llvm::BasicBlock *elseEnd = builder_.GetInsertBlock();
   builder_.CreateBr(endBlock);
 
   builder_.SetInsertPoint(endBlock);
 
-  const Type *type = model_.expr(id).type;
   if (Type::isVoid(type))
     return nullptr;
 
-  SourceLoc loc = ast_.expr(id).loc;
   llvm::PHINode *phi =
       builder_.CreatePHI(layout_.llvmType(type), 2, "cond");
-  phi->addIncoming(coerce(thenValue, type, loc), thenEnd);
-  phi->addIncoming(coerce(elseValue, type, loc), elseEnd);
+  phi->addIncoming(thenValue, thenEnd);
+  phi->addIncoming(elseValue, elseEnd);
   return phi;
 }
 

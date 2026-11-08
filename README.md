@@ -95,11 +95,11 @@ $ echo $?
 
 make test runs:
 
-- 46 Catch2 test cases covering the lexer, parser, Sema, pretty printer, code
+- 54 Catch2 test cases covering the lexer, parser, Sema, pretty printer, code
   generation, and SCCP.
-- An end-to-end e2e CTest that compiles 17 accepted programs with both
+- An end-to-end e2e CTest that compiles 20 accepted programs with both
   --compile and --optimize, links and runs them, compares the results with
-  clang, checks --print-ast round trips, and verifies that 7 invalid programs
+  clang, checks --print-ast round trips, and verifies that 10 invalid programs
   are rejected with the required diagnostic format and no .ll output.
 
 The e2e test is only registered when Python 3 and clang are available at

@@ -9,6 +9,7 @@
 #include "Sema.hpp"
 
 #include "llvm/IR/Module.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/FileSystem.h"
@@ -24,12 +25,20 @@
 
 Compiler::Compiler(std::string filename)
     : filename_(std::move(filename)), diagnostics_(filename_) {
-  initializeTarget();
+  // Frontend-only modes do not need target registration.  A default
+  // DataLayout is enough for their semantic analysis; the real target layout
+  // is created lazily by compile().
+  dataLayout_ = std::make_unique<llvm::DataLayout>("");
+  layout_ = std::make_unique<TypeLayout>(context_, *dataLayout_);
 }
 
 Compiler::~Compiler() = default;
 
 void Compiler::initializeTarget() {
+  if (targetInitialized_)
+    return;
+  targetInitialized_ = true;
+
   llvm::InitializeAllTargetInfos();
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
@@ -45,14 +54,15 @@ void Compiler::initializeTarget() {
         triple, "generic", "", options, std::nullopt));
   }
 
-  if (targetMachine_)
-    dataLayout_ = std::make_unique<llvm::DataLayout>(
-        targetMachine_->createDataLayout());
-  else
-    dataLayout_ = std::make_unique<llvm::DataLayout>(
-        "e-m:o-i64:64-i128:128-n32:64-S128");
-
-  layout_ = std::make_unique<TypeLayout>(context_, *dataLayout_);
+  auto dataLayout =
+      targetMachine_
+          ? std::make_unique<llvm::DataLayout>(
+                targetMachine_->createDataLayout())
+          : std::make_unique<llvm::DataLayout>(
+                "e-m:o-i64:64-i128:128-n32:64-S128");
+  auto layout = std::make_unique<TypeLayout>(context_, *dataLayout);
+  dataLayout_ = std::move(dataLayout);
+  layout_ = std::move(layout);
 }
 
 void Compiler::runFrontend() {
@@ -85,6 +95,7 @@ int Compiler::printAst() {
 }
 
 int Compiler::compile(bool optimize) {
+  initializeTarget();
   runFrontend();
 
   std::string output = filename_;

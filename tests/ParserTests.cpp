@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <stdexcept>
 #include <string>
 #include <variant>
 
@@ -102,4 +103,22 @@ TEST_CASE("parser accepts duplicate definitions for semantic analysis",
   TestCompiler compiler;
   REQUIRE(compiler.parse(
       "int f(void) { return 0; } int f(void) { return 1; }"));
+}
+
+TEST_CASE("parser rejects an empty translation unit", "[parser]") {
+  TestCompiler compiler;
+  std::string error;
+  REQUIRE_FALSE(compiler.parse("", &error));
+  REQUIRE(error.find("test.c:1:1: error: expected external declaration") !=
+          std::string::npos);
+  REQUIRE_FALSE(compiler.parse("// a comment is not an external declaration\n"));
+  REQUIRE_FALSE(compiler.parse(" \n\t\n"));
+}
+
+TEST_CASE("AST rejects malformed node ids", "[ast]") {
+  AST ast;
+  REQUIRE_THROWS_AS(ast.expr(ExprId{}), std::out_of_range);
+  REQUIRE_THROWS_AS(ast.expr(ExprId(0)), std::out_of_range);
+  REQUIRE_THROWS_AS(ast.decl(DeclId(7)), std::out_of_range);
+  REQUIRE_THROWS_AS(ast.typeSpec(TypeSpecId(1)), std::out_of_range);
 }

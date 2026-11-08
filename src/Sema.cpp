@@ -112,7 +112,7 @@ SourceLoc declarationNameLoc(const AST &ast, DeclId id) {
 
 } // namespace
 
-Sema::Sema(AST &ast, SemanticModel &model, TypeContext &types,
+Sema::Sema(const AST &ast, SemanticModel &model, TypeContext &types,
            TypeLayout &layout, Diagnostics &diagnostics)
     : ast_(ast), model_(model), types_(types), layout_(layout),
       diagnostics_(diagnostics) {
@@ -123,6 +123,8 @@ Sema::Sema(AST &ast, SemanticModel &model, TypeContext &types,
 void Sema::analyze() {
   for (DeclId id : ast_.translationUnit().decls)
     analyzeTopLevel(id);
+  for (const auto &[id, loc] : tentativeObjects_)
+    validateObjectType(model_.decl(id).type, loc, "variable");
 }
 
 void Sema::pushScope() {
@@ -249,8 +251,8 @@ void Sema::declareLocal(Symbol name, DeclId decl, SourceLoc loc) {
   info.isTentative = false;
 }
 
-const Type *Sema::resolveTypeSpec(TypeSpecId id) {
-  TypeSpec &spec = ast_.typeSpec(id);
+const Type *Sema::resolveTypeSpec(TypeSpecId id, bool declareTag) {
+  const TypeSpec &spec = ast_.typeSpec(id);
   switch (spec.kind) {
   case TypeSpec::Kind::Void:
     return types_.voidType();
@@ -290,7 +292,7 @@ const Type *Sema::resolveTypeSpec(TypeSpecId id) {
 
     std::unordered_set<Symbol> fieldNames;
     for (DeclId fieldId : spec.fields) {
-      Decl &field = ast_.decl(fieldId);
+      const Decl &field = ast_.decl(fieldId);
       auto *fieldDecl = std::get_if<FieldDecl>(&field.node);
       if (!fieldDecl)
         diagnostics_.error(field.loc, "invalid struct member");
@@ -329,11 +331,24 @@ const Type *Sema::resolveTypeSpec(TypeSpecId id) {
   if (!spec.tag)
     diagnostics_.error(spec.loc, "expected struct tag or declaration");
 
-  record = lookupTag(spec.tag);
-  if (!record) {
-    record = model_.addStruct(spec.tag, spec.loc, false);
-    record->type = types_.structType(record);
-    current_->tags[spec.tag] = record;
+  if (declareTag) {
+    // A declaration of the form "struct S;" declares the tag in the current
+    // scope even when an outer scope already declares a tag with that name.
+    auto it = current_->tags.find(spec.tag);
+    if (it != current_->tags.end()) {
+      record = it->second;
+    } else {
+      record = model_.addStruct(spec.tag, spec.loc, false);
+      record->type = types_.structType(record);
+      current_->tags[spec.tag] = record;
+    }
+  } else {
+    record = lookupTag(spec.tag);
+    if (!record) {
+      record = model_.addStruct(spec.tag, spec.loc, false);
+      record->type = types_.structType(record);
+      current_->tags[spec.tag] = record;
+    }
   }
   model_.typeSpec(id).record = record;
   return types_.structType(record);
@@ -358,7 +373,7 @@ Sema::DeclResult Sema::resolveDeclarator(DeclaratorId id, const Type *base) {
     std::unordered_set<Symbol> parameterNames;
 
     for (DeclId paramId : parameters) {
-      Decl &param = ast_.decl(paramId);
+      const Decl &param = ast_.decl(paramId);
       auto *paramDecl = std::get_if<ParamDecl>(&param.node);
       if (!paramDecl)
         diagnostics_.error(param.loc, "invalid parameter declaration");
@@ -426,14 +441,14 @@ bool Sema::isCompleteObject(const Type *type) const {
   return true;
 }
 
-void Sema::validateObjectType(const Type *type, SourceLoc loc,
-                              const char *what) const {
+void Sema::validateObjectType(const Type *type, SourceLoc loc, const char *what,
+                              bool requireComplete) const {
   if (Type::isVoid(type))
     diagnostics_.error(loc,
                        std::string(what) + " has incomplete type 'void'");
   if (Type::isFunction(type))
     diagnostics_.error(loc, std::string(what) + " declared as a function");
-  if (!isCompleteObject(type))
+  if (requireComplete && !isCompleteObject(type))
     diagnostics_.error(loc, std::string(what) + " has incomplete type '" +
                                  TypeContext::toString(type) + "'");
 }
@@ -477,7 +492,7 @@ void Sema::validateFieldType(const Type *type, Symbol name,
 }
 
 void Sema::analyzeTopLevel(DeclId id) {
-  Decl &decl = ast_.decl(id);
+  const Decl &decl = ast_.decl(id);
 
   if (auto *var = std::get_if<VarDecl>(&decl.node)) {
     const Type *base = resolveTypeSpec(var->spec);
@@ -485,7 +500,13 @@ void Sema::analyzeTopLevel(DeclId id) {
     SourceLoc nameLoc = result.nameLoc.line ? result.nameLoc : decl.loc;
     if (!result.name)
       diagnostics_.error(nameLoc, "declaration requires a name");
-    validateObjectType(result.type, nameLoc, "variable");
+    // A file-scope object declaration without an initializer is a tentative
+    // definition.  C11 permits an incomplete type here if the type is
+    // completed later in the translation unit, so completeness is checked
+    // after all top-level declarations have been analyzed.
+    validateObjectType(result.type, nameLoc, "variable",
+                       /*requireComplete=*/false);
+    tentativeObjects_.emplace_back(id, nameLoc);
     declareGlobal(result.name, id, false, result.type, nameLoc, false);
     model_.decl(id).type = result.type;
     model_.decl(id).name = result.name;
@@ -519,7 +540,7 @@ void Sema::analyzeTopLevel(DeclId id) {
   }
 
   if (auto *tag = std::get_if<TagDecl>(&decl.node)) {
-    const Type *type = resolveTypeSpec(tag->spec);
+    const Type *type = resolveTypeSpec(tag->spec, /*declareTag=*/true);
     model_.decl(id).type = type;
     model_.decl(id).record = model_.typeSpec(tag->spec).record;
     model_.decl(id).isGlobal = current_ == programScope();
@@ -530,7 +551,7 @@ void Sema::analyzeTopLevel(DeclId id) {
 }
 
 void Sema::analyzeLocalDecl(DeclId id) {
-  Decl &decl = ast_.decl(id);
+  const Decl &decl = ast_.decl(id);
 
   if (auto *var = std::get_if<VarDecl>(&decl.node)) {
     const Type *base = resolveTypeSpec(var->spec);
@@ -562,7 +583,7 @@ void Sema::analyzeLocalDecl(DeclId id) {
   }
 
   if (auto *tag = std::get_if<TagDecl>(&decl.node)) {
-    const Type *type = resolveTypeSpec(tag->spec);
+    const Type *type = resolveTypeSpec(tag->spec, /*declareTag=*/true);
     model_.decl(id).type = type;
     model_.decl(id).record = model_.typeSpec(tag->spec).record;
     model_.decl(id).isGlobal = false;
@@ -582,6 +603,15 @@ void Sema::analyzeLocalFunction(DeclId id, const DeclResult &result) {
   model_.decl(id).isDefinition = false;
   model_.decl(id).params = result.params;
 
+  // A block-scope function declaration has external linkage.  A file-scope
+  // object with the same name conflicts with it, but an object in an
+  // enclosing block does not: the function declaration hides that object.
+  auto globalObjectIt = programScope()->ordinary.find(result.name);
+  if (globalObjectIt != programScope()->ordinary.end() &&
+      !model_.decl(globalObjectIt->second).isFunction)
+    diagnostics_.error(nameLoc, "redefinition of '" + *result.name +
+                                    "' as a different kind of symbol");
+
   auto currentIt = current_->ordinary.find(result.name);
   if (currentIt != current_->ordinary.end()) {
     const DeclInfo &old = model_.decl(currentIt->second);
@@ -597,15 +627,16 @@ void Sema::analyzeLocalFunction(DeclId id, const DeclResult &result) {
   DeclId visible = lookupOrdinary(result.name);
   if (visible.valid()) {
     const DeclInfo &old = model_.decl(visible);
-    if (!old.isFunction)
-      diagnostics_.error(nameLoc, "redefinition of '" + *result.name +
-                                      "' as a different kind of symbol");
-    if (old.type != result.type)
-      diagnostics_.error(nameLoc, "conflicting types for '" + *result.name +
-                                      "'");
-    current_->ordinary[result.name] = visible;
-    globalFunctions_.emplace(result.name, visible);
-    return;
+    if (old.isFunction) {
+      if (old.type != result.type)
+        diagnostics_.error(nameLoc, "conflicting types for '" + *result.name +
+                                        "'");
+      current_->ordinary[result.name] = visible;
+      globalFunctions_.emplace(result.name, visible);
+      return;
+    }
+    // The visible symbol is an object in an enclosing block.  The function
+    // declaration hides it and denotes the external function instead.
   }
 
   auto globalIt = globalFunctions_.find(result.name);
@@ -676,7 +707,7 @@ void Sema::analyzeCompound(StmtId id, bool push) {
 }
 
 void Sema::analyzeStmt(StmtId id) {
-  Stmt &stmt = ast_.stmt(id);
+  const Stmt &stmt = ast_.stmt(id);
   SourceLoc loc = stmt.loc;
 
   if (std::holds_alternative<CompoundStmt>(stmt.node)) {
@@ -754,7 +785,7 @@ void Sema::analyzeStmt(StmtId id) {
 
   if (auto *labelStmt = std::get_if<LabelStmt>(&stmt.node)) {
     assert(function_ && "label outside of a function");
-    LabelDecl &label = ast_.label(labelStmt->label);
+    const LabelDecl &label = ast_.label(labelStmt->label);
     if (function_->labels.count(label.name))
       diagnostics_.error(label.loc,
                          "redefinition of label '" + *label.name + "'");
@@ -889,7 +920,7 @@ ExprInfo &Sema::checkExpr(ExprId id) {
   if (info.type)
     return info;
 
-  Expr &expr = ast_.expr(id);
+  const Expr &expr = ast_.expr(id);
   SourceLoc loc = expr.loc;
 
   if (auto *identifier = std::get_if<IdentifierExpr>(&expr.node)) {

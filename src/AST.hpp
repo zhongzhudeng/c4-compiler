@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <variant>
 #include <vector>
@@ -281,86 +282,92 @@ struct TranslationUnit {
 class AST {
 public:
   template <typename T> ExprId addExpr(SourceLoc loc, T node) {
+    uint32_t index = nextIndex(exprs_.size(), "expression");
     exprs_.emplace_back(loc, ExprNode(std::move(node)));
-    return ExprId(static_cast<uint32_t>(exprs_.size() - 1));
+    return ExprId(index);
   }
 
   template <typename T> StmtId addStmt(SourceLoc loc, T node) {
+    uint32_t index = nextIndex(stmts_.size(), "statement");
     stmts_.emplace_back(loc, StmtNode(std::move(node)));
-    return StmtId(static_cast<uint32_t>(stmts_.size() - 1));
+    return StmtId(index);
   }
 
   template <typename T> DeclId addDecl(SourceLoc loc, T node) {
+    uint32_t index = nextIndex(decls_.size(), "declaration");
     decls_.emplace_back(loc, DeclNode(std::move(node)));
-    return DeclId(static_cast<uint32_t>(decls_.size() - 1));
+    return DeclId(index);
   }
 
   template <typename T> DeclaratorId addDeclarator(SourceLoc loc, T node) {
+    uint32_t index = nextIndex(declarators_.size(), "declarator");
     declarators_.emplace_back(loc, DeclaratorNode(std::move(node)));
-    return DeclaratorId(static_cast<uint32_t>(declarators_.size() - 1));
+    return DeclaratorId(index);
   }
 
   TypeSpecId addTypeSpec(TypeSpec spec) {
+    uint32_t index = nextIndex(typeSpecs_.size(), "type specifier");
     typeSpecs_.push_back(std::move(spec));
-    return TypeSpecId(static_cast<uint32_t>(typeSpecs_.size() - 1));
+    return TypeSpecId(index);
   }
 
   LabelId addLabel(SourceLoc loc, Symbol name) {
+    uint32_t index = nextIndex(labels_.size(), "label");
     labels_.push_back(LabelDecl{loc, name});
-    return LabelId(static_cast<uint32_t>(labels_.size() - 1));
+    return LabelId(index);
   }
 
   Expr &expr(ExprId id) {
-    assert(id.valid() && id.index < exprs_.size());
+    checkId(id, exprs_.size(), "expression");
     return exprs_[id.index];
   }
   const Expr &expr(ExprId id) const {
-    assert(id.valid() && id.index < exprs_.size());
+    checkId(id, exprs_.size(), "expression");
     return exprs_[id.index];
   }
 
   Stmt &stmt(StmtId id) {
-    assert(id.valid() && id.index < stmts_.size());
+    checkId(id, stmts_.size(), "statement");
     return stmts_[id.index];
   }
   const Stmt &stmt(StmtId id) const {
-    assert(id.valid() && id.index < stmts_.size());
+    checkId(id, stmts_.size(), "statement");
     return stmts_[id.index];
   }
 
   Decl &decl(DeclId id) {
-    assert(id.valid() && id.index < decls_.size());
+    checkId(id, decls_.size(), "declaration");
     return decls_[id.index];
   }
   const Decl &decl(DeclId id) const {
-    assert(id.valid() && id.index < decls_.size());
+    checkId(id, decls_.size(), "declaration");
     return decls_[id.index];
   }
 
   Declarator &declarator(DeclaratorId id) {
-    assert(id.valid() && id.index < declarators_.size());
+    checkId(id, declarators_.size(), "declarator");
     return declarators_[id.index];
   }
   const Declarator &declarator(DeclaratorId id) const {
-    assert(id.valid() && id.index < declarators_.size());
+    checkId(id, declarators_.size(), "declarator");
     return declarators_[id.index];
   }
 
   TypeSpec &typeSpec(TypeSpecId id) {
-    assert(id.valid() && id.index < typeSpecs_.size());
+    checkId(id, typeSpecs_.size(), "type specifier");
     return typeSpecs_[id.index];
   }
   const TypeSpec &typeSpec(TypeSpecId id) const {
-    assert(id.valid() && id.index < typeSpecs_.size());
+    checkId(id, typeSpecs_.size(), "type specifier");
     return typeSpecs_[id.index];
   }
 
   LabelDecl &label(LabelId id) {
-    assert(id.valid() && id.index < labels_.size());
+    checkId(id, labels_.size(), "label");
     return labels_[id.index];
   }
   const LabelDecl &label(LabelId id) const {
-    assert(id.valid() && id.index < labels_.size());
+    checkId(id, labels_.size(), "label");
     return labels_[id.index];
   }
 
@@ -375,6 +382,19 @@ public:
   const TranslationUnit &translationUnit() const { return tu_; }
 
 private:
+  template <typename Id> static void checkId(Id id, size_t size,
+                                             const char *kind) {
+    if (!id.valid() || static_cast<size_t>(id.index) >= size)
+      throw std::out_of_range(std::string("invalid AST ") + kind +
+                              " node id");
+  }
+
+  static uint32_t nextIndex(size_t size, const char *kind) {
+    if (size >= static_cast<size_t>(NodeId<ExprTag>::Invalid))
+      throw std::length_error(std::string("too many AST ") + kind + " nodes");
+    return static_cast<uint32_t>(size);
+  }
+
   std::vector<Expr> exprs_;
   std::vector<Stmt> stmts_;
   std::vector<Decl> decls_;

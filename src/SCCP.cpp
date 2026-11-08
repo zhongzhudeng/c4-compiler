@@ -408,6 +408,28 @@ private:
         continue;
       llvm::BasicBlock *taken =
           branch->getSuccessor(condition->isZero() ? 1 : 0);
+      if (branch->getSuccessor(0) == branch->getSuccessor(1)) {
+        // Both edges entered the same block.  Collapse the duplicate PHI
+        // entries for this predecessor to the one selected by the edge that
+        // the constant condition takes; after the branch becomes
+        // unconditional there is only one predecessor edge.
+        unsigned keptEdge = condition->isZero() ? 1 : 0;
+        for (llvm::PHINode &phi : taken->phis()) {
+          std::vector<unsigned> occurrences;
+          for (unsigned i = 0; i < phi.getNumIncomingValues(); ++i)
+            if (phi.getIncomingBlock(i) == &block)
+              occurrences.push_back(i);
+          if (occurrences.size() <= 1)
+            continue;
+          unsigned keep = occurrences[keptEdge < occurrences.size()
+                                          ? keptEdge
+                                          : occurrences.size() - 1];
+          llvm::Value *keptValue = phi.getIncomingValue(keep);
+          for (auto it = occurrences.rbegin(); it != occurrences.rend(); ++it)
+            phi.removeIncomingValue(*it, /*DeletePHIIfEmpty=*/false);
+          phi.addIncoming(keptValue, &block);
+        }
+      }
       llvm::IRBuilder<> builder(&block, branch->getIterator());
       builder.CreateBr(taken);
       branch->eraseFromParent();
@@ -446,22 +468,22 @@ private:
       }
     }
 
-    // 5. Delete unreachable blocks.  Their PHIs are removed first so that no
-    //    remaining use refers to a block that is about to be destroyed.
+    // 5. Delete unreachable blocks.  Replace their SSA results with poison
+    //    first: dead blocks may still refer to values defined in other dead
+    //    blocks, and destroying one block while another still uses its values
+    //    would leave dangling operands in LLVM's use lists.
     std::vector<llvm::BasicBlock *> dead;
     for (llvm::BasicBlock &block : function_)
       if (!reachable.count(&block))
         dead.push_back(&block);
 
-    for (llvm::BasicBlock *block : dead) {
-      for (auto it = block->begin(); it != block->end();) {
-        llvm::Instruction *instruction = &*it++;
-        if (llvm::isa<llvm::PHINode>(instruction))
-          instruction->eraseFromParent();
-      }
-      block->getTerminator()->eraseFromParent();
-      new llvm::UnreachableInst(function_.getContext(), block);
-    }
+    for (llvm::BasicBlock *block : dead)
+      for (llvm::Instruction &instruction : *block)
+        if (!instruction.getType()->isVoidTy() && !instruction.use_empty())
+          instruction.replaceAllUsesWith(
+              llvm::PoisonValue::get(instruction.getType()));
+    for (llvm::BasicBlock *block : dead)
+      block->dropAllReferences();
     for (llvm::BasicBlock *block : dead)
       block->eraseFromParent();
 

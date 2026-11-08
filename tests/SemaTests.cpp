@@ -178,3 +178,70 @@ TEST_CASE("sema rejects invalid programs", "[sema]") {
                  "int main(void) { struct S s; int x; x = !s; "
                  "return 0; }");
 }
+
+TEST_CASE("sema scopes struct tags and completes tentative definitions",
+          "[sema]") {
+  // A block-scope "struct S;" declares a new tag instead of reusing the
+  // outer definition, so the two pointer types are incompatible.
+  requireInvalid(R"(
+struct S { int a; };
+int main(void) {
+  struct S *p;
+  {
+    struct S;
+    struct S *q;
+    p = q;
+  }
+  return 0;
+}
+)");
+  requireInvalid(R"(
+struct S { int a; };
+int main(void) {
+  struct S *p;
+  {
+    struct S;
+    struct S { int b; };
+    struct S *q;
+    p = q;
+  }
+  return 0;
+}
+)");
+  requireValid(R"(
+struct S { int a; };
+int main(void) {
+  struct S *p;
+  {
+    struct S;
+    struct S *q;
+    q = q;
+  }
+  return 0;
+}
+)");
+
+  // A file-scope tentative definition may start incomplete and be completed
+  // later in the translation unit; it is invalid only if never completed.
+  requireValid("struct S; struct S g; struct S { int x; }; "
+               "int main(void) { return sizeof(g); }");
+  requireInvalid("struct S; struct S g; int main(void) { return 0; }");
+  // The type is still incomplete at this use, even though it is completed
+  // later in the translation unit.
+  requireInvalid("struct S; struct S g; "
+                 "int main(void) { return sizeof(g); } "
+                 "struct S { int x; };");
+  requireInvalid("struct S; int main(void) { struct S s; return 0; }");
+}
+
+TEST_CASE("sema lets block-scope functions hide outer block objects",
+          "[sema]") {
+  requireValid("int f(void) { return 42; } "
+               "int main(void) { int f; { int f(void); return f(); } }");
+  requireValid("int main(void) { int f; { int f(void); return 0; } }");
+  // A file-scope object has external linkage, so it conflicts with the
+  // block-scope function declaration.
+  requireInvalid("int f; int main(void) { { int f(void); return 0; } }");
+  requireInvalid("int f(void) { return 0; } "
+                 "int main(void) { int f; { int f(int); return 0; } }");
+}

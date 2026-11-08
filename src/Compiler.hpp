@@ -40,6 +40,7 @@ private:
   std::unique_ptr<llvm::TargetMachine> targetMachine_;
   std::unique_ptr<TypeLayout> layout_;
   std::unique_ptr<SemanticModel> model_;
+  bool targetInitialized_ = false;
 
   void initializeTarget();
   void runFrontend();
