@@ -30,7 +30,7 @@ bool declaratorHasName(const AST &ast, DeclaratorId id) {
 
 Symbol declaratorName(const AST &ast, DeclaratorId id) {
   if (!id.valid())
-    return nullptr;
+    return Symbol();
   const Declarator &d = ast.declarator(id);
   if (std::holds_alternative<NameDeclarator>(d.node))
     return std::get<NameDeclarator>(d.node).name;

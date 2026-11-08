@@ -5,6 +5,7 @@ add_executable(c4_tests
   TypeTests.cpp
   PrinterTests.cpp
   CodeGenTests.cpp
+  SymbolTests.cpp
   SCCPTests.cpp
   PipelineTests.cpp)
 target_link_libraries(c4_tests PRIVATE c4core Catch2::Catch2WithMain)

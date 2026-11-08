@@ -1,8 +1,5 @@
 #include "Lexer.hpp"
 
-#include <cctype>
-#include <fstream>
-#include <iterator>
 #include <string_view>
 #include <utility>
 
@@ -75,23 +72,11 @@ constexpr Punctuator kPunctuators[] = {
 
 } // namespace
 
-Lexer::Lexer(std::string filename, SymbolInternalizer &symbols)
-    : filename_(std::move(filename)), symbols_(symbols),
-      diagnostics_(filename_) {
-  filenameSymbol_ = symbols_.internalize(filename_);
-  std::ifstream stream(filename_, std::ios::binary);
-  if (!stream) {
-    diagnostics_.error(SourceLoc{1, 1}, "cannot open input file");
-  }
-  source_.assign(std::istreambuf_iterator<char>(stream),
-                 std::istreambuf_iterator<char>());
-}
-
 Lexer::Lexer(std::string filename, std::string source,
              SymbolInternalizer &symbols)
-    : filename_(std::move(filename)), source_(std::move(source)),
-      symbols_(symbols), diagnostics_(filename_) {
-  filenameSymbol_ = symbols_.internalize(filename_);
+    : source_(std::move(source)), symbols_(symbols),
+      diagnostics_(std::move(filename)) {
+  filenameSymbol_ = symbols_.internalize(diagnostics_.filename());
 }
 
 int Lexer::peek(size_t offset) const {
@@ -100,7 +85,7 @@ int Lexer::peek(size_t offset) const {
   return static_cast<unsigned char>(source_[pos_ + offset]);
 }
 
-bool Lexer::eof(size_t offset) const { return pos_ + offset >= source_.size(); }
+bool Lexer::eof() const { return pos_ >= source_.size(); }
 
 void Lexer::consume() {
   if (eof())
@@ -316,13 +301,6 @@ Token Lexer::lexToken() {
     kind = lexPunctuator();
   }
   return makeToken(kind, start, begin);
-}
-
-void Lexer::tokenize(const std::function<void(const Token &)> &f) {
-  for (const Token &tok : tokenize()) {
-    if (tok.Kind != TK_EOI)
-      f(tok);
-  }
 }
 
 std::vector<Token> Lexer::tokenize() {

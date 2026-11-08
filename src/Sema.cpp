@@ -330,7 +330,7 @@ const Type *Sema::resolveTypeSpec(TypeSpecId id, bool declareTag) {
         model_.bindTag(current_, structSpec.tag, record);
       }
     } else {
-      record = model_.addStruct(nullptr, spec.loc, true);
+      record = model_.addStruct(Symbol(), spec.loc, true);
     }
 
     record->loc = spec.loc;

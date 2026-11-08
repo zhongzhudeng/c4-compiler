@@ -104,10 +104,10 @@ TEST_CASE("TypeContext interns function and array types structurally",
 TEST_CASE("TypeContext preserves struct identity across completion",
           "[type]") {
   TypeContext types;
-  std::string tag = "Node";
+  SymbolInternalizer symbols;
 
   StructDecl node;
-  node.tag = &tag;
+  node.tag = symbols.internalize("Node");
   const Type *incomplete = types.structType(&node);
   CHECK(incomplete == types.structType(&node));
   CHECK(incomplete->is<Type::Struct>());
@@ -122,15 +122,14 @@ TEST_CASE("TypeContext preserves struct identity across completion",
 
   // Recursion through a pointer keeps the canonical struct type.
   node.fields.push_back(
-      FieldInfo{nullptr, types.pointerTo(incomplete), DeclId{}, 0});
+      FieldInfo{Symbol(), types.pointerTo(incomplete), DeclId{}, 0});
   CHECK(node.fields[0].type->pointee() == incomplete);
   CHECK(types.pointerTo(incomplete) ==
         types.pointerTo(types.structType(&node)));
 
   // Distinct tags, including shadowed ones, have distinct identities.
-  std::string otherTag = "Node";
   StructDecl other;
-  other.tag = &otherTag;
+  other.tag = symbols.internalize("Node");
   CHECK(types.structType(&other) != incomplete);
   CHECK(types.pointerTo(types.structType(&other)) !=
         types.pointerTo(incomplete));
@@ -200,9 +199,9 @@ TEST_CASE("TypeLayout maps primitive, pointer, array, and struct types",
   const Type *recordType = types.structType(&record);
   record.type = recordType;
   record.fields.push_back(
-      FieldInfo{nullptr, types.charType(), DeclId{}, 0});
+      FieldInfo{Symbol(), types.charType(), DeclId{}, 0});
   record.fields.push_back(
-      FieldInfo{nullptr, types.intType(), DeclId{}, 0});
+      FieldInfo{Symbol(), types.intType(), DeclId{}, 0});
 
   CHECK(layout.sizeOf(recordType) == 8);
   CHECK(layout.fieldOffset(&record, 0) == 0);

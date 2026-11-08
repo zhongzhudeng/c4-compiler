@@ -128,25 +128,11 @@ public:
     ScopedCerrCapture capture;
     if (!parse(source, error))
       return false;
-    Diagnostics diagnostics("test.c");
-    TypeContext types;
-    llvm::LLVMContext context;
-    llvm::DataLayout dataLayout("e-m:o-i64:64-i128:128-n32:64-S128");
-    TypeLayout layout(context, dataLayout);
-    SemanticModel model(ast_);
-    try {
-      Sema sema(ast_, model, types, layout, diagnostics);
-      sema.analyze();
-      std::ostringstream stream;
-      Printer printer(ast_, model, stream);
-      printer.print();
-      if (output)
-        *output = stream.str();
-    } catch (const CompileError &) {
-      if (error)
-        *error = capture.text();
-      return false;
-    }
+    std::ostringstream stream;
+    Printer printer(ast_, stream);
+    printer.print();
+    if (output)
+      *output = stream.str();
     return true;
   }
 

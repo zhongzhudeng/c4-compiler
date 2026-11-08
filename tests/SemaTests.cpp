@@ -297,7 +297,7 @@ Symbol declName(const TestCompiler &compiler, DeclId id) {
     return declaratorName(ast, param->declarator);
   if (auto *field = std::get_if<FieldDecl>(&decl.node))
     return declaratorName(ast, field->declarator);
-  return nullptr;
+  return Symbol();
 }
 
 void collectDeclaratorParams(const AST &ast, DeclaratorId id,

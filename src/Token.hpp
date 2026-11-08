@@ -4,13 +4,12 @@
 #include "SymbolInternalizer.hpp"
 
 #include <ostream>
-#include <string>
 
 #define KIND_ACTION(KD, STR) KD,
 
 /// Token kinds use the names of the C11 token non-terminals where possible.
-/// The enum is intentionally unscoped so the existing TokenKinds.def tables
-/// stay readable.
+/// The enum is intentionally unscoped so the TokenKinds.def tables stay
+/// readable.
 enum TokenKind {
 #include "TokenKinds.def"
 };
@@ -23,21 +22,18 @@ const char *tokenKindName(TokenKind kind);
 /// printer treat them as their primary punctuator.
 TokenKind canonicalTokenKind(TokenKind kind);
 
+/// One lexed token.  Text and FileName are interned Symbols, so copying a
+/// token does not copy spelling bytes.  Tokens are only produced by the lexer;
+/// there is no empty-token state.
 struct Token {
-  TokenKind Kind = TK_EOI;
-  Symbol Text = nullptr;
+  TokenKind Kind;
+  Symbol Text;
   SourceLoc Loc;
   // Interned; the token stream does not own a copy of the filename.
-  Symbol FileName = nullptr;
+  Symbol FileName;
 
-  Token() = default;
   Token(SourceLoc loc, TokenKind kind, Symbol text, Symbol filename)
       : Kind(kind), Text(text), Loc(loc), FileName(filename) {}
-
-  bool is(TokenKind kind) const { return Kind == kind; }
-  bool isCanonical(TokenKind kind) const {
-    return canonicalTokenKind(Kind) == kind;
-  }
 };
 
 std::ostream &operator<<(std::ostream &stream, const Token &tok);

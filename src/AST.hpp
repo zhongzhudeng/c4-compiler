@@ -52,15 +52,15 @@ using LabelId = NodeId<LabelTag>;
 // ---------------------------------------------------------------------------
 
 struct IdentifierExpr {
-  Symbol name = nullptr;
+  Symbol name;
 };
 
 struct ConstantExpr {
-  Symbol spelling = nullptr;
+  Symbol spelling;
 };
 
 struct StringLiteralExpr {
-  Symbol spelling = nullptr;
+  Symbol spelling;
 };
 
 struct UnaryExpr {
@@ -108,7 +108,7 @@ struct SubscriptExpr {
 
 struct MemberExpr {
   ExprId base;
-  Symbol member = nullptr;
+  Symbol member;
   bool arrow = false;
 };
 
@@ -174,7 +174,7 @@ struct BreakStmt {};
 struct ContinueStmt {};
 
 struct GotoStmt {
-  Symbol name = nullptr;
+  Symbol name;
 };
 
 struct LabelStmt {
@@ -199,7 +199,7 @@ struct Stmt {
 // ---------------------------------------------------------------------------
 
 struct NameDeclarator {
-  Symbol name = nullptr;
+  Symbol name;
 };
 
 struct PointerDeclarator {
@@ -229,7 +229,7 @@ struct TypeSpec {
   struct Int {};
 
   struct Struct {
-    Symbol tag = nullptr;          // struct tag; may be null
+    Symbol tag;          // struct tag; may be null
     std::vector<DeclId> fields;    // field declarations
     bool hasBraces = false;        // syntactically contains { ... }
   };
@@ -283,7 +283,7 @@ struct Decl {
 
 struct LabelDecl {
   SourceLoc loc;
-  Symbol name = nullptr;
+  Symbol name;
 };
 
 struct TranslationUnit {

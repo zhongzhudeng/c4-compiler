@@ -17,7 +17,9 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/Host.h"
 
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
@@ -82,10 +84,15 @@ struct FrontendEnvironment {
 } // namespace
 
 TokenizedSource tokenizeFile(std::string filename) {
-  TokenizedSource result(std::move(filename));
-  Lexer lexer(result.filename_, result.symbols_);
-  result.tokens_ = lexer.tokenize();
-  return result;
+  std::ifstream stream(filename, std::ios::binary);
+  if (!stream) {
+    Diagnostics diagnostics(filename);
+    diagnostics.error(SourceLoc{1, 1}, "cannot open input file");
+  }
+  std::string source;
+  source.assign(std::istreambuf_iterator<char>(stream),
+                std::istreambuf_iterator<char>());
+  return tokenizeString(std::move(filename), std::move(source));
 }
 
 TokenizedSource tokenizeString(std::string filename, std::string source) {
@@ -179,7 +186,9 @@ int run(const std::string &filename, CompileMode mode) {
     TypeContext types;
     AnalyzedProgram program =
         analyze(parse(tokenizeFile(filename)), types, environment.layout);
-    Printer printer(program.ast(), program.model(), std::cout);
+    // The printer needs only the AST; semantic analysis still runs so that
+    // --print-ast rejects the same invalid programs as --parse (task D-001).
+    Printer printer(program.ast(), std::cout);
     printer.print();
     return 0;
   }

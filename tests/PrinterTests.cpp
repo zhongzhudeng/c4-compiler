@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <iterator>
+#include <sstream>
 #include <string>
 
 namespace {
@@ -85,4 +86,107 @@ TEST_CASE("printer formats sizeof expressions", "[printer]") {
           "{\n"
           "\treturn ((sizeof(int *)) + (sizeof \"abc\"));\n"
           "}\n");
+}
+
+TEST_CASE("printer renders directly from the AST", "[printer][architecture]") {
+  TestCompiler compiler;
+  REQUIRE(compiler.parse("int main(void) { return 0; }"));
+  std::ostringstream stream;
+  Printer printer(compiler.ast(), stream);
+  printer.print();
+  REQUIRE(stream.str() == "int (main(void))\n{\n\treturn 0;\n}\n");
+}
+
+TEST_CASE("printer expands comma-separated struct members", "[printer]") {
+  TestCompiler compiler;
+  std::string output;
+  REQUIRE(compiler.print("struct S { int a, b; char c; } s;", &output));
+  REQUIRE(output ==
+          "struct S\n"
+          "{\n"
+          "\tint a;\n"
+          "\tint b;\n"
+          "\tchar c;\n"
+          "} s;\n");
+}
+
+TEST_CASE("printer keeps struct declarations inline in type-name contexts",
+          "[printer]") {
+  TestCompiler compiler;
+  std::string output;
+  REQUIRE(compiler.print(
+      "int f(struct S { int a, b; } p);\n"
+      "int main(void) { return sizeof(struct T { int x, y; }); }\n",
+      &output));
+  REQUIRE(output ==
+          "int (f(struct S { int a; int b; } p));\n"
+          "\n"
+          "int (main(void))\n"
+          "{\n"
+          "\treturn (sizeof(struct T { int x; int y; }));\n"
+          "}\n");
+}
+
+TEST_CASE("printer nests multiline struct declarations", "[printer]") {
+  TestCompiler compiler;
+  std::string output;
+  REQUIRE(compiler.print(
+      "struct Outer { struct Inner { int x; } inner; int y; } o;", &output));
+  REQUIRE(output ==
+          "struct Outer\n"
+          "{\n"
+          "\tstruct Inner\n"
+          "\t{\n"
+          "\t\tint x;\n"
+          "\t} inner;\n"
+          "\tint y;\n"
+          "} o;\n");
+}
+
+TEST_CASE("printer canonicalizes digraph braces", "[printer]") {
+  TestCompiler compiler;
+  std::string output;
+  REQUIRE(compiler.print("int main(void) <% return 0; %>", &output));
+  REQUIRE(output == "int (main(void))\n{\n\treturn 0;\n}\n");
+  REQUIRE(output.find("<%") == std::string::npos);
+  REQUIRE(output.find("%>") == std::string::npos);
+}
+
+TEST_CASE("printer formats prototypes and definitions consistently",
+          "[printer]") {
+  TestCompiler compiler;
+  std::string output;
+  REQUIRE(compiler.print(
+      "int f(int x);\nint f(int x) { return x; }\n", &output));
+  REQUIRE(output ==
+          "int (f(int x));\n"
+          "\n"
+          "int (f(int x))\n"
+          "{\n"
+          "\treturn x;\n"
+          "}\n");
+}
+
+TEST_CASE("printer fully parenthesizes nested expressions", "[printer]") {
+  TestCompiler compiler;
+  std::string output;
+  REQUIRE(compiler.print(
+      "int main(void) { return 1 + 2 * 3 == 4 && !0; }", &output));
+  REQUIRE(output ==
+          "int (main(void))\n"
+          "{\n"
+          "\treturn (((1 + (2 * 3)) == 4) && (!0));\n"
+          "}\n");
+}
+
+TEST_CASE("printer output is idempotent", "[printer]") {
+  TestCompiler compiler;
+  std::string first;
+  REQUIRE(compiler.print(
+      "struct S { int a, b; } s; "
+      "int f(int x) { if (x) { return x; } return 0; }",
+      &first));
+  std::string second;
+  REQUIRE(compiler.print(first, &second));
+  REQUIRE(second == first);
 }

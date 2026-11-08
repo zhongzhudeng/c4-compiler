@@ -3,11 +3,7 @@
 #include <cassert>
 #include <variant>
 
-Printer::Printer(const AST &ast, const SemanticModel &model,
-                 std::ostream &out)
-    : ast_(ast), out_(out) {
-  (void)model;
-}
+Printer::Printer(const AST &ast, std::ostream &out) : ast_(ast), out_(out) {}
 
 void Printer::indent(int level) {
   for (int i = 0; i < level; ++i)
@@ -36,170 +32,258 @@ const char *Printer::binaryOperator(BinaryExpr::Op op) {
   return "?";
 }
 
-std::string Printer::declaratorString(DeclaratorId id) const {
-  if (!id.valid())
-    return {};
+const char *Printer::unaryOperator(UnaryExpr::Op op) {
+  switch (op) {
+  case UnaryExpr::Op::Plus:
+    return "+";
+  case UnaryExpr::Op::Minus:
+    return "-";
+  case UnaryExpr::Op::Not:
+    return "!";
+  case UnaryExpr::Op::Deref:
+    return "*";
+  case UnaryExpr::Op::Addr:
+    return "&";
+  }
+  return "?";
+}
 
+bool Printer::isEmptyDeclarator(DeclaratorId id) const {
+  if (!id.valid())
+    return true;
   const Declarator &declarator = ast_.declarator(id);
   if (auto *name = std::get_if<NameDeclarator>(&declarator.node))
-    return name->name ? *name->name : std::string();
+    return name->name.empty();
+  return false;
+}
+
+bool Printer::isBarePointerDeclarator(DeclaratorId id) const {
+  if (!id.valid())
+    return false;
+  auto *pointer = std::get_if<PointerDeclarator>(&ast_.declarator(id).node);
+  return pointer && isEmptyDeclarator(pointer->inner);
+}
+
+void Printer::printDeclarator(DeclaratorId id) {
+  if (!id.valid())
+    return;
+
+  const Declarator &declarator = ast_.declarator(id);
+  if (auto *name = std::get_if<NameDeclarator>(&declarator.node)) {
+    if (name->name)
+      out_ << *name->name;
+    return;
+  }
 
   if (auto *pointer = std::get_if<PointerDeclarator>(&declarator.node)) {
-    std::string inner = declaratorString(pointer->inner);
-    if (inner.empty())
-      return "*";
-    return "(*" + inner + ")";
+    if (isEmptyDeclarator(pointer->inner)) {
+      out_ << '*';
+      return;
+    }
+    out_ << "(*";
+    printDeclarator(pointer->inner);
+    out_ << ')';
+    return;
   }
 
   auto *function = std::get_if<FunctionDeclarator>(&declarator.node);
   assert(function && "unknown declarator kind");
-  std::string inner = declaratorString(function->inner);
 
-  std::string parameters;
-  if (function->explicitVoid) {
-    parameters = "void";
-  } else {
-    for (size_t i = 0; i < function->params.size(); ++i) {
-      if (i)
-        parameters += ", ";
-      parameters += parameterString(function->params[i]);
-    }
+  if (isEmptyDeclarator(function->inner)) {
+    out_ << '(';
+    printParameterList(*function);
+    out_ << ')';
+    return;
   }
 
-  // An abstract pointer is a single-token atom when it stands alone, but it
-  // needs parentheses when a function suffix is attached to it.
-  if (inner == "*")
-    inner = "(*)";
-
-  if (inner.empty())
-    return "(" + parameters + ")";
-  return "(" + inner + "(" + parameters + "))";
+  out_ << '(';
+  if (isBarePointerDeclarator(function->inner))
+    out_ << "(*)";
+  else
+    printDeclarator(function->inner);
+  out_ << '(';
+  printParameterList(*function);
+  out_ << "))";
 }
 
-std::string Printer::parameterString(DeclId id) const {
+void Printer::printParameterList(const FunctionDeclarator &function) {
+  if (function.explicitVoid) {
+    out_ << "void";
+    return;
+  }
+  for (size_t i = 0; i < function.params.size(); ++i) {
+    if (i)
+      out_ << ", ";
+    printParameter(function.params[i]);
+  }
+}
+
+void Printer::printParameter(DeclId id) {
   auto *parameter = std::get_if<ParamDecl>(&ast_.decl(id).node);
   if (!parameter)
-    return {};
-  std::string result = typeSpecFlat(parameter->spec);
-  std::string declarator = declaratorString(parameter->declarator);
-  if (!declarator.empty())
-    result += " " + declarator;
-  return result;
+    return;
+  printFlatTypeAndDeclarator(parameter->spec, parameter->declarator);
 }
 
-std::string Printer::typeSpecFlat(TypeSpecId id) const {
+void Printer::printFlatTypeSpec(TypeSpecId id) {
   const TypeSpec &spec = ast_.typeSpec(id);
-  if (std::holds_alternative<TypeSpec::Void>(spec.node))
-    return "void";
-  if (std::holds_alternative<TypeSpec::Char>(spec.node))
-    return "char";
-  if (std::holds_alternative<TypeSpec::Int>(spec.node))
-    return "int";
+  if (std::holds_alternative<TypeSpec::Void>(spec.node)) {
+    out_ << "void";
+    return;
+  }
+  if (std::holds_alternative<TypeSpec::Char>(spec.node)) {
+    out_ << "char";
+    return;
+  }
+  if (std::holds_alternative<TypeSpec::Int>(spec.node)) {
+    out_ << "int";
+    return;
+  }
 
   const TypeSpec::Struct &structure = std::get<TypeSpec::Struct>(spec.node);
-  std::string result = "struct";
+  out_ << "struct";
   if (structure.tag)
-    result += " " + *structure.tag;
+    out_ << ' ' << *structure.tag;
   if (structure.hasBraces) {
-    result += " {";
-    for (DeclId field : structure.fields)
-      result += " " + fieldFlat(field);
-    result += " }";
+    out_ << " {";
+    for (DeclId field : structure.fields) {
+      out_ << ' ';
+      printFlatField(field);
+    }
+    out_ << " }";
   }
-  return result;
 }
 
-std::string Printer::fieldFlat(DeclId id) const {
+void Printer::printFlatField(DeclId id) {
   auto *field = std::get_if<FieldDecl>(&ast_.decl(id).node);
   if (!field)
-    return {};
-  std::string result = typeSpecFlat(field->spec);
-  std::string declarator = declaratorString(field->declarator);
-  if (!declarator.empty())
-    result += " " + declarator;
-  result += ";";
-  return result;
+    return;
+  printFlatTypeAndDeclarator(field->spec, field->declarator);
+  out_ << ';';
 }
 
-std::string Printer::expressionString(ExprId id) const {
+void Printer::printFlatTypeAndDeclarator(TypeSpecId spec,
+                                         DeclaratorId declarator) {
+  printFlatTypeSpec(spec);
+  if (!isEmptyDeclarator(declarator)) {
+    out_ << ' ';
+    printDeclarator(declarator);
+  }
+}
+
+void Printer::printTypeAndDeclarator(TypeSpecId spec, DeclaratorId declarator,
+                                     int level) {
+  printTypeSpec(spec, level);
+  if (!isEmptyDeclarator(declarator)) {
+    out_ << ' ';
+    printDeclarator(declarator);
+  }
+}
+
+void Printer::printExpr(ExprId id) {
   if (!id.valid())
-    return {};
+    return;
 
   const Expr &expr = ast_.expr(id);
-  if (auto *identifier = std::get_if<IdentifierExpr>(&expr.node))
-    return identifier->name ? *identifier->name : std::string();
-  if (auto *constant = std::get_if<ConstantExpr>(&expr.node))
-    return constant->spelling ? *constant->spelling : std::string();
-  if (auto *string = std::get_if<StringLiteralExpr>(&expr.node))
-    return string->spelling ? *string->spelling : std::string();
+  if (auto *identifier = std::get_if<IdentifierExpr>(&expr.node)) {
+    if (identifier->name)
+      out_ << *identifier->name;
+    return;
+  }
+  if (auto *constant = std::get_if<ConstantExpr>(&expr.node)) {
+    if (constant->spelling)
+      out_ << *constant->spelling;
+    return;
+  }
+  if (auto *string = std::get_if<StringLiteralExpr>(&expr.node)) {
+    if (string->spelling)
+      out_ << *string->spelling;
+    return;
+  }
 
   if (auto *unary = std::get_if<UnaryExpr>(&expr.node)) {
-    const char *op = "";
-    switch (unary->op) {
-    case UnaryExpr::Op::Plus:
-      op = "+";
-      break;
-    case UnaryExpr::Op::Minus:
-      op = "-";
-      break;
-    case UnaryExpr::Op::Not:
-      op = "!";
-      break;
-    case UnaryExpr::Op::Deref:
-      op = "*";
-      break;
-    case UnaryExpr::Op::Addr:
-      op = "&";
-      break;
-    }
-    return "(" + std::string(op) + expressionString(unary->operand) + ")";
+    out_ << '(' << unaryOperator(unary->op);
+    printExpr(unary->operand);
+    out_ << ')';
+    return;
   }
 
-  if (auto *binary = std::get_if<BinaryExpr>(&expr.node))
-    return "(" + expressionString(binary->lhs) + " " +
-           binaryOperator(binary->op) + " " +
-           expressionString(binary->rhs) + ")";
+  if (auto *binary = std::get_if<BinaryExpr>(&expr.node)) {
+    out_ << '(';
+    printExpr(binary->lhs);
+    out_ << ' ' << binaryOperator(binary->op) << ' ';
+    printExpr(binary->rhs);
+    out_ << ')';
+    return;
+  }
 
-  if (auto *assign = std::get_if<AssignExpr>(&expr.node))
-    return "(" + expressionString(assign->lhs) + " = " +
-           expressionString(assign->rhs) + ")";
+  if (auto *assign = std::get_if<AssignExpr>(&expr.node)) {
+    out_ << '(';
+    printExpr(assign->lhs);
+    out_ << " = ";
+    printExpr(assign->rhs);
+    out_ << ')';
+    return;
+  }
 
-  if (auto *conditional = std::get_if<ConditionalExpr>(&expr.node))
-    return "(" + expressionString(conditional->cond) + " ? " +
-           expressionString(conditional->thenExpr) + " : " +
-           expressionString(conditional->elseExpr) + ")";
+  if (auto *conditional = std::get_if<ConditionalExpr>(&expr.node)) {
+    out_ << '(';
+    printExpr(conditional->cond);
+    out_ << " ? ";
+    printExpr(conditional->thenExpr);
+    out_ << " : ";
+    printExpr(conditional->elseExpr);
+    out_ << ')';
+    return;
+  }
 
   if (auto *call = std::get_if<CallExpr>(&expr.node)) {
-    std::string result = "(" + expressionString(call->callee) + "(";
+    out_ << '(';
+    printExpr(call->callee);
+    out_ << '(';
     for (size_t i = 0; i < call->args.size(); ++i) {
       if (i)
-        result += ", ";
-      result += expressionString(call->args[i]);
+        out_ << ", ";
+      printExpr(call->args[i]);
     }
-    result += "))";
-    return result;
+    out_ << "))";
+    return;
   }
 
-  if (auto *subscript = std::get_if<SubscriptExpr>(&expr.node))
-    return "(" + expressionString(subscript->base) + "[" +
-           expressionString(subscript->index) + "])";
+  if (auto *subscript = std::get_if<SubscriptExpr>(&expr.node)) {
+    out_ << '(';
+    printExpr(subscript->base);
+    out_ << '[';
+    printExpr(subscript->index);
+    out_ << "])";
+    return;
+  }
 
-  if (auto *member = std::get_if<MemberExpr>(&expr.node))
-    return "(" + expressionString(member->base) +
-           (member->arrow ? "->" : ".") +
-           (member->member ? *member->member : std::string()) + ")";
+  if (auto *member = std::get_if<MemberExpr>(&expr.node)) {
+    out_ << '(';
+    printExpr(member->base);
+    out_ << (member->arrow ? "->" : ".");
+    if (member->member)
+      out_ << *member->member;
+    out_ << ')';
+    return;
+  }
 
   auto *sizeOf = std::get_if<SizeofExpr>(&expr.node);
   assert(sizeOf && "unknown expression kind");
   if (auto *typeName = std::get_if<SizeofExpr::TypeName>(&sizeOf->target)) {
-    std::string spelling = typeSpecFlat(typeName->spec);
-    std::string declarator = declaratorString(typeName->declarator);
-    if (!declarator.empty())
-      spelling += " " + declarator;
-    return "(sizeof(" + spelling + "))";
+    out_ << "(sizeof(";
+    printFlatTypeSpec(typeName->spec);
+    if (!isEmptyDeclarator(typeName->declarator)) {
+      out_ << ' ';
+      printDeclarator(typeName->declarator);
+    }
+    out_ << "))";
+    return;
   }
-  return "(sizeof " + expressionString(std::get<ExprId>(sizeOf->target)) +
-         ")";
+  out_ << "(sizeof ";
+  printExpr(std::get<ExprId>(sizeOf->target));
+  out_ << ')';
 }
 
 void Printer::printTypeSpec(TypeSpecId id, int level) {
@@ -237,10 +321,7 @@ void Printer::printDecl(DeclId id, int level) {
 
   if (auto *variable = std::get_if<VarDecl>(&decl.node)) {
     indent(level);
-    printTypeSpec(variable->spec, level);
-    std::string declarator = declaratorString(variable->declarator);
-    if (!declarator.empty())
-      out_ << ' ' << declarator;
+    printTypeAndDeclarator(variable->spec, variable->declarator, level);
     out_ << ";\n";
     return;
   }
@@ -248,7 +329,8 @@ void Printer::printDecl(DeclId id, int level) {
   if (auto *function = std::get_if<FunctionDecl>(&decl.node)) {
     indent(level);
     printTypeSpec(function->spec, level);
-    out_ << ' ' << declaratorString(function->declarator);
+    out_ << ' ';
+    printDeclarator(function->declarator);
     if (!function->body.valid()) {
       out_ << ";\n";
       return;
@@ -260,19 +342,13 @@ void Printer::printDecl(DeclId id, int level) {
 
   if (auto *field = std::get_if<FieldDecl>(&decl.node)) {
     indent(level);
-    printTypeSpec(field->spec, level);
-    std::string declarator = declaratorString(field->declarator);
-    if (!declarator.empty())
-      out_ << ' ' << declarator;
+    printTypeAndDeclarator(field->spec, field->declarator, level);
     out_ << ";\n";
     return;
   }
 
   if (auto *parameter = std::get_if<ParamDecl>(&decl.node)) {
-    printTypeSpec(parameter->spec, level);
-    std::string declarator = declaratorString(parameter->declarator);
-    if (!declarator.empty())
-      out_ << ' ' << declarator;
+    printTypeAndDeclarator(parameter->spec, parameter->declarator, level);
     return;
   }
 
@@ -283,25 +359,27 @@ void Printer::printDecl(DeclId id, int level) {
   out_ << ";\n";
 }
 
-void Printer::printCompoundBody(StmtId id, int level) {
+void Printer::printCompound(StmtId id, int level, bool leadingIndent,
+                            bool trailingNewline) {
   auto *compound = std::get_if<CompoundStmt>(&ast_.stmt(id).node);
   assert(compound && "expected a compound statement");
-  indent(level);
+  if (leadingIndent)
+    indent(level);
   out_ << "{\n";
   for (StmtId item : compound->items)
     printStmt(item, level + 1);
   indent(level);
-  out_ << "}\n";
+  out_ << '}';
+  if (trailingNewline)
+    out_ << '\n';
+}
+
+void Printer::printCompoundBody(StmtId id, int level) {
+  printCompound(id, level, /*leadingIndent=*/true, /*trailingNewline=*/true);
 }
 
 void Printer::printCompoundInline(StmtId id, int level) {
-  auto *compound = std::get_if<CompoundStmt>(&ast_.stmt(id).node);
-  assert(compound && "expected a compound statement");
-  out_ << "{\n";
-  for (StmtId item : compound->items)
-    printStmt(item, level + 1);
-  indent(level);
-  out_ << "}";
+  printCompound(id, level, /*leadingIndent=*/false, /*trailingNewline=*/false);
 }
 
 void Printer::printControlledBody(StmtId id, int level) {
@@ -320,7 +398,9 @@ void Printer::printIf(StmtId id, int level, bool leadingIndent) {
 
   if (leadingIndent)
     indent(level);
-  out_ << "if (" << expressionString(ifStmt->cond) << ")";
+  out_ << "if (";
+  printExpr(ifStmt->cond);
+  out_ << ')';
 
   bool thenIsCompound =
       std::holds_alternative<CompoundStmt>(ast_.stmt(ifStmt->thenStmt).node);
@@ -366,8 +446,7 @@ void Printer::printStmt(StmtId id, int level) {
 
   if (auto *exprStmt = std::get_if<ExprStmt>(&stmt.node)) {
     indent(level);
-    if (exprStmt->expr.valid())
-      out_ << expressionString(exprStmt->expr);
+    printExpr(exprStmt->expr);
     out_ << ";\n";
     return;
   }
@@ -379,7 +458,9 @@ void Printer::printStmt(StmtId id, int level) {
 
   if (auto *whileStmt = std::get_if<WhileStmt>(&stmt.node)) {
     indent(level);
-    out_ << "while (" << expressionString(whileStmt->cond) << ")";
+    out_ << "while (";
+    printExpr(whileStmt->cond);
+    out_ << ')';
     bool bodyIsCompound =
         std::holds_alternative<CompoundStmt>(ast_.stmt(whileStmt->body).node);
     printControlledBody(whileStmt->body, level);
@@ -391,8 +472,10 @@ void Printer::printStmt(StmtId id, int level) {
   if (auto *returnStmt = std::get_if<ReturnStmt>(&stmt.node)) {
     indent(level);
     out_ << "return";
-    if (returnStmt->expr.valid())
-      out_ << ' ' << expressionString(returnStmt->expr);
+    if (returnStmt->expr.valid()) {
+      out_ << ' ';
+      printExpr(returnStmt->expr);
+    }
     out_ << ";\n";
     return;
   }
@@ -411,15 +494,19 @@ void Printer::printStmt(StmtId id, int level) {
 
   if (auto *gotoStmt = std::get_if<GotoStmt>(&stmt.node)) {
     indent(level);
-    out_ << "goto " << (gotoStmt->name ? *gotoStmt->name : std::string())
-         << ";\n";
+    out_ << "goto ";
+    if (gotoStmt->name)
+      out_ << *gotoStmt->name;
+    out_ << ";\n";
     return;
   }
 
   auto *labelStmt = std::get_if<LabelStmt>(&stmt.node);
   assert(labelStmt && "unknown statement kind");
   const LabelDecl &label = ast_.label(labelStmt->label);
-  out_ << (label.name ? *label.name : std::string()) << ":\n";
+  if (label.name)
+    out_ << *label.name;
+  out_ << ":\n";
   printStmt(labelStmt->stmt, level);
 }
 

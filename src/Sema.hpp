@@ -23,7 +23,7 @@ private:
     // A definition adopts this scope as its function scope.
     ScopeId functionScope;
     std::vector<DeclId> params;
-    Symbol name = nullptr;
+    Symbol name;
     SourceLoc nameLoc;
   };
 

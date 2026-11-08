@@ -31,9 +31,10 @@ TokenKind canonicalTokenKind(TokenKind kind) {
 
 std::ostream &operator<<(std::ostream &stream, const Token &tok) {
   if (tok.FileName)
-    stream << *tok.FileName;
+    stream << tok.FileName.str();
   stream << ':' << tok.Loc.line << ':' << tok.Loc.column << ": "
-         << tokenKindName(tok.Kind) << ' '
-         << (tok.Text ? *tok.Text : "");
+         << tokenKindName(tok.Kind) << ' ';
+  if (tok.Text)
+    stream << tok.Text.str();
   return stream;
 }

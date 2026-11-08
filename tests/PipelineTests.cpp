@@ -29,7 +29,7 @@ Symbol firstDeclaratorName(const AST &ast) {
     return declaratorName(ast, var->declarator);
   if (const auto *function = std::get_if<FunctionDecl>(&decl.node))
     return declaratorName(ast, function->declarator);
-  return nullptr;
+  return Symbol();
 }
 
 std::string readText(const std::filesystem::path &path) {
@@ -190,7 +190,7 @@ TEST_CASE("frontend phases run without a target environment", "[pipeline]") {
               frontend.types, frontend.layout);
 
   std::ostringstream printed;
-  Printer printer(analyzed.ast(), analyzed.model(), printed);
+  Printer printer(analyzed.ast(), printed);
   printer.print();
   CHECK(printed.str().find("int (main(void))") != std::string::npos);
   CHECK(printed.str().find("(sizeof(int))") != std::string::npos);

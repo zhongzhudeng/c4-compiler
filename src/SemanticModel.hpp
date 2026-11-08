@@ -42,7 +42,7 @@ enum class ScopeKind {
 };
 
 struct FieldInfo {
-  Symbol name = nullptr;
+  Symbol name;
   const Type *type = nullptr;
   DeclId decl;
   uint64_t offset = 0;
@@ -52,7 +52,7 @@ struct FieldInfo {
 /// Struct types point at it, which is what permits recursive and incomplete
 /// types.  Fields are populated during Sema.
 struct StructDecl {
-  Symbol tag = nullptr;
+  Symbol tag;
   SourceLoc loc;
   std::vector<FieldInfo> fields;
   bool complete = false;
@@ -64,7 +64,7 @@ struct StructDecl {
 /// canonical type, linkage and definition state; declarations only point at it.
 /// Every declaration that denotes the entity is recorded in declarations.
 struct Entity {
-  Symbol name = nullptr;
+  Symbol name;
   const Type *type = nullptr;
   EntityKind kind = EntityKind::Object;
   Linkage linkage = Linkage::None;

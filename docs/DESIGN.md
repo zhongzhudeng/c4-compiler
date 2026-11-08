@@ -64,17 +64,20 @@ analysis, pretty printer, build files, tests.
       -> Parser (syntax-only AST)
       -> AST (vector-owned, typed 32-bit NodeIds, std::variant kinds)
       -> Sema (name resolution + type checking -> SemanticModel)
-      -> Printer (AST + SemanticModel)
+      -> Printer (AST only)
       -> CodeGen (AST + SemanticModel + TypeLayout -> LLVM 23 IR)
       -> [--optimize only] mem2reg -> own SCCP
       -> verified, human-readable .ll
+
+--print-ast still runs Sema first so that it rejects the same invalid programs
+as --parse (task D-001), but the Printer itself receives only the AST.
 
 Source files:
 
     src/Support.hpp        SourceLoc, CompileError, Diagnostics
     src/Token.*            token kinds, spelling, tokenKindName
     src/Lexer.*            maximal-munch lexer, comments, constants, escapes
-    src/SymbolInternalizer.*  string interning (Symbol = const std::string*)
+    src/SymbolInternalizer.*  interned Symbol handles (pointer identity)
     src/AST.*              vector-owned AST, typed IDs, declarator queries
     src/Type.*             interned algebraic types, TypeLayout over DataLayout
     src/SemanticModel.*    entities, scopes, and per-node semantic results
@@ -104,7 +107,9 @@ Each result owns exactly the state its stage produced and nothing later stages
 do not need:
 
 - TokenizedSource owns the token vector and the SymbolInternalizer its token
-  text and filenames point at.  Tokenization needs no parser, Sema, or backend.
+  text and filenames point at.  Symbols are pointer-identity handles into that
+  interner, so moving the interner forward leaves every token and AST spelling
+  valid.  Tokenization needs no parser, Sema, or backend.
 - ParsedProgram owns the SymbolInternalizer and the completed AST.  The parser
   consumes the token vector, so tokens are destroyed with the input stage; AST
   names remain valid because symbol ownership moved forward.
@@ -249,6 +254,49 @@ grammar (or the EOF position for a missing token); Sema uses the first terminal
 of the erroneous construct (operator for binary errors, keyword for
 if/while/return, identifier for names).
 
+### Symbols and tokens
+
+SymbolInternalizer owns all interned spellings in one
+std::unordered_set<std::string>.  Symbol is a pointer-sized, non-owning handle
+to one element of that set: equal spellings from the same interner have the
+same address, so equality and hashing are pointer comparisons and copying a
+Symbol copies one word.  std::unordered_set keeps element addresses stable
+across rehashing, and moving the set moves its nodes without changing those
+addresses, so a Symbol stays valid until its interner is destroyed.  The
+interner is moved through the pipeline stages rather than copied, which is what
+keeps token and AST spellings alive.
+
+A default-constructed Symbol is null and represents an absent name or tag;
+non-null Symbols can only be produced by SymbolInternalizer.  There is no
+SymbolId, generation counter, or extra indirection, and no empty-string
+sentinel: if (symbol) distinguishes absence from an interned empty spelling.
+
+Token is a value type with Kind, Text, Loc, and FileName and no default
+constructor, so an uninitialized token cannot enter the stream.  Text and
+FileName are interned Symbols; tokens never own spelling bytes.  The lexer
+produces the end-of-input token explicitly, and --tokenize skips it.
+
+### Lexer (task B)
+
+Lexer(filename, source, SymbolInternalizer&) has one output, tokenize(), which
+returns the complete token vector including the internal EOF token.  File
+loading is not a lexer concern: Compiler::tokenizeFile reads the bytes in
+binary mode and reports "cannot open input file" at 1:1, then delegates to
+tokenizeString, so both entry points use the same scanner.  The former
+callback-based streaming interface was removed because no mode consumed tokens
+incrementally.
+
+The scanner is a single left-to-right cursor (peek/consume) over the source
+bytes.  consume() treats CRLF as one newline and a lone CR or LF as one
+newline, so SourceLoc line/column positions are 1-based and tabs advance one
+column.  Punctuators are matched by a longest-first table, which implements
+maximal munch and preserves digraph spellings; keywords are matched through
+KeyWords.def.  Numbers, character constants, and string literals share the same
+cursor and report restricted-C4 diagnostics (octal constants, suffixes,
+multi-character constants, invalid escapes, unterminated literals and comments)
+at the first offending position.  Processing is one pass over the input, and
+token text is interned once per distinct spelling.
+
 ### Parser (task C)
 
 Syntax-only; it discards source parentheses but keeps a fully parenthesizable
@@ -276,12 +324,25 @@ rejected (explicitly permitted by task E); anonymous structs are supported.
 
 ### Pretty printer (task D)
 
-Prints from the AST, never from source text.  Formatting follows the reference
-pretty.c: tabs for indentation, one blank line between file-scope
-declarations, fully parenthesized expressions and declarators, labels at
-column zero, sizeof expr printed as (sizeof expr) and sizeof(type) as
-(sizeof(type)).  The reference fixture tests/fixtures/pretty.c is reproduced
-byte-exactly.
+Printer(const AST&, std::ostream&) renders directly to the caller's stream and
+depends only on the AST; the former SemanticModel constructor argument was
+unused and is gone.  print() walks the file-scope declarations; printDecl,
+printStmt, printExpr, and printDeclarator recurse with an explicit indentation
+level, so there is no intermediate text and no second traversal to reconstruct
+strings.  The printer owns no output and keeps no mutable state beyond its two
+references.
+
+Formatting follows the reference pretty.c: tabs for indentation, one blank line
+between file-scope declarations, fully parenthesized expressions and
+declarators, labels at column zero, sizeof expr printed as (sizeof expr) and
+sizeof(type) as (sizeof(type)).  Type specs have two paths over the same struct
+data: printTypeSpec renders declarations, where a struct definition is
+multiline, while printFlatTypeSpec renders type-name contexts (sizeof,
+parameters, and inline struct members), where it stays on one line.  Shared
+helpers printTypeAndDeclarator/printFlatTypeAndDeclarator and the
+printCompound/printControlledBody family keep declarations, fields, parameters,
+and controlled statements on one formatting path.  The reference fixture
+tests/fixtures/pretty.c is reproduced byte-exactly.
 
 ### Code generation (task F)
 
@@ -448,6 +509,14 @@ while.body; the deleted branches and blocks are gone.
     a partially analyzed model cannot satisfy a later stage.
 18. Frontend-only modes construct no TargetEnvironment and perform no target
     registration.
+19. Symbols are pointer-identity handles: equal spellings from one interner are
+    the same Symbol, null means absence, and non-null Symbols only come from an
+    interner that outlives their uses.
+20. A token has no empty state; its spelling and filename borrow the stage's
+    interner and remain valid when that interner moves to the next stage.
+21. The Printer consumes only the AST and writes to a caller-owned stream; it
+    holds no semantic model, intermediate text, or formatting state between
+    nodes.
 
 ## Build and test
 
@@ -462,9 +531,9 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 
 ## Verification
 
-- 106 Catch2 test cases (lexer, parser, Sema, types/AST, printer, codegen,
-  SCCP, pipeline) plus the end-to-end harness (107 CTest tests), all passing in
-  Debug, Release, and AddressSanitizer builds.
+- 126 Catch2 test cases (lexer, symbol/token, parser, Sema, types/AST, printer,
+  codegen, SCCP, pipeline) plus the end-to-end harness (127 CTest tests), all
+  passing in Debug, Release, and AddressSanitizer builds.
   Nine Sema cases are architectural regressions for entity identity, binding
   identity, and scope lifetime; eleven CodeGen cases cover typed expression
   results, missing local storage, conversions, calls, control flow, and
@@ -476,6 +545,13 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
   separation, the analyzed-program prerequisite, target-free frontend
   execution, failure behavior, independent invocations, per-mode stage
   composition, output naming, and default/--compile equivalence.
+  Five Symbol/Token cases cover pointer-identity interning, Latin-1 bytes,
+  interner growth, stage-move lifetime, and the non-default token invariant;
+  thirteen lexer cases cover maximal munch, tab and CR/LF/CRLF positions, exact
+  diagnostics, digraph spellings, large inputs, and file/string equivalence;
+  thirteen printer cases cover the reference fixture, nested declarators and
+  expressions, inline and multiline structs, digraph canonicalization, and
+  print-parse-print idempotence.
   Twenty-five SCCP cases cover the lattice algebra (joins, overdefined
   propagation, monotonic advance), executable-edge PHI inputs, constant and
   overdefined branches, duplicate PHI edges, dead-block cycles, integer/cast/
@@ -483,6 +559,10 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
   points.  Optimized IR for the 23 end-to-end programs and the 11 SCCP
   conformance fixtures is byte-identical to the accepted pre-redesign
   baseline.
+- Lexer token streams and Printer output were compared with the pre-refactor
+  baseline over 152 sources (23 e2e programs, pretty.c, 124 parser-valid cases,
+  and 4 printer-exact cases): all 350 outputs matched byte-for-byte, including
+  --compile/--optimize IR for the 23 e2e programs.
 - End-to-end suite tests/e2e/run_e2e.py: 23 accepted programs x
   {--compile, --optimize} plus 14 rejected programs (430 checks); each
   accepted program is compiled to .ll, linked with clang, executed, and
@@ -520,6 +600,8 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
       modes.
 - [x] Algebraic SCCP lattice with an explicit analysis result and
       transformation boundary.
+- [x] Symbol/Lexer/Printer architectural refactor: pointer-identity Symbol
+      handles, one lexer interface, AST-only stream printer.
 
 ## Known limitations (within the assignment scope)
 

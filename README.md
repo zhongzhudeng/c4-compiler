@@ -19,12 +19,16 @@ source bytes
 ```
 
 - **Lexer** — hand-written maximal-munch lexer for C11 tokens, comments, and
-  string/character escapes, with CR/LF/CRLF source positions.
+  string/character escapes, with CR/LF/CRLF source positions. Interned
+  spellings and filenames are pointer-identity Symbol handles owned by the
+  token stream.
 - **AST** — nodes are owned in vectors and referenced by typed 32-bit IDs; the
   AST stores syntax only.
 - **Parser** — recursive descent with precedence climbing for the C4 grammar.
 - **Sema** — scopes, declarators, type checking, structs, labels/goto, and
   tentative definitions. Results live in an independent SemanticModel.
+- **Printer** — renders the task D format directly from the AST to the output
+  stream; it has no semantic-model dependency.
 - **CodeGen** — LLVM 23 opaque-pointer API with module-wide declarations and a
   per-function emitter; expression results are typed as Place, RValue,
   FunctionDesignator, or Void. Sema and CodeGen share TypeLayout, so sizeof
@@ -105,8 +109,9 @@ $ echo $?
 
 make test runs:
 
-- 106 Catch2 test cases covering the lexer, parser, Sema, types/AST, pretty
-  printer, code generation, SCCP, and the phase/lifetime pipeline invariants.
+- 126 Catch2 test cases covering the lexer, symbol interner, parser, Sema,
+  types/AST, pretty printer, code generation, SCCP, and the phase/lifetime
+  pipeline invariants.
 - An end-to-end e2e CTest that compiles 23 accepted programs with both
   --compile and --optimize, links and runs them, compares the results with
   clang, checks --print-ast round trips, and verifies that 14 invalid programs
