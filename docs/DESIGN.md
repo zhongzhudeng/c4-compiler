@@ -257,7 +257,7 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 
 ## Verification
 
-- 43 Catch2 test cases (lexer, parser, Sema, printer, codegen, SCCP), all
+- 46 Catch2 test cases (lexer, parser, Sema, printer, codegen, SCCP), all
   passing.
 - End-to-end suite tests/e2e/run_e2e.py: 17 accepted programs x
   {--compile, --optimize} plus 7 rejected programs; each accepted program is
