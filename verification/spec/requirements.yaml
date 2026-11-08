@@ -172,7 +172,7 @@ requirements:
   interface: src/TokenKinds.def
   verification: lexer
   status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/assignment-example, lexer/keywords, lexer/identifiers)"
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (lexer/assignment-example, lexer/keywords, lexer/identifiers, lexer/generated-0, ...)"
   notes: ''
 - id: L-002
   title: Maximal munch
@@ -183,7 +183,7 @@ requirements:
   interface: src/Lexer.cpp
   verification: lexer
   status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/identifiers, lexer/punctuators, lexer/maximal-munch)"
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (lexer/identifiers, lexer/punctuators, lexer/maximal-munch, lexer/generated-0, ...)"
   notes: ''
 - id: L-003
   title: Keywords
@@ -260,7 +260,7 @@ requirements:
   interface: src/Lexer.cpp; src/Token.cpp
   verification: lexer, parser, printer
   status: verified
-  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (lexer/punctuators, lexer/digraph-spellings, lexer/maximal-munch, lexer/hash-is-a-punctuator, ...)"
+  evidence: "run_conformance.py: 14 case(s), 0 failed, 0 skipped (lexer/punctuators, lexer/digraph-spellings, lexer/maximal-munch, lexer/hash-is-a-punctuator, ...)"
   notes: ''
 - id: L-010
   title: Whitespace and comments
@@ -293,7 +293,7 @@ requirements:
   interface: src/Token.cpp; src/Compiler.cpp
   verification: lexer
   status: verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (cli/mode-tokenize, lexer/assignment-example, lexer/empty-file)"
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (cli/mode-tokenize, lexer/assignment-example, lexer/empty-file, lexer/generated-0, ...)"
   notes: ''
 - id: L-013
   title: Lexical error locations
@@ -337,7 +337,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (parser/declarations, parser/expressions, parser/struct-member-chain, parser/function-pointer-call, ...)"
+  evidence: "run_conformance.py: 38 case(s), 0 failed, 0 skipped (parser/declarations, parser/expressions, parser/struct-member-chain, parser/function-pointer-call, ...)"
   notes: ''
 - id: C-002
   title: Other expressions only chain productions
@@ -370,7 +370,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: verified
-  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-pointer-call, parser/block-function-declaration, parser/prototype-scope, ...)"
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-pointer-call, parser/block-function-declaration, parser/prototype-scope, ...)"
   notes: ''
 - id: C-005
   title: Statements
@@ -381,7 +381,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: verified
-  evidence: "run_conformance.py: 9 case(s), 0 failed, 0 skipped (parser/statements, parser/break-and-continue, parser/dangling-else, parser/null-statements-and-labels, ...)"
+  evidence: "run_conformance.py: 17 case(s), 0 failed, 0 skipped (parser/statements, parser/break-and-continue, parser/dangling-else, parser/null-statements-and-labels, ...)"
   notes: ''
 - id: C-006
   title: External definitions
@@ -392,7 +392,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: verified
-  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions)"
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/generated-parameters)"
   notes: ''
 - id: C-007
   title: --parse mode
@@ -425,7 +425,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: verified
-  evidence: "run_conformance.py: 19 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/expressions, parser/statements, ...)"
+  evidence: "run_conformance.py: 59 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/expressions, parser/statements, ...)"
   notes: ''
 - id: C-010
   title: Parser error locations
@@ -480,7 +480,7 @@ requirements:
   interface: src/Printer.cpp; src/Compiler.cpp
   verification: printer
   status: verified
-  evidence: "run_conformance.py: 43 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...)"
+  evidence: "run_conformance.py: 83 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...)"
   notes: ''
 - id: D-002
   title: Reference output
@@ -502,7 +502,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: verified
-  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...)"
+  evidence: "run_conformance.py: 82 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...)"
   notes: ''
 - id: D-004
   title: Tabs and line wrapping
@@ -513,7 +513,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: verified
-  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...)"
+  evidence: "run_conformance.py: 80 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...)"
   notes: ''
 - id: D-005
   title: Full parenthesization
@@ -524,7 +524,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: verified
-  evidence: "run_conformance.py: 43 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...)"
+  evidence: "run_conformance.py: 83 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...)"
   notes: ''
 - id: D-006
   title: No digraphs
@@ -535,7 +535,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: verified
-  evidence: "run_conformance.py: 41 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...)"
+  evidence: "run_conformance.py: 81 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...)"
   notes: ''
 - id: D-007
   title: No reassociation
@@ -546,7 +546,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: verified
-  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...)"
+  evidence: "run_conformance.py: 82 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...)"
   notes: ''
 - id: D-008
   title: Structural round trip
@@ -557,7 +557,7 @@ requirements:
   interface: src/Printer.cpp; src/Parser.cpp
   verification: printer
   status: partial
-  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); corpus-scoped, not a universal proof"
+  evidence: "run_conformance.py: 80 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); corpus-scoped, not a universal proof"
   notes: ''
 - id: S-001
   title: Scopes
