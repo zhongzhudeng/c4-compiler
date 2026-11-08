@@ -84,8 +84,62 @@ Source files:
     src/CodeGen.*          module-wide IR and per-function lowering
     src/Optimizer.*        mem2reg only (permitted SSA construction)
     src/SCCP.*             own sparse conditional constant propagation
-    src/Compiler.*         pipeline driver and .ll output
+    src/Compiler.*         pipeline phases, target environment, .ll output
     src/main.cpp           CLI
+
+### Pipeline phases and resource ownership
+
+The orchestration layer is a sequence of value-returning phase functions rather
+than a mutable Compiler object:
+
+    TokenizedSource tokenizeFile/tokenizeString(...)
+    ParsedProgram   parse(TokenizedSource)
+    AnalyzedProgram analyze(ParsedProgram, TypeContext&, TypeLayout&)
+    llvm::Module    generateModule(const AnalyzedProgram&, TargetEnvironment&, name)
+    void            optimizeModule(llvm::Module&)
+    void            writeModule(const llvm::Module&, path, sourceFilename)
+    int             run(filename, CompileMode)
+
+Each result owns exactly the state its stage produced and nothing later stages
+do not need:
+
+- TokenizedSource owns the token vector and the SymbolInternalizer its token
+  text and filenames point at.  Tokenization needs no parser, Sema, or backend.
+- ParsedProgram owns the SymbolInternalizer and the completed AST.  The parser
+  consumes the token vector, so tokens are destroyed with the input stage; AST
+  names remain valid because symbol ownership moved forward.
+- AnalyzedProgram owns the ParsedProgram and the SemanticModel.  It borrows
+  TypeContext and TypeLayout because those are shared with CodeGen.  Its
+  constructor is private and only analyze() can create it, so a model that Sema
+  has not completed cannot satisfy a later stage's requirement.
+- TargetEnvironment owns the LLVMContext, DataLayout, and TypeLayout, and the
+  target triple.  Its constructor performs the one-time LLVM target
+  registration, derives the DataLayout from a generic-CPU target machine (with
+  the established fallback layout), and builds the TypeLayout over the same
+  context and layout.  It is constructed only for --compile/--optimize, so
+  frontend-only modes never register targets or create a TargetMachine.
+- generateModule creates the llvm::Module in the TargetEnvironment's context,
+  sets its triple and data layout from the same environment, and lowers the
+  AnalyzedProgram.  Sema and CodeGen therefore cannot observe different layout
+  semantics.
+
+run() composes the stages for each mode:
+
+    --tokenize   tokenizeFile -> print tokens (internal EOF skipped)
+    --parse      tokenizeFile -> parse -> analyze
+    --print-ast  tokenizeFile -> parse -> analyze -> Printer
+    --compile    tokenizeFile -> parse -> TargetEnvironment -> analyze
+                 -> generateModule -> writeModule
+    --optimize   same, then optimizeModule before writeModule
+    default      CompileMode::Compile
+
+Frontend-only modes build a local FrontendEnvironment (LLVMContext,
+DataLayout(""), TypeLayout) for Sema's sizeof handling.  In compile modes the
+TargetEnvironment is declared before TypeContext and AnalyzedProgram, and the
+module after them, so reverse declaration order destroys the module first, then
+the analyzed program, then the borrowed types/layout, then the environment that
+owns the context and layout.  The same ordering lets a CompileError from any
+phase unwind without returning a partially analyzed stage result.
 
 ### AST ownership and node relationships
 
@@ -359,6 +413,12 @@ while.body; the deleted branches and blocks are gone.
     through checked accessors, and canonical Type* identity is preserved.
 15. TypeSpec and SizeofExpr encode their mutually exclusive syntactic forms
     directly; an absent abstract declarator remains representable.
+16. Stage results own the symbols and AST they expose; token and AST data are
+    moved forward, never duplicated.
+17. AnalyzedProgram exists only after Sema completes, and CodeGen consumes it;
+    a partially analyzed model cannot satisfy a later stage.
+18. Frontend-only modes construct no TargetEnvironment and perform no target
+    registration.
 
 ## Build and test
 
@@ -373,9 +433,9 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 
 ## Verification
 
-- 84 Catch2 test cases (lexer, parser, Sema, types/AST, printer, codegen,
-  SCCP) plus the end-to-end harness (85 CTest tests), all passing in Debug and
-  Release.
+- 95 Catch2 test cases (lexer, parser, Sema, types/AST, printer, codegen,
+  SCCP, pipeline) plus the end-to-end harness (96 CTest tests), all passing in
+  Debug, Release, and AddressSanitizer builds.
   Nine Sema cases are architectural regressions for entity identity, binding
   identity, and scope lifetime; eleven CodeGen cases cover typed expression
   results, missing local storage, conversions, calls, control flow, and
@@ -383,6 +443,10 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
   primitive/pointer/function/array/struct identity, incomplete-to-complete
   struct identity, predicates and printing, TypeLayout sizes and offsets, both
   sizeof forms, TypeSpec alternatives, and checked category access.
+  Eleven pipeline cases cover token/symbol ownership, parse-before-Sema
+  separation, the analyzed-program prerequisite, target-free frontend
+  execution, failure behavior, independent invocations, per-mode stage
+  composition, output naming, and default/--compile equivalence.
 - End-to-end suite tests/e2e/run_e2e.py: 23 accepted programs x
   {--compile, --optimize} plus 14 rejected programs (430 checks); each
   accepted program is compiled to .ll, linked with clang, executed, and
@@ -416,6 +480,8 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 - [x] Full CTest verification.
 - [x] CodeGen redesign: typed expression results and function-scoped emitters.
 - [x] Algebraic Type representation and AST invariant cleanup.
+- [x] Phase-oriented pipeline with explicit ownership and target-free frontend
+      modes.
 
 ## Known limitations (within the assignment scope)
 

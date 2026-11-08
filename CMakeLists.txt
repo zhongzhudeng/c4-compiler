@@ -59,7 +59,8 @@ set(C4_CORE_SOURCES
   src/Printer.cpp
   src/CodeGen.cpp
   src/Optimizer.cpp
-  src/SCCP.cpp)
+  src/SCCP.cpp
+  src/Compiler.cpp)
 
 add_library(c4core STATIC ${C4_CORE_SOURCES})
 target_include_directories(c4core PUBLIC src)
@@ -69,7 +70,7 @@ target_compile_definitions(c4core PUBLIC
 target_compile_options(c4core PRIVATE -Wall -Wextra -Wno-unused-parameter)
 target_link_libraries(c4core PUBLIC ${LLVM_DYLIB})
 
-add_executable(c4 src/main.cpp src/Compiler.cpp)
+add_executable(c4 src/main.cpp)
 target_link_libraries(c4 PRIVATE c4core)
 target_compile_options(c4 PRIVATE -Wall -Wextra)
 set_target_properties(c4 PROPERTIES

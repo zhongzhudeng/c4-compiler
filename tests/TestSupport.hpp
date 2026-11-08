@@ -40,6 +40,19 @@ private:
   std::streambuf *old_;
 };
 
+/// Captures output written to std::cout for the lifetime of the object.
+class ScopedCoutCapture {
+public:
+  ScopedCoutCapture() : old_(std::cout.rdbuf(buffer_.rdbuf())) {}
+  ~ScopedCoutCapture() { std::cout.rdbuf(old_); }
+
+  std::string text() const { return buffer_.str(); }
+
+private:
+  std::ostringstream buffer_;
+  std::streambuf *old_;
+};
+
 /// Convenience front end for unit tests.  Every call starts from a fresh AST.
 class TestCompiler {
 public:

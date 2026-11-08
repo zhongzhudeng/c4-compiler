@@ -245,7 +245,7 @@ not instrumented.
 - Lexer: \`src/Lexer.cpp\`, \`src/Lexer.hpp\`.
 - Token names and printing: \`src/Token.cpp\`, \`src/TokenKinds.def\`,
   \`src/KeyWords.def\`.
-- CLI mode: \`src/Compiler.cpp\` (\`Compiler::tokenize\`) and \`src/main.cpp\`.
+- CLI mode: \`src/Compiler.cpp\` (\`run\`/\`tokenizeFile\`) and \`src/main.cpp\`.
 
 ## Verification
 

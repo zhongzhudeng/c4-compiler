@@ -32,6 +32,14 @@ source bytes
 - **SCCP** — the project's own sparse conditional constant propagation;
   mem2reg is the only LLVM pass used.
 
+The driver is phase-oriented rather than a mutable compiler object:
+tokenizeFile/tokenizeString return a TokenizedSource that owns the token stream
+and its symbol interner; parse returns a ParsedProgram that owns the AST and
+symbols; analyze returns an AnalyzedProgram that owns the semantic model and
+borrows the type context and layout; compile modes construct a
+TargetEnvironment that owns the LLVM context, data layout, and type layout.
+Frontend-only modes never register LLVM targets or create a target machine.
+
 The architecture, invariants, and verification record are documented in
 [docs/DESIGN.md](docs/DESIGN.md).
 
@@ -97,8 +105,8 @@ $ echo $?
 
 make test runs:
 
-- 84 Catch2 test cases covering the lexer, parser, Sema, types/AST, pretty
-  printer, code generation, and SCCP.
+- 95 Catch2 test cases covering the lexer, parser, Sema, types/AST, pretty
+  printer, code generation, SCCP, and the phase/lifetime pipeline invariants.
 - An end-to-end e2e CTest that compiles 23 accepted programs with both
   --compile and --optimize, links and runs them, compares the results with
   clang, checks --print-ast round trips, and verifies that 14 invalid programs

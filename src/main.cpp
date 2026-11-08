@@ -20,30 +20,29 @@ void usage() {
 }
 
 struct Invocation {
-  enum class Mode { Tokenize, Parse, PrintAst, Compile, Optimize };
-  Mode mode = Mode::Compile;
+  CompileMode mode = CompileMode::Compile;
   std::string filename;
 };
 
-bool parseMode(const std::string &text, Invocation::Mode &mode) {
+bool parseMode(const std::string &text, CompileMode &mode) {
   if (text == "tokenize" || text == "--tokenize") {
-    mode = Invocation::Mode::Tokenize;
+    mode = CompileMode::Tokenize;
     return true;
   }
   if (text == "parse" || text == "--parse") {
-    mode = Invocation::Mode::Parse;
+    mode = CompileMode::Parse;
     return true;
   }
   if (text == "print-ast" || text == "--print-ast") {
-    mode = Invocation::Mode::PrintAst;
+    mode = CompileMode::PrintAst;
     return true;
   }
   if (text == "compile" || text == "--compile") {
-    mode = Invocation::Mode::Compile;
+    mode = CompileMode::Compile;
     return true;
   }
   if (text == "optimize" || text == "--optimize") {
-    mode = Invocation::Mode::Optimize;
+    mode = CompileMode::Optimize;
     return true;
   }
   return false;
@@ -51,7 +50,7 @@ bool parseMode(const std::string &text, Invocation::Mode &mode) {
 
 bool parseInvocation(int argc, char **argv, Invocation &invocation) {
   if (argc == 2 && argv[1][0] != '-') {
-    invocation.mode = Invocation::Mode::Compile;
+    invocation.mode = CompileMode::Compile;
     invocation.filename = argv[1];
     return true;
   }
@@ -90,25 +89,11 @@ int main(int argc, char **argv) {
   }
 
   try {
-    Compiler compiler(invocation.filename);
-    switch (invocation.mode) {
-    case Invocation::Mode::Tokenize:
-      return compiler.tokenize();
-    case Invocation::Mode::Parse:
-      return compiler.parse();
-    case Invocation::Mode::PrintAst:
-      return compiler.printAst();
-    case Invocation::Mode::Compile:
-      return compiler.compile(false);
-    case Invocation::Mode::Optimize:
-      return compiler.compile(true);
-    }
+    return run(invocation.filename, invocation.mode);
   } catch (const CompileError &) {
     return 1;
   } catch (const std::exception &error) {
     std::cerr << "c4: internal error: " << error.what() << '\n';
     return 2;
   }
-
-  return 2;
 }
