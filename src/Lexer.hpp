@@ -1,63 +1,58 @@
 #pragma once
 
+#include "Support.hpp"
 #include "SymbolInternalizer.hpp"
 #include "Token.hpp"
+
+#include <cstddef>
 #include <functional>
 #include <string>
-#include <string_view>
+#include <vector>
 
+/// Hand-written lexer for the C4 subset.  It implements the maximal-munch
+/// rule, ISO-8859-1 byte positions, CR/LF/CRLF line endings, and the
+/// restricted constant/string rules from the assignment.
 class Lexer {
 public:
-  Lexer(const char *filename, SymbolInternalizer &symbolInternalizer);
-  /// For unittest usage
-  Lexer(const char *filename, std::string src,
-        SymbolInternalizer &symbolInternalizer);
-  ~Lexer();
+  Lexer(std::string filename, SymbolInternalizer &symbols);
+  Lexer(std::string filename, std::string source,
+        SymbolInternalizer &symbols);
 
-  void tokenize(std::function<void(Token)> f);
+  Lexer(const Lexer &) = delete;
+  Lexer &operator=(const Lexer &) = delete;
+
+  /// Calls f for every token except the internal end-of-input token.
+  void tokenize(const std::function<void(const Token &)> &f);
+
+  /// Returns the complete token stream, including the end-of-input token.
   std::vector<Token> tokenize();
 
 private:
-  std::string_view filename;
-  std::string src;
-  std::string_view::iterator chars;
-  std::string_view::const_iterator end;
-  size_t line;
-  size_t column;
-  size_t len_remaining;
-  SymbolInternalizer &symbolInternalizer;
+  std::string filename_;
+  std::string source_;
+  size_t pos_ = 0;
+  uint32_t line_ = 1;
+  uint32_t column_ = 1;
+  SymbolInternalizer &symbols_;
+  Diagnostics diagnostics_;
 
-  static constexpr char eof_char = '\0';
+  int peek(size_t offset = 0) const;
+  bool eof(size_t offset = 0) const;
+  SourceLoc here() const { return SourceLoc{line_, column_}; }
+  void consume();
 
-  Token advance_token();
-  std::string_view token_string(size_t len);
-  TokenKind identifier_or_keywords();
-  void decimal_digits();
-  bool single_quoted_string(const Locatable &loc);
-  bool double_quoted_string(const Locatable &loc);
+  void skipWhitespaceAndComments();
+  Token lexToken();
+  TokenKind lexNumber();
+  TokenKind lexCharacterConstant();
+  TokenKind lexStringLiteral();
+  TokenKind lexPunctuator();
 
-  /// Moves to the next character.
-  void bump();
-  /// Moves to the next line.
-  void new_line();
-  /// Peeks the next symbol from the input stream without consuming it.
-  /// If requested position doesn't exist, `EOF_CHAR` is returned.
-  /// However, getting `EOF_CHAR` doesn't always mean actual end of file,
-  /// it should be checked with `is_eof` method.
-  char first();
-  /// Peeks the second symbol from the input stream without consuming it.
-  char second();
-  /// Checks if there is nothing more to consume.
-  bool is_eof();
-  /// Returns amount of already consumed symbols.
-  size_t pos_within_token();
-  /// Resets the number of bytes consumed to 0.
-  void reset_pos_within_token();
-  /// Eats symbols while predicate returns true or until the end of file is
-  /// reached.
-  void eat_while(bool (*predicate)(char));
-  void eat_while(bool (*predicate)(char, char));
-  bool is_escape_sequence_char(char c);
-  void line_comment();
-  bool block_comment(const Locatable &loc);
+  Token makeToken(TokenKind kind, SourceLoc start, size_t begin) const;
+  [[noreturn]] void fail(SourceLoc loc, const std::string &message) const;
+
+  static bool isIdentStart(int c);
+  static bool isIdentContinue(int c);
+  static bool isDigit(int c);
+  static bool isSimpleEscape(int c);
 };

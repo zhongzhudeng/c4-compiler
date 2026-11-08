@@ -1,58 +1,23 @@
-BUILDDIR ?= build
-CFG      ?= debug
-NAME     ?= c4
-SRCDIR   ?= src
+BUILD_DIR ?= build/debug
+BUILD_TYPE ?= Debug
+CMAKE ?= cmake
+CTEST ?= ctest
 
-all:
+.PHONY: all configure test debug release clean
 
--include config/$(CFG).cfg
+all: configure
+	${CMAKE} --build ${BUILD_DIR}
 
-# Be verbose about the build.
-Q ?= @
+configure:
+	${CMAKE} -S . -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
 
-BINDIR := $(BUILDDIR)/$(CFG)
-BIN    := $(BINDIR)/$(NAME)
-SRC    := $(sort $(wildcard $(SRCDIR)/*.cpp))
-OBJ    := $(SRC:$(SRCDIR)/%.cpp=$(BINDIR)/%.o)
-DEP    := $(OBJ:%.o=%.d)
+test: all
+	${CTEST} --test-dir ${BUILD_DIR} --output-on-failure
 
-# Try to locate llvm-config, a tool that produces command line flags for the
-# build process.
-ifneq ("$(wildcard llvm/install/bin/llvm-config)","")
-	LLVM_CONFIG  ?= llvm/install/bin/llvm-config
-else
-	LLVM_CONFIG  ?= llvm-config
-endif
+debug: all
 
-# Obtain the LLVM build flags if we found llvm-config.
-ifeq (,$(wildcard $(LLVM_CONFIG)))
-	LLVM_CFLAGS  :=
-	LLVM_LDFLAGS :=
-else
-	LLVM_CFLAGS  := $(shell $(LLVM_CONFIG) --cppflags)
-	LLVM_LDFLAGS := $(shell $(LLVM_CONFIG) --ldflags --libs --system-libs)
-endif
-
-CFLAGS   := $(LLVM_CFLAGS) -Wall -W $(CFLAGS)
-CXXFLAGS += $(CFLAGS) -std=c++17
-LDFLAGS  += $(LLVM_LDFLAGS)
-
-DUMMY := $(shell mkdir -p $(sort $(dir $(OBJ))))
-
-.PHONY: all clean
-
-all: $(BIN)
-
--include $(DEP)
+release:
+	${MAKE} BUILD_DIR=build/release BUILD_TYPE=Release all
 
 clean:
-	@echo "===> CLEAN"
-	$(Q)rm -fr $(BINDIR)
-
-$(BIN): $(OBJ)
-	@echo "===> LD $@"
-	$(Q)$(CXX) -o $(BIN) $(OBJ) $(LDFLAGS)
-
-$(BINDIR)/%.o: $(SRCDIR)/%.cpp
-	@echo "===> CXX $<"
-	$(Q)$(CXX) $(CXXFLAGS) -MMD -c -o $@ $<
+	${CMAKE} -E rm -rf build

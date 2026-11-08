@@ -1,58 +1,62 @@
 #pragma once
-#include "Diagnostic.hpp"
-#include "Parser.hpp"
-#include "Sema.hpp"
-#include "Syntax.hpp"
-#include "SyntaxDecl.hpp"
+
+#include "AST.hpp"
+#include "Support.hpp"
 #include "Token.hpp"
-#include <functional>
+
+#include <cstddef>
 #include <vector>
 
-class UnitTestParser;
-
+/// Recursive-descent parser for the restricted C4 grammar.  It performs
+/// syntax analysis only and fills the ID-based AST; all names and types are
+/// resolved later by Sema.
 class Parser {
 public:
-  Parser(std::vector<Token> token_stream, Sema &Action);
-  ~Parser();
-  TranslationUnitPtr parse();
+  Parser(AST &ast, std::vector<Token> tokens, Diagnostics &diagnostics);
+
+  void parseTranslationUnit();
 
 private:
-  std::vector<Token> token_stream;
-  std::vector<Token>::iterator cursor;
-  std::vector<Token>::const_iterator end;
+  AST &ast_;
+  std::vector<Token> tokens_;
+  size_t pos_ = 0;
+  Diagnostics &diagnostics_;
 
-  Sema &Action;
+  const Token &current() const;
+  const Token &peekToken(size_t offset) const;
+  TokenKind peekKind(size_t offset) const;
+  SourceLoc loc() const;
+  bool atEnd() const;
+  bool check(TokenKind kind) const;
+  bool accept(TokenKind kind);
+  void expect(TokenKind kind, const char *what);
+  void advance();
+  [[noreturn]] void error(SourceLoc location, const std::string &message) const;
 
-  friend UnitTestParser;
+  bool isTypeSpecifierStart() const;
+  bool isDeclaratorStart() const;
+  bool isTypeNameAhead() const;
+  bool isParameterListAhead() const;
 
-  const Locatable &location(void);
-  void bump(void);
-  bool check(TokenKind tk);
-  bool accept(TokenKind tk);
-  void expect(TokenKind tk, const char *txt);
-  TokenKind kind();
-  TokenKind kind_first();
-  bool is_paren_type_name();
-  bool is_end();
+  TypeSpecId parseTypeSpec();
+  DeclaratorId parseDeclarator(bool allowName, bool allowEmpty);
+  std::vector<DeclId> parseParameterList(SourceLoc lparen, bool &explicitVoid);
+  DeclId parseParameterDeclaration();
+  DeclId parseFieldDeclaration();
 
-  ExprPtr ParseExpr();
+  DeclId parseExternalDeclaration();
+  DeclId parseLocalDeclaration();
 
-  DeclSpecPtr ParseDeclSpec();
-  DeclaratorDeclPtr ParseDeclaratorDecl();
-  DeclaratorPtr ParseDeclarator();
-  DeclaratorPtr ParseNonFuncDeclarator();
+  StmtId parseStatement();
+  StmtId parseCompoundStatement();
 
-  StmtPtr ParseStmt();
+  ExprId parseExpression();
+  ExprId parseConditional();
+  ExprId parseBinary(int minPrecedence);
+  ExprId parseUnary();
+  ExprId parsePostfix();
+  ExprId parsePrimary();
 
-  ExprPtr ParseUnaryExpr();
-  ExprPtr ParseBinaryExprRHS(int, ExprPtr);
-  ExprPtr ParsePostfixExprSuffix(ExprPtr expr);
-
-  ExprPtr ParseIdentifierExpr();
-  ExprPtr ParseConstantExpr();
-  ExprPtr ParseStringLiteralExpr();
-  ExprPtr ParseParenExpr();
-
-  CompStmtPtr ParseCompoundStmt();
-  DeclPtr ParseExternDecl();
+  bool isAssignmentLHS(ExprId id) const;
+  static int binaryPrecedence(TokenKind kind, BinaryExpr::Op &op);
 };

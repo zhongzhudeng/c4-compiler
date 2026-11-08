@@ -1,22 +1,42 @@
 #pragma once
 
-#include "Diagnostic.hpp"
+#include "Support.hpp"
 #include "SymbolInternalizer.hpp"
+
+#include <ostream>
+#include <string>
 
 #define KIND_ACTION(KD, STR) KD,
 
+/// Token kinds use the names of the C11 token non-terminals where possible.
+/// The enum is intentionally unscoped so the existing TokenKinds.def tables
+/// stay readable.
 enum TokenKind {
 #include "TokenKinds.def"
 };
 
 #undef KIND_ACTION
 
-struct Token : public Locatable {
-public:
-  TokenKind Kind;
-  Symbol Text;
+const char *tokenKindName(TokenKind kind);
 
-  Token(Locatable &loc, TokenKind kind, Symbol text);
+/// Digraphs are lexed and spelled exactly as written, but the parser and
+/// printer treat them as their primary punctuator.
+TokenKind canonicalTokenKind(TokenKind kind);
 
-  friend std::ostream &operator<<(std::ostream &stream, const Token &tok);
+struct Token {
+  TokenKind Kind = TK_EOI;
+  Symbol Text = nullptr;
+  SourceLoc Loc;
+  std::string FileName;
+
+  Token() = default;
+  Token(SourceLoc loc, TokenKind kind, Symbol text, std::string filename)
+      : Kind(kind), Text(text), Loc(loc), FileName(std::move(filename)) {}
+
+  bool is(TokenKind kind) const { return Kind == kind; }
+  bool isCanonical(TokenKind kind) const {
+    return canonicalTokenKind(Kind) == kind;
+  }
 };
+
+std::ostream &operator<<(std::ostream &stream, const Token &tok);

@@ -1,545 +1,335 @@
 #include "Lexer.hpp"
-#include "Diagnostic.hpp"
-#include "Token.hpp"
+
+#include <cctype>
 #include <fstream>
-#include <functional>
-#include <string>
+#include <iterator>
 #include <string_view>
-#include <vector>
+#include <utility>
 
-Lexer::Lexer(const char *filename, SymbolInternalizer &symbolInternalizer)
-    : filename(filename), symbolInternalizer(symbolInternalizer) {
-  std::ifstream ifs(filename);
-  src = std::string(std::istreambuf_iterator<char>{ifs}, {});
-  chars = std::string_view(src).begin();
-  end = std::string_view(src).cend();
-  line = 1;
-  column = 1;
-  len_remaining = src.length();
+namespace {
+
+struct Punctuator {
+  const char *text;
+  TokenKind kind;
+};
+
+// Longest spellings must be tried first.  This is the complete C11
+// punctuator set; unsupported operators are still lexed and are rejected by
+// the parser later.
+constexpr Punctuator kPunctuators[] = {
+    {"%:%:", TK_PERCENTCOLONPERCENTCOLON},
+    {"<<=", TK_LESSLESSEQUAL},
+    {">>=", TK_GREATERGREATEREQUAL},
+    {"...", TK_ELLIPSIS},
+    {"##", TK_HASHHASH},
+    {"->", TK_ARROW},
+    {"++", TK_PLUSPLUS},
+    {"--", TK_MINUSMINUS},
+    {"<<", TK_LESSLESS},
+    {">>", TK_GREATERGREATER},
+    {"<=", TK_LESSEQUAL},
+    {">=", TK_GREATEREQUAL},
+    {"==", TK_EQUALEQUAL},
+    {"!=", TK_EXCLAIMEQUAL},
+    {"&&", TK_AMPAMP},
+    {"||", TK_PIPEPIPE},
+    {"*=", TK_STAREQUAL},
+    {"/=", TK_SLASHEQUAL},
+    {"%=", TK_PERCENTEQUAL},
+    {"+=", TK_PLUSEQUAL},
+    {"-=", TK_MINUSEQUAL},
+    {"&=", TK_AMPEQUAL},
+    {"^=", TK_CARETEQUAL},
+    {"|=", TK_PIPEEQUAL},
+    {"<:", TK_LESSCOLON},
+    {":>", TK_COLONGREATER},
+    {"<%", TK_LESSPERCENT},
+    {"%>", TK_PERCENTGREATER},
+    {"%:", TK_PERCENTCOLON},
+    {"[", TK_LSQUARE},
+    {"]", TK_RSQUARE},
+    {"(", TK_LPAREN},
+    {")", TK_RPAREN},
+    {"{", TK_LBRACE},
+    {"}", TK_RBRACE},
+    {".", TK_PERIOD},
+    {"&", TK_AMP},
+    {"*", TK_STAR},
+    {"+", TK_PLUS},
+    {"-", TK_MINUS},
+    {"~", TK_TILD},
+    {"!", TK_EXCLAIM},
+    {"/", TK_SLASH},
+    {"%", TK_PERCENT},
+    {"<", TK_LESS},
+    {">", TK_GREATER},
+    {"^", TK_CARET},
+    {"|", TK_PIPE},
+    {"?", TK_QUESTION},
+    {":", TK_COLON},
+    {";", TK_SEMICOLON},
+    {"=", TK_EQUAL},
+    {",", TK_COMMA},
+    {"#", TK_HASH},
+};
+
+} // namespace
+
+Lexer::Lexer(std::string filename, SymbolInternalizer &symbols)
+    : filename_(std::move(filename)), symbols_(symbols),
+      diagnostics_(filename_) {
+  std::ifstream stream(filename_, std::ios::binary);
+  if (!stream) {
+    diagnostics_.error(SourceLoc{1, 1}, "cannot open input file");
+  }
+  source_.assign(std::istreambuf_iterator<char>(stream),
+                 std::istreambuf_iterator<char>());
 }
 
-Lexer::Lexer(const char *filename, std::string input,
-             SymbolInternalizer &symbolInternalizer)
-    : filename(filename), src(std::move(input)),
-      symbolInternalizer(symbolInternalizer) {
-  chars = std::string_view(src).begin();
-  end = std::string_view(src).cend();
-  line = 1;
-  column = 1;
-  len_remaining = src.length();
+Lexer::Lexer(std::string filename, std::string source,
+             SymbolInternalizer &symbols)
+    : filename_(std::move(filename)), source_(std::move(source)),
+      symbols_(symbols), diagnostics_(filename_) {}
+
+int Lexer::peek(size_t offset) const {
+  if (pos_ + offset >= source_.size())
+    return -1;
+  return static_cast<unsigned char>(source_[pos_ + offset]);
 }
 
-Lexer::~Lexer() {}
+bool Lexer::eof(size_t offset) const { return pos_ + offset >= source_.size(); }
 
-void Lexer::tokenize(std::function<void(Token)> f) {
-  for (auto tok = advance_token(); tok.Kind != TokenKind::TK_EOI;
-       tok = advance_token())
-    f(tok);
+void Lexer::consume() {
+  if (eof())
+    return;
+  int c = peek();
+  ++pos_;
+  if (c == '\r') {
+    // CRLF is one newline; a lone CR is also one newline.
+    if (peek() == '\n')
+      ++pos_;
+    ++line_;
+    column_ = 1;
+  } else if (c == '\n') {
+    ++line_;
+    column_ = 1;
+  } else {
+    ++column_;
+  }
+}
+
+bool Lexer::isIdentStart(int c) {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+}
+
+bool Lexer::isIdentContinue(int c) { return isIdentStart(c) || isDigit(c); }
+
+bool Lexer::isDigit(int c) { return c >= '0' && c <= '9'; }
+
+bool Lexer::isSimpleEscape(int c) {
+  switch (c) {
+  case '\'':
+  case '"':
+  case '?':
+  case '\\':
+  case 'a':
+  case 'b':
+  case 'f':
+  case 'n':
+  case 'r':
+  case 't':
+  case 'v':
+    return true;
+  default:
+    return false;
+  }
+}
+
+void Lexer::skipWhitespaceAndComments() {
+  for (;;) {
+    int c = peek();
+    if (c == ' ' || c == '\t' || c == '\v' || c == '\f' || c == '\r' ||
+        c == '\n') {
+      consume();
+      continue;
+    }
+    if (c == '/' && peek(1) == '/') {
+      consume();
+      consume();
+      while (!eof() && peek() != '\n' && peek() != '\r')
+        consume();
+      continue;
+    }
+    if (c == '/' && peek(1) == '*') {
+      SourceLoc start = here();
+      consume();
+      consume();
+      bool closed = false;
+      while (!eof()) {
+        if (peek() == '*' && peek(1) == '/') {
+          consume();
+          consume();
+          closed = true;
+          break;
+        }
+        consume();
+      }
+      if (!closed)
+        fail(start, "unterminated comment");
+      continue;
+    }
+    return;
+  }
+}
+
+void Lexer::fail(SourceLoc loc, const std::string &message) const {
+  diagnostics_.error(loc, message);
+}
+
+Token Lexer::makeToken(TokenKind kind, SourceLoc start, size_t begin) const {
+  std::string_view spelling(source_.data() + begin, pos_ - begin);
+  return Token(start, kind, symbols_.internalize(spelling), filename_);
+}
+
+TokenKind Lexer::lexNumber() {
+  if (peek() == '0') {
+    consume();
+    if (isDigit(peek()))
+      fail(here(), "octal constants are not supported");
+    if (isIdentStart(peek()) || peek() == '.')
+      fail(here(), "invalid suffix on integer constant");
+    return TK_CONSTANT;
+  }
+  while (isDigit(peek()))
+    consume();
+  if (isIdentStart(peek()) || peek() == '.')
+    fail(here(), "invalid suffix on integer constant");
+  return TK_CONSTANT;
+}
+
+TokenKind Lexer::lexCharacterConstant() {
+  SourceLoc start = here();
+  consume(); // opening quote
+  if (eof() || peek() == '\n' || peek() == '\r')
+    fail(start, "missing terminating ' character");
+  if (peek() == '\'')
+    fail(here(), "empty character constant");
+  if (peek() == '\\') {
+    consume();
+    if (eof() || peek() == '\n' || peek() == '\r')
+      fail(start, "missing terminating ' character");
+    if (!isSimpleEscape(peek()))
+      fail(here(), "invalid escape sequence");
+    consume();
+  } else {
+    if (peek() == 0)
+      fail(here(), "invalid character in character constant");
+    consume();
+  }
+  if (eof() || peek() == '\n' || peek() == '\r')
+    fail(start, "missing terminating ' character");
+  if (peek() != '\'')
+    fail(here(), "multi-character character constant");
+  consume();
+  return TK_CONSTANT;
+}
+
+TokenKind Lexer::lexStringLiteral() {
+  SourceLoc start = here();
+  consume(); // opening quote
+  while (!eof()) {
+    int c = peek();
+    if (c == '"') {
+      consume();
+      return TK_STRING_LITERAL;
+    }
+    if (c == '\n' || c == '\r')
+      fail(start, "missing terminating \" character");
+    if (c == '\\') {
+      consume();
+      if (eof() || peek() == '\n' || peek() == '\r')
+        fail(start, "missing terminating \" character");
+      if (!isSimpleEscape(peek()))
+        fail(here(), "invalid escape sequence");
+      consume();
+      continue;
+    }
+    if (c == 0)
+      fail(here(), "invalid character in string literal");
+    consume();
+  }
+  fail(start, "missing terminating \" character");
+}
+
+TokenKind Lexer::lexPunctuator() {
+  for (const Punctuator &p : kPunctuators) {
+    size_t length = std::char_traits<char>::length(p.text);
+    if (pos_ + length > source_.size())
+      continue;
+    if (source_.compare(pos_, length, p.text) != 0)
+      continue;
+    for (size_t i = 0; i < length; ++i)
+      consume();
+    return p.kind;
+  }
+  int c = peek();
+  std::string message = "invalid character";
+  if (c >= 32 && c < 127) {
+    message += " '";
+    message += static_cast<char>(c);
+    message += '\'';
+  } else {
+    message += " (byte ";
+    message += std::to_string(static_cast<unsigned char>(c));
+    message += ')';
+  }
+  fail(here(), message);
+}
+
+Token Lexer::lexToken() {
+  SourceLoc start = here();
+  size_t begin = pos_;
+  int c = peek();
+  TokenKind kind;
+  if (isIdentStart(c)) {
+    while (isIdentContinue(peek()))
+      consume();
+    std::string_view text(source_.data() + begin, pos_ - begin);
+#define KEYWORD_ACTION(KD, STR)                                                \
+  if (text == STR)                                                             \
+    return makeToken(KD, start, begin);
+#include "KeyWords.def"
+#undef KEYWORD_ACTION
+    kind = TK_IDENTIFIER;
+  } else if (isDigit(c)) {
+    kind = lexNumber();
+  } else if (c == '\'') {
+    kind = lexCharacterConstant();
+  } else if (c == '"') {
+    kind = lexStringLiteral();
+  } else {
+    kind = lexPunctuator();
+  }
+  return makeToken(kind, start, begin);
+}
+
+void Lexer::tokenize(const std::function<void(const Token &)> &f) {
+  for (const Token &tok : tokenize()) {
+    if (tok.Kind != TK_EOI)
+      f(tok);
+  }
 }
 
 std::vector<Token> Lexer::tokenize() {
-  std::vector<Token> token_stream;
-  tokenize([&](Token tok) { token_stream.emplace_back(tok); });
-  return token_stream;
-}
-
-Token Lexer::advance_token() {
-  char cur;
-  TokenKind kind;
-  Locatable location(filename);
-
-AdvanceToken:
-  location.set_position(line, column);
-  if (first() == eof_char) {
-    Symbol symbol = symbolInternalizer.internalize("");
-    kind = TK_EOI;
-    return Token(location, kind, symbol);
+  std::vector<Token> tokens;
+  for (;;) {
+    skipWhitespaceAndComments();
+    SourceLoc start = here();
+    if (eof()) {
+      tokens.push_back(
+          Token(start, TK_EOI, symbols_.internalize(""), filename_));
+      return tokens;
+    }
+    tokens.push_back(lexToken());
   }
-  cur = first(), bump();
-  switch (cur) {
-
-  /// whitespace
-  case ' ':  // space
-  case '\t': // horizontal tab
-  case '\v': // vertical tab
-  case '\f': // form-feed
-    eat_while(
-        [](char c) { return c == ' ' || c == '\t' || c == '\v' || c == '\f'; });
-    reset_pos_within_token();
-    goto AdvanceToken;
-
-  /// new line
-  case '\r':
-    switch (first()) {
-    case '\n':
-      bump();
-      new_line();
-      break;
-    default:
-      new_line();
-    }
-    goto AdvanceToken;
-  case '\n':
-    new_line();
-    goto AdvanceToken;
-
-  /// identifier
-  case 'A' ... 'Z':
-  case 'a' ... 'z':
-  case '_':
-    kind = identifier_or_keywords();
-    break;
-
-  /// constant
-
-  /// decimal-constants, 0
-  /// attention: this implementation regard "00" as valid constant
-  case '0' ... '9':
-    decimal_digits();
-    kind = TK_CONSTANT;
-    break;
-  /// character-constant
-  case '\'':
-    if (not single_quoted_string(location))
-      exit(1);
-    kind = TK_CONSTANT;
-    break;
-
-  case '\"':
-    if (not double_quoted_string(location))
-      exit(1);
-    kind = TK_STRING_LITERAL;
-    break;
-
-  /// punctuation
-  case '!':
-    switch (first()) {
-    case '=':
-      bump();
-      kind = TK_EXCLAIMEQUAL; // "!="
-      break;
-    default:
-      kind = TK_EXCLAIM; // "!"
-    }
-    break;
-  case '#':
-    switch (first()) {
-    case '#':
-      bump();
-      kind = TK_HASHHASH; // "##"
-      break;
-    default:
-      kind = TK_EXCLAIM; // "#"
-    }
-    break;
-  case '%':
-    switch (first()) {
-    case ':':
-      bump();
-      if (first() == '%' && second() == ':') {
-        bump(), bump();
-        kind = TK_PERCENTCOLONPERCENTCOLON; // "%:%:"
-      } else
-        kind = TK_PERCENTCOLON; // "%:"
-      break;
-    case '=':
-      bump();
-      kind = TK_EXCLAIMEQUAL; // "%="
-      break;
-    case '>':
-      bump();
-      kind = TK_PERCENTGREATER; // "%="
-      break;
-    default:
-      kind = TK_PERCENT; // "%"
-    }
-    break;
-  case '&':
-    switch (first()) {
-    case '&':
-      bump();
-      kind = TK_AMPAMP; // "&&"
-      break;
-    case '=':
-      bump();
-      kind = TK_AMPEQUAL; // "&="
-      break;
-    default:
-      kind = TK_AMP; //"&"
-    }
-    break;
-  case '(':
-    kind = TK_LPAREN;
-    break;
-  case ')':
-    kind = TK_RPAREN;
-    break;
-  case '*':
-    switch (first()) {
-    case '=':
-      bump();
-      kind = TK_STAREQUAL; // "*="
-      break;
-    default:
-      kind = TK_STAR; // "*"
-    }
-    break;
-  case '+':
-    switch (first()) {
-    case '+':
-      bump();
-      kind = TK_PLUSPLUS; // "++"
-      break;
-    case '=':
-      bump();
-      kind = TK_PLUSEQUAL; // "+="
-      break;
-    default:
-      kind = TK_PLUS; // "+"
-    }
-    break;
-  case ',':
-    kind = TK_COMMA;
-    break;
-  case '-':
-    switch (first()) {
-    case '-':
-      bump();
-      kind = TK_MINUSMINUS; // "--"
-      break;
-    case '=':
-      bump();
-      kind = TK_MINUSEQUAL; // "-="
-      break;
-    case '>':
-      bump();
-      kind = TK_ARROW; // "->"
-      break;
-    default:
-      kind = TK_MINUS; // "-"
-    }
-    break;
-  case '.':
-    if (first() == '.' && second() == '.') {
-      bump(), bump();
-      kind = TK_ELLIPSIS; // "..."
-    } else
-      kind = TK_PERIOD;
-    break;
-  case '/':
-    switch (first()) {
-    case '=':
-      bump();
-      kind = TK_SLASHEQUAL; // "/="
-      break;
-    case '/':
-      // line comment
-      bump();
-      line_comment();
-      if (first() == eof_char) {
-        // TODO: error msg
-        errorloc(location, "\n");
-        exit(1);
-      }
-      reset_pos_within_token();
-      goto AdvanceToken;
-      break;
-    case '*':
-      // block comment
-      bump();
-      if (not block_comment(location))
-        exit(1);
-      if (first() == eof_char) {
-        // TODO: error msg
-        errorloc(location, "\n");
-        exit(1);
-      }
-      reset_pos_within_token();
-      goto AdvanceToken;
-    default:
-      kind = TK_SLASH; // "/"
-    }
-    break;
-  case ':':
-    switch (first()) {
-    case '>':
-      bump();
-      kind = TK_COLONGREATER; // ":>"
-      break;
-    default:
-      kind = TK_COLON; // ":"
-    }
-    break;
-  case '<':
-    switch (first()) {
-    case '%':
-      bump();
-      kind = TK_LESSPERCENT; // "<%"
-      break;
-    case ':':
-      bump();
-      kind = TK_LESSCOLON; // "<:"
-      break;
-    case '<':
-      bump();
-      switch (first()) {
-      case '=':
-        bump();
-        kind = TK_LESSLESSEQUAL; // "<<="
-        break;
-      default:
-        kind = TK_LESSLESS; // "<<"
-      }
-      break;
-    case '=':
-      bump();
-      kind = TK_LESSEQUAL; // "<="
-      break;
-    default:
-      kind = TK_LESS; // "<"
-    }
-    break;
-  case '=':
-    switch (first()) {
-    case '=':
-      bump();
-      kind = TK_EQUALEQUAL; //"=="
-      break;
-    default:
-      kind = TK_EQUAL; //"="
-    }
-    break;
-  case '>':
-    switch (first()) {
-    case '=':
-      bump();
-      kind = TK_GREATEREQUAL; // ">="
-      break;
-    case '>':
-      bump();
-      switch (first()) {
-      case '=':
-        bump();
-        kind = TK_GREATERGREATEREQUAL; // ">>="
-        break;
-      default:
-        kind = TK_GREATERGREATER; // ">>"
-      }
-      break;
-    default:
-      kind = TK_GREATER; // ">"
-    }
-    break;
-  case '?':
-    kind = TK_QUESTION; // "?"
-    break;
-  case '[':
-    kind = TK_LSQUARE; // "["
-    break;
-  case ']':
-    kind = TK_RSQUARE; // "]"
-    break;
-  case '^':
-    switch (first()) {
-    case '=':
-      bump();
-      kind = TK_CARETEQUAL; // "^="
-      break;
-    default:
-      kind = TK_CARET; // "^"
-    }
-    break;
-  case '{':
-    kind = TK_LBRACE; // "{"
-    break;
-  case '|':
-    switch (first()) {
-    case '=':
-      bump();
-      kind = TK_PIPEEQUAL; // "|="
-      break;
-    case '|':
-      bump();
-      kind = TK_PIPEPIPE; // "||"
-      break;
-    default:
-      kind = TK_CARET; // "^"
-    }
-    break;
-  case '}':
-    kind = TK_RBRACE; // ""
-    break;
-  case ';':
-    kind = TK_SEMICOLON; // ";"
-    break;
-  case '~':
-    kind = TK_TILD; // "~"
-    break;
-  default:
-    errorloc(location, " error: invaild charactor\n");
-    exit(1);
-  }
-
-  std::string_view str = token_string(pos_within_token());
-  Symbol symbol = symbolInternalizer.internalize(str);
-  Token tok(location, kind, symbol);
-  reset_pos_within_token();
-  return tok;
-}
-
-std::string_view Lexer::token_string(size_t len) {
-  return std::string_view(chars - len, len);
-}
-
-TokenKind Lexer::identifier_or_keywords() {
-  eat_while([](char c) { return isalnum(c) || c == '_'; });
-  std::string_view str = token_string(pos_within_token());
-#define KEYWORD_ACTION(KD, STR)                                                \
-  if (STR == str)                                                              \
-    return KD;
-#include "KeyWords.def"
-#undef KEYWORD_ACTION
-  return TK_IDENTIFIER;
-}
-
-void Lexer::decimal_digits() {
-  eat_while([](char c) { return '0' <= c && c <= '9'; });
-}
-
-bool Lexer::single_quoted_string(const Locatable &loc) {
-  if (first() == eof_char or first() == '\n' or first() == '\r') {
-    errorloc(loc, "Missing terminating ' character\n");
-    return false;
-  }
-  if (first() == '\'') {
-    errorloc(loc, "Empty character constant\n");
-    return false;
-  }
-  // escape sequence
-  if (first() == '\\') {
-    bump();
-    if (first() == eof_char) {
-      errorloc(loc, "Missing terminating ' character\n");
-      return false;
-    }
-    if (not is_escape_sequence_char(first())) {
-      errorloc(loc, "Unexpected escape sequence: \\", first(), '\n');
-      return false;
-    }
-  }
-  if (second() == eof_char) {
-    errorloc(loc, "Missing terminating ' character\n");
-    return false;
-  }
-  if (second() != '\'') {
-    errorloc(loc, "Multi-character character constant\n");
-    return false;
-  }
-  bump(), bump();
-  return true;
-}
-
-bool Lexer::double_quoted_string(const Locatable &loc) {
-  while (first() != eof_char) {
-    switch (first()) {
-    case '"':
-      bump();
-      return true;
-    case '\\':
-      if (second() != eof_char && not is_escape_sequence_char(second())) {
-        errorloc(loc, "Unexpected escape sequence: \\", first(), '\n');
-        return false;
-      }
-      bump();
-      break;
-    case '\n':
-    case '\r':
-      errorloc(loc, "Missing terminating '\"' character\n");
-      return false;
-    }
-    bump();
-  }
-  errorloc(loc, "Unexpected escape sequence: \\", first(), '\n');
-  return false;
-}
-
-void Lexer::bump() {
-  column++;
-  if (chars != end)
-    chars++;
-}
-
-void Lexer::new_line() {
-  column = 1;
-  line++;
-  reset_pos_within_token();
-}
-
-char Lexer::first() { return chars != end ? *chars : eof_char; }
-
-char Lexer::second() { return (chars + 1) != end ? *(chars + 1) : eof_char; }
-
-bool Lexer::is_eof() { return chars == end; }
-
-size_t Lexer::pos_within_token() { return len_remaining - (end - chars); }
-
-void Lexer::reset_pos_within_token() { len_remaining = end - chars; }
-
-void Lexer::eat_while(bool (*predicate)(char)) {
-  while (predicate(first()) && !is_eof())
-    bump();
-}
-
-void Lexer::eat_while(bool (*predicate)(char, char)) {
-  while (predicate(first(), second()) && !is_eof())
-    bump();
-}
-
-bool Lexer::is_escape_sequence_char(char c) {
-  return c == '\'' || c == '\"' || c == '?' || c == '\\' || c == 'a' ||
-         c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v';
-}
-
-void Lexer::line_comment() {
-  eat_while([](char c) { return c != '\r' && c != '\n'; });
-}
-
-bool Lexer::block_comment(const Locatable &loc) {
-  char cur;
-EatBlockComment:
-  eat_while([](char first, char second) {
-    return // */
-        !(first == '*' && second == '/') &&
-        // new line
-        (first != '\r' && first != '\n');
-  });
-  if (first() == eof_char) {
-    errorloc(loc, "Unterminated /* comment\n");
-    return false;
-  }
-  cur = first(), bump();
-  switch (cur) {
-  case '*':
-    if (first() == '/') {
-      bump();
-      return true;
-    }
-    break;
-  case '\r':
-    switch (first()) {
-    case '\n':
-      bump();
-      new_line();
-      break;
-    default:
-      new_line();
-    }
-    goto EatBlockComment;
-  case '\n':
-    new_line();
-    goto EatBlockComment;
-  default:
-    goto EatBlockComment;
-  }
-  return false;
 }

@@ -1,21 +1,27 @@
-include(CTest)
-enable_testing()
-
-find_package(Catch2 3 REQUIRED)
-find_package(fmt REQUIRED)
-add_executable(tests Lexer.cpp Sema.cpp)
-target_compile_features(tests PRIVATE cxx_std_20)
-target_include_directories(tests PRIVATE ../src)
-
-if(EXISTS "llvm/install/bin/llvm-config")
-  target_compile_options(tests PRIVATE -Wall -W ${LLVM_CFLAGS})
-  target_link_options(tests PRIVATE "-Wl,--search_paths_first" "-Wl,-headerpad_max_install_names")
-  target_link_directories(tests PRIVATE ${LLVM_LIBDIR} /opt/homebrew/opt/zstd/lib)
-  target_link_libraries(tests PRIVATE fmt::fmt compiler Catch2::Catch2WithMain ${LLVM_LIBS} ${SYSTEM_LIBS})
-else()
-  target_compile_options(tests PRIVATE -Wall -W)
-  target_link_libraries(tests PRIVATE fmt::fmt compiler Catch2::Catch2WithMain)
-endif()
+add_executable(c4_tests
+  LexerTests.cpp
+  ParserTests.cpp
+  SemaTests.cpp
+  PrinterTests.cpp
+  CodeGenTests.cpp
+  SCCPTests.cpp)
+target_link_libraries(c4_tests PRIVATE c4core Catch2::Catch2WithMain)
+target_include_directories(c4_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_definitions(c4_tests PRIVATE
+  C4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+target_compile_options(c4_tests PRIVATE -Wall -Wextra)
 
 include(Catch)
-catch_discover_tests(tests)
+catch_discover_tests(c4_tests)
+
+find_program(CLANG_EXECUTABLE NAMES clang)
+if(Python3_Interpreter_FOUND AND CLANG_EXECUTABLE)
+  add_test(NAME e2e
+    COMMAND Python3::Interpreter
+      ${CMAKE_CURRENT_SOURCE_DIR}/e2e/run_e2e.py
+      --c4 $<TARGET_FILE:c4>
+      --clang ${CLANG_EXECUTABLE}
+      --programs ${CMAKE_CURRENT_SOURCE_DIR}/e2e/programs
+      --rejects ${CMAKE_CURRENT_SOURCE_DIR}/e2e/rejects)
+  set_tests_properties(e2e PROPERTIES TIMEOUT 300)
+endif()
