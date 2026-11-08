@@ -21,6 +21,8 @@ python3 verification/conformance/run_conformance.py --c4 build/c4
 ```
 
 The command writes `results/evidence.json` and regenerates `../COVERAGE.md`.
+Both are generated outputs and are not tracked by git; regenerate them locally
+when needed.
 To also write the executed statuses and evidence summaries back into
 `verification/spec/requirements.yaml`:
 

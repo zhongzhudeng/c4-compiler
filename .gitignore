@@ -4,6 +4,10 @@ build/
 # Generated LLVM IR
 *.ll
 
+# Generated verification output
+verification/conformance/results/
+verification/COVERAGE.md
+
 # Editor and OS files
 .vscode/
 .idea/
