@@ -110,7 +110,7 @@ int Compiler::compile(bool optimize) {
   module.setTargetTriple(llvm::Triple(triple_));
   module.setDataLayout(*dataLayout_);
 
-  CodeGen codegen(ast_, *model_, *layout_, context_, module, diagnostics_);
+  CodeGen codegen(ast_, *model_, types_, *layout_, context_, module);
   codegen.emit();
 
   if (optimize) {

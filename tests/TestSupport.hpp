@@ -82,6 +82,34 @@ public:
     return true;
   }
 
+  /// Runs CodeGen against the AST/model produced by analyze().  Tests can
+  /// mutate the AST after semantic analysis to exercise lowering invariants.
+  bool generate(std::string *ir = nullptr, std::string *error = nullptr) {
+    if (!model_ || !types_ || !layout_ || !context_ || !dataLayout_) {
+      if (error)
+        *error = "no analyzed program";
+      return false;
+    }
+    try {
+      llvm::Module module("test", *context_);
+      module.setDataLayout(*dataLayout_);
+      CodeGen codegen(ast_, *model_, *types_, *layout_, *context_, module);
+      codegen.emit();
+
+      std::string text;
+      llvm::raw_string_ostream stream(text);
+      module.print(stream, nullptr);
+      stream.flush();
+      if (ir)
+        *ir = text;
+    } catch (const std::exception &exception) {
+      if (error)
+        *error = exception.what();
+      return false;
+    }
+    return true;
+  }
+
   bool print(const std::string &source, std::string *output,
              std::string *error = nullptr) {
     ScopedCerrCapture capture;
@@ -132,7 +160,7 @@ public:
 
       llvm::Module module("test", context);
       module.setDataLayout(dataLayout);
-      CodeGen codegen(ast_, model, layout, context, module, diagnostics);
+      CodeGen codegen(ast_, model, types, layout, context, module);
       codegen.emit();
 
       if (optimize) {

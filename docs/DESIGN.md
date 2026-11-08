@@ -81,7 +81,7 @@ Source files:
     src/Parser.*           recursive-descent / precedence-climbing parser
     src/Sema.*             scopes, declarators, type checking, labels
     src/Printer.*          reference pretty printer (task D format)
-    src/CodeGen.*          LLVM 23 IR construction
+    src/CodeGen.*          module-wide IR and per-function lowering
     src/Optimizer.*        mem2reg only (permitted SSA construction)
     src/SCCP.*             own sparse conditional constant propagation
     src/Compiler.*         pipeline driver and .ll output
@@ -206,11 +206,45 @@ byte-exactly.
 
 ### Code generation (task F)
 
-LLVM 23 opaque-pointer API with IRBuilder.  Mapping:
+LLVM 23 opaque-pointer API with IRBuilder.  CodeGen is split into module-wide
+and function-scoped responsibilities:
+
+- CodeGen owns the llvm::Module and LLVMContext, the shared TypeLayout and
+  TypeContext, the EntityId maps for external objects and functions, and
+  module-wide string constants.  It creates external declarations once and
+  verifies the module after all definitions.
+- CodeGen::FunctionEmitter is a nested class constructed for exactly one
+  function definition and destroyed afterwards.  It owns the current
+  llvm::Function, its return type, the IRBuilder and alloca builder, the local
+  EntityId-to-alloca map, label blocks, and loop contexts.  There is no
+  function state on the module-level object and no manual reset between
+  definitions.
+
+Expression lowering distinguishes four result categories:
+
+- Place{address, type}: an addressable object, including string-literal
+  arrays.  Assignment targets and member bases require this category.
+- RValue{value, type}: a computed scalar (integer or pointer) value.  Void,
+  struct, array, and function values are deliberately not representable.
+- FunctionDesignator{callee, function type}: a callable function or function
+  pointer.  Direct calls use the function; indirect calls use the pointer.
+- VoidResult: evaluation with no resulting value, produced by void calls and
+  void conditional expressions.
+
+Conversions are explicit: emitValue applies lvalue-to-rvalue conversion,
+array-to-pointer decay, and function-to-pointer decay; load performs a scalar
+load; convert handles integer promotion/truncation, pointer compatibility, and
+null pointer constants using Sema's nullPointerConstant flag; emitDiscarded
+evaluates an expression statement, applying scalar lvalue conversion without
+requiring a value for arrays or structs.  Sema's value categories and the
+canonical TypeContext types are authoritative; CodeGen only checks LLVM
+lowering invariants.
+
+The LLVM mapping is otherwise unchanged:
 - char -> i8 (signed), int -> i32, pointers -> ptr, structs -> literal LLVM
   structs from TypeLayout, functions -> llvm::FunctionType.
 - File-scope objects become zero-initialized LLVM globals; tentative
-  definitions (int g; int g;) share one global by name.
+  definitions (int g; int g;) share one global by EntityId.
 - Every local and parameter is allocated in the entry block and initialized
   with a store, which makes mem2reg applicable.  Locals without initializers
   keep C's indeterminate value.
@@ -222,10 +256,17 @@ LLVM 23 opaque-pointer API with IRBuilder.  Mapping:
   decaying to ptr.  Pointer arithmetic and subscripts use typed GEPs; pointer
   difference is computed in i64 and divided by the element size.
 - Control flow uses explicit basic blocks: if/else, while, ?:, &&, || with
-  short-circuit PHIs, labels/goto (label blocks are pre-created so forward
-  gotos work), break/continue.
+  short-circuit PHIs; PHI incoming blocks are recorded after each arm so
+  nested expressions keep predecessor dominance.  Labels/goto use pre-created
+  label blocks so forward gotos work; break/continue use the innermost loop
+  context.
 - Void functions emit ret void; non-void functions without a terminator get a
   zero return (matching main's implicit return).
+- Missing local storage, missing labels or entities, invalid conversions, and
+  invalid insertion points are internal errors: they throw
+  std::runtime_error("codegen: ..."), which main reports as
+  "c4: internal error: ..." with exit code 2.  CodeGen never synthesizes a
+  global for a local entity and never emits source-language diagnostics.
 - llvm::verifyModule runs after generation; invalid IR is an internal error.
 
 ### SCCP (task G)
@@ -283,6 +324,12 @@ while.body; the deleted branches and blocks are gone.
    defined ScopeId.
 10. External linkage, not the syntactic declaration site, determines entity
     identity.
+11. CodeGen expression results distinguish Place, RValue, FunctionDesignator,
+    and VoidResult; a void expression is never an RValue.
+12. A local EntityId resolves only to its own local storage; missing storage is
+    an internal error, never a synthesized global.
+13. FunctionEmitter state has exactly one function-definition lifetime; no
+    module-level mutable function state exists.
 
 ## Build and test
 
@@ -297,19 +344,25 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 
 ## Verification
 
-- 65 Catch2 test cases (lexer, parser, Sema, printer, codegen, SCCP), all
-  passing.  Nine Sema cases are architectural regressions for entity
-  identity, binding identity, and scope lifetime.
-- End-to-end suite tests/e2e/run_e2e.py: 20 accepted programs x
-  {--compile, --optimize} plus 10 rejected programs; each accepted program is
-  compiled to .ll, linked with clang, executed, and compared against its
-  expected exit status and stdout; the original C source is also compiled with
-  clang and checked differentially.  --print-ast output is re-parsed to check
+- 76 Catch2 test cases (lexer, parser, Sema, printer, codegen, SCCP) plus the
+  end-to-end harness (77 CTest tests), all passing in Debug and Release.
+  Nine Sema cases are architectural regressions for entity identity, binding
+  identity, and scope lifetime; eleven CodeGen cases cover typed expression
+  results, missing local storage, conversions, calls, control flow, and
+  function-state isolation.
+- End-to-end suite tests/e2e/run_e2e.py: 23 accepted programs x
+  {--compile, --optimize} plus 14 rejected programs (430 checks); each
+  accepted program is compiled to .ll, linked with clang, executed, and
+  compared against its expected exit status and stdout; the original C source
+  is also compiled with clang and checked differentially.  --print-ast output
+  is re-parsed to check
   the printer/parser round trip.  Rejected programs must exit 1, print the
   required diagnostic format, and produce no .ll.
-- Full A-G conformance harness: 720/720 cases passed, including 108/109
+- Full A-G conformance harness: 726/726 cases passed, including 108/109
   grammar alternatives (the uncovered alternative is
   struct-declaration/without-declarator-list).
+- LLVM verifier checks pass for generated IR in both --compile and --optimize;
+  the conformance suite also runs llvm-as and executes both modes.
 - Manual probes verified token positions/format, the reference printer
   fixture, pointer/struct/function-pointer edge cases, and SCCP IR.
 
@@ -328,6 +381,7 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 - [x] Own SCCP and --optimize (mem2reg only as permitted).
 - [x] End-to-end and differential tests.
 - [x] Full CTest verification.
+- [x] CodeGen redesign: typed expression results and function-scoped emitters.
 
 ## Known limitations (within the assignment scope)
 

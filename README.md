@@ -25,8 +25,10 @@ source bytes
 - **Parser** — recursive descent with precedence climbing for the C4 grammar.
 - **Sema** — scopes, declarators, type checking, structs, labels/goto, and
   tentative definitions. Results live in an independent SemanticModel.
-- **CodeGen** — LLVM 23 opaque-pointer API; Sema and CodeGen share TypeLayout,
-  so sizeof cannot drift from the generated layout.
+- **CodeGen** — LLVM 23 opaque-pointer API with module-wide declarations and a
+  per-function emitter; expression results are typed as Place, RValue,
+  FunctionDesignator, or Void. Sema and CodeGen share TypeLayout, so sizeof
+  cannot drift from the generated layout.
 - **SCCP** — the project's own sparse conditional constant propagation;
   mem2reg is the only LLVM pass used.
 
