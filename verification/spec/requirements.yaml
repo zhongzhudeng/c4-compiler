@@ -481,7 +481,7 @@ requirements:
   interface: src/Printer.cpp; src/Compiler.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 148 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 150 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-002
   title: Reference output
@@ -503,7 +503,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 147 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 149 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-004
   title: Tabs and line wrapping
@@ -514,7 +514,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 145 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 147 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-005
   title: Full parenthesization
@@ -525,7 +525,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 148 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 150 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-006
   title: No digraphs
@@ -536,7 +536,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 146 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 148 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-007
   title: No reassociation
@@ -547,7 +547,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 147 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 149 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-008
   title: Structural round trip
@@ -558,7 +558,7 @@ requirements:
   interface: src/Printer.cpp; src/Parser.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 145 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 147 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-001
   title: Scopes
@@ -899,7 +899,7 @@ requirements:
   interface: src/CodeGen.cpp
   verification: codegen
   status: corpus-verified
-  evidence: "run_conformance.py: 43 case(s), 0 failed, 0 skipped (cli/mode-compile, codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 47 case(s), 0 failed, 0 skipped (cli/mode-compile, codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-002
   title: char/int LLVM types
@@ -943,7 +943,7 @@ requirements:
   interface: src/Compiler.cpp
   verification: codegen
   status: corpus-verified
-  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 46 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-006
   title: Default compile mode
@@ -965,7 +965,7 @@ requirements:
   interface: src/Compiler.cpp
   verification: codegen
   status: corpus-verified
-  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 46 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-008
   title: Differential execution
@@ -976,7 +976,7 @@ requirements:
   interface: src/CodeGen.cpp
   verification: codegen
   status: corpus-verified
-  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 46 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: F-009
   title: LLVM 15 environment deviation
