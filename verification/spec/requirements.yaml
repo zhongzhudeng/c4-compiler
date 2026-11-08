@@ -360,7 +360,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: corpus-verified
-  evidence: "run_conformance.py: 16 case(s), 0 failed, 0 skipped (parser/declarations, parser/forward-pointer, parser/tentative-definitions, parser/block-function-declaration, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 17 case(s), 0 failed, 0 skipped (parser/declarations, parser/forward-pointer, parser/tentative-definitions, parser/block-function-declaration, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-004
   title: Declarators
@@ -371,7 +371,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: corpus-verified
-  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-pointer-call, parser/block-function-declaration, parser/prototype-scope, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 9 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-pointer-call, parser/block-function-declaration, parser/prototype-scope, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-005
   title: Statements
@@ -393,7 +393,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: corpus-verified
-  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/generated-parameters); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/generated-parameters, parser/generated-nested-declarators); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-007
   title: --parse mode
@@ -426,7 +426,7 @@ requirements:
   interface: src/Parser.cpp
   verification: parser
   status: corpus-verified
-  evidence: "run_conformance.py: 121 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/expressions, parser/statements, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 123 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/expressions, parser/statements, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: C-010
   title: Parser error locations
@@ -481,7 +481,7 @@ requirements:
   interface: src/Printer.cpp; src/Compiler.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 146 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 148 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-002
   title: Reference output
@@ -503,7 +503,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 145 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 147 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-004
   title: Tabs and line wrapping
@@ -514,7 +514,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 143 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 145 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-005
   title: Full parenthesization
@@ -525,7 +525,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 146 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 148 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-006
   title: No digraphs
@@ -536,7 +536,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 144 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 146 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-007
   title: No reassociation
@@ -547,7 +547,7 @@ requirements:
   interface: src/Printer.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 145 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 147 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: D-008
   title: Structural round trip
@@ -558,7 +558,7 @@ requirements:
   interface: src/Printer.cpp; src/Parser.cpp
   verification: printer
   status: corpus-verified
-  evidence: "run_conformance.py: 143 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 145 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-001
   title: Scopes
@@ -569,7 +569,7 @@ requirements:
   interface: src/Sema.cpp
   verification: sema
   status: corpus-verified
-  evidence: "run_conformance.py: 12 case(s), 0 failed, 0 skipped (sema/file-var-visible, sema/block-shadow, sema/outer-restored, sema/use-before-declaration, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 15 case(s), 0 failed, 0 skipped (sema/file-var-visible, sema/block-shadow, sema/outer-restored, sema/use-before-declaration, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-002
   title: Namespaces
@@ -635,7 +635,7 @@ requirements:
   interface: src/Sema.cpp
   verification: sema
   status: corpus-verified
-  evidence: "run_conformance.py: 13 case(s), 0 failed, 0 skipped (sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, sema/distinct-tag-pointer, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 16 case(s), 0 failed, 0 skipped (sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, sema/distinct-tag-pointer, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-008
   title: Struct completeness
@@ -646,7 +646,7 @@ requirements:
   interface: src/Sema.cpp
   verification: sema
   status: corpus-verified
-  evidence: "run_conformance.py: 13 case(s), 0 failed, 0 skipped (sema/tentative-incomplete, sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 16 case(s), 0 failed, 0 skipped (sema/tentative-incomplete, sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-009
   title: Declarator-derived types
@@ -657,7 +657,7 @@ requirements:
   interface: src/Sema.cpp; src/Type.cpp
   verification: sema
   status: corpus-verified
-  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sema/comma-struct-different-shapes, sema/function-returning-pointer, sema/pointer-to-function, sema/function-returning-function, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (sema/comma-struct-different-shapes, sema/nested-function-definition-tag-visible, sema/nested-return-tag-hidden, sema/function-returning-pointer, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-010
   title: Parameter rules
@@ -668,7 +668,7 @@ requirements:
   interface: src/Sema.cpp
   verification: sema
   status: corpus-verified
-  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/parameter-function-adjusted, sema/definition-param-name-required, sema/void-only-parameter, sema/incomplete-parameter, ...); finite corpus conformance, not a universal proof"
+  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (sema/nested-parameter-tag-hidden, sema/parameter-function-adjusted, sema/definition-param-name-required, sema/void-only-parameter, ...); finite corpus conformance, not a universal proof"
   notes: ''
 - id: S-011
   title: Type categories
