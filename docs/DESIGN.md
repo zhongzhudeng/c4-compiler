@@ -574,6 +574,9 @@ libLLVM-23.dylib, and links the tests against Catch2 3.
 - Full A-G conformance harness: 726/726 cases passed, including 108/109
   grammar alternatives (the uncovered alternative is
   struct-declaration/without-declarator-list).
+- The harness writes results/evidence.json and COVERAGE.md as generated,
+  untracked artifacts; requirements.yaml remains the tracked specification and
+  is synchronized with --update-requirements.
 - LLVM verifier checks pass for generated IR in both --compile and --optimize;
   the conformance suite also runs llvm-as and executes both modes.
 - Manual probes verified token positions/format, the reference printer
