@@ -1,0 +1,37 @@
+4318
+
+      saarland          Compiler Construction (WS 2022/23)     Compiler Design Lab
+                                                            Prof. Dr. Sebastian Hack
+      university        Project Assignment 5
+                                                                  Fabian Ritter, B.Sc.
+      computer science
+
+      Project Task G Implement Sparse Conditional Constant Propagation
+
+      For this project assignment, we introduce an additional compiler switch, --optimize. This switch performs the
+      same operation as --compile and additionally performs optimizations. Implement the following optimization:
+
+          · Perform the SCCP 1 analysis.
+
+          · If applicable,
+
+                 - substitute instructions with constants,
+                 - substitute conditional branches with unconditional ones,
+                 - remove dead instructions and
+                 - remove unreachable blocks.
+
+          · If you do not want to implement SSA construction yourself, you may use the LLVM mem2reg pass (see
+             llvm::createPromoteMemoryToRegisterPass()) but no other LLVM passes.
+
+          · This is the last project assignment. Information on scheduling your code review meeting with us will be
+             made available online.
+
+          · The soft deadline for this milestone is 2023-02-10.
+
+          · Keep it simple!
+
+          1consider https://dl.acm.org/citation.cfm?id=103136 for more details if you haven't already (accessible from the uni-
+      versity network).
+
+                                                                         1
+

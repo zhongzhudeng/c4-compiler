@@ -1,0 +1,162 @@
+# C4 restricted grammar (Assignment 2, Project Task C)
+#
+# This file is the machine-readable form of the grammar restriction stated in
+# CD.pdf, Project Task C, plus the C11 productions it names.  Quoted terminals
+# are keyword or punctuator spellings; identifier, constant and string-literal
+# are lexical token classes defined in lexer.md.  Digraph spellings are lexed as
+# distinct punctuator tokens but are canonicalized to their primary spelling
+# before parsing, so the grammar below uses only primary spellings.
+#
+# The grammar describes the C4 subset only.  It deliberately omits every C11
+# production that Task C excludes (arrays, casts, most operators, typedef,
+# enum, union, qualifiers, storage classes, initializers, switch, for, do,
+# old-style function declarators, etc.).  Valid C outside this grammar is
+# outside C4 and may be rejected; see requirements.yaml.
+
+translation-unit ::= external-declaration
+                   | translation-unit external-declaration
+
+external-declaration ::= function-definition
+                       | declaration
+
+function-definition ::= declaration-specifiers declarator compound-statement
+
+declaration ::= declaration-specifiers init-declarator? ";"
+
+declaration-specifiers ::= type-specifier
+
+type-specifier ::= "void"
+                 | "char"
+                 | "int"
+                 | struct-or-union-specifier
+
+struct-or-union-specifier ::= "struct" "{" struct-declaration-list "}"
+                            | "struct" identifier "{" struct-declaration-list "}"
+                            | "struct" identifier
+
+struct-declaration-list ::= struct-declaration
+                          | struct-declaration-list struct-declaration
+
+struct-declaration ::= type-specifier struct-declarator-list? ";"
+
+struct-declarator-list ::= struct-declarator
+                         | struct-declarator-list "," struct-declarator
+
+struct-declarator ::= declarator
+
+init-declarator ::= declarator
+
+declarator ::= pointer? direct-declarator
+
+direct-declarator ::= identifier
+                    | "(" declarator ")"
+                    | direct-declarator "(" parameter-type-list ")"
+
+pointer ::= "*"
+          | "*" pointer
+
+parameter-type-list ::= parameter-list
+
+parameter-list ::= parameter-declaration
+                 | parameter-list "," parameter-declaration
+
+parameter-declaration ::= declaration-specifiers declarator
+                        | declaration-specifiers
+
+abstract-declarator ::= pointer
+                      | pointer? direct-abstract-declarator
+
+direct-abstract-declarator ::= "(" abstract-declarator ")"
+                             | "(" parameter-type-list ")"
+                             | direct-abstract-declarator "(" parameter-type-list ")"
+
+type-name ::= type-specifier abstract-declarator?
+
+primary-expression ::= identifier
+                     | constant
+                     | string-literal
+                     | "(" expression ")"
+
+postfix-expression ::= primary-expression
+                     | postfix-expression "[" expression "]"
+                     | postfix-expression "(" argument-expression-list? ")"
+                     | postfix-expression "." identifier
+                     | postfix-expression "->" identifier
+
+argument-expression-list ::= assignment-expression
+                           | argument-expression-list "," assignment-expression
+
+unary-expression ::= postfix-expression
+                   | "&" cast-expression
+                   | "*" cast-expression
+                   | "-" cast-expression
+                   | "!" cast-expression
+                   | "sizeof" unary-expression
+                   | "sizeof" "(" type-name ")"
+
+cast-expression ::= unary-expression
+
+multiplicative-expression ::= cast-expression
+                            | multiplicative-expression "*" cast-expression
+
+additive-expression ::= multiplicative-expression
+                      | additive-expression "+" multiplicative-expression
+                      | additive-expression "-" multiplicative-expression
+
+shift-expression ::= additive-expression
+
+relational-expression ::= shift-expression
+                        | relational-expression "<" shift-expression
+
+equality-expression ::= relational-expression
+                      | equality-expression "==" relational-expression
+                      | equality-expression "!=" relational-expression
+
+AND-expression ::= equality-expression
+
+exclusive-OR-expression ::= AND-expression
+
+inclusive-OR-expression ::= exclusive-OR-expression
+
+logical-AND-expression ::= inclusive-OR-expression
+                         | logical-AND-expression "&&" inclusive-OR-expression
+
+logical-OR-expression ::= logical-AND-expression
+                        | logical-OR-expression "||" logical-AND-expression
+
+conditional-expression ::= logical-OR-expression
+                         | logical-OR-expression "?" expression ":" conditional-expression
+
+assignment-expression ::= conditional-expression
+                        | unary-expression "=" assignment-expression
+
+expression ::= assignment-expression
+
+statement ::= labeled-statement
+            | compound-statement
+            | expression-statement
+            | selection-statement
+            | iteration-statement
+            | jump-statement
+
+labeled-statement ::= identifier ":" statement
+
+compound-statement ::= "{" block-item-list? "}"
+
+block-item-list ::= block-item
+                  | block-item-list block-item
+
+block-item ::= declaration
+             | statement
+
+expression-statement ::= expression? ";"
+
+selection-statement ::= "if" "(" expression ")" statement
+                      | "if" "(" expression ")" statement "else" statement
+
+iteration-statement ::= "while" "(" expression ")" statement
+
+jump-statement ::= "goto" identifier ";"
+                 | "continue" ";"
+                 | "break" ";"
+                 | "return" expression? ";"

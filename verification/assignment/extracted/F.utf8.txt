@@ -1,0 +1,39 @@
+4318
+
+      saarland          Compiler Construction (WS 2022/23)     Compiler Design Lab
+                                                            Prof. Dr. Sebastian Hack
+      university        Project Assignment 4
+                                                                  Fabian Ritter, B.Sc.
+      computer science
+
+      Project Task F Intermediate Representation
+
+          · Install LLVM 15.0. Follow the instructions from the "Introduction to LLVM" slide set to do so, preferably
+             using the build_llvm.sh script from the project template.
+             Building LLVM will take a while.
+
+          · Download and study the provided example programs to gain some intuition about the LLVM API. The
+             examples show how to directly construct LLVM IR representation for small but relevant code fragments.
+             You should be able to build and run them if you add the binary folder of your LLVM install (using the
+             defaults from our build script, this is llvm/install/bin) to your path.
+
+          · Implement a systematic LLVM IR construction from your AST. The compiler must perform this if --compile
+             or no explicit compilation mode is given. Use LLVM's 8-bit and 32-bit integer types to implement the char
+             and int types in C, respectively. You may use LLVM's llvm::DataLayout to compute sizes of types.
+
+          · The output shall be human readable LLVM code into a file. When the input is foo/bar.c the output file
+             is bar.ll in the current directory. To output into a file perform the following:
+
+             #include "llvm/Support/FileSystem.h"
+             #include "llvm/Support/raw_ostream.h"
+             ...
+             std::error_code EC;
+             raw_fd_ostream stream(filename, EC, llvm::sys::fs::OpenFlags::OF_Text);
+             M.print(stream, nullptr); /* M is a llvm::Module */
+
+          · The soft deadline for this milestone is 2023-01-27.
+
+          · Keep it simple!
+
+                        1
+

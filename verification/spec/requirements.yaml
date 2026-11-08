@@ -1,0 +1,1100 @@
+schema: 1
+sources:
+  AB: verification/assignment/sources/AB.pdf
+  CD: verification/assignment/sources/CD.pdf
+  E: verification/assignment/sources/E.pdf
+  F: verification/assignment/sources/F.pdf
+  G: verification/assignment/sources/G.pdf
+  N1570: verification/assignment/sources/n1570.pdf
+classifications:
+- required
+- must-reject
+- may-reject
+- exempted
+- out-of-scope
+- implementation-constraint
+statuses:
+- verified
+- partial
+- uncovered
+- blocked
+- not-applicable
+requirements:
+- id: A-001
+  title: Acceptance boundary
+  source: AB.pdf, Project Task A, Technical requirements and restrictions, bullet 4
+  classification: required
+  statement: Accept and correctly compile every program in the specified C4 subset; reject every program that is not part of the full C language; for valid C outside C4, either reject with an error or support correctly.
+  formalization: contracts.md#A-001; requirements.yaml classification
+  interface: src/Compiler.cpp; src/Sema.cpp
+  verification: codegen.differential, parser.valid, sema.reference
+  status: partial
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/acceptance-boundary); corpus-scoped, not a universal proof"
+  notes: ''
+- id: A-002
+  title: Buildable c4 executable
+  source: AB.pdf, Project Task A, Technical requirements, bullet 2
+  classification: implementation-constraint
+  statement: The project must be buildable with the provided Makefile and produce a binary c4.
+  formalization: contracts.md#A-002
+  interface: Makefile; CMakeLists.txt
+  verification: build
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (build/c4-binary, build/makefile)"
+  notes: ''
+- id: A-003
+  title: Acceptance exit code
+  source: AB.pdf, Project Task A, Technical requirements, bullet 3
+  classification: required
+  statement: Upon acceptance of a source program c4 terminates with return code 0.
+  formalization: contracts.md#A-003
+  interface: src/main.cpp
+  verification: cli
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/parse-accepts)"
+  notes: ''
+- id: A-004
+  title: Rejection exit code and diagnostic format
+  source: AB.pdf, Project Task A, Technical requirements, bullet 3
+  classification: required
+  statement: 'Rejection terminates with return code 1 and prints <filename>:<line>:<column>: error: <message> to stderr.'
+  formalization: contracts.md#A-003
+  interface: src/Support.cpp (Diagnostics); src/main.cpp
+  verification: cli, lexer, parser, sema
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (cli/parse-rejects, lexer/invalid-character)"
+  notes: ''
+- id: A-005
+  title: CLI modes
+  source: AB.pdf Task B; CD.pdf Tasks C-D; F.pdf Task F; G.pdf Task G
+  classification: required
+  statement: Support --tokenize, --parse, --print-ast, --compile, --optimize, and the default compile mode with the specified file argument.
+  formalization: contracts.md#A-004
+  interface: src/main.cpp; src/Compiler.cpp
+  verification: cli
+  status: verified
+  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (build/c4-binary, cli/parse-accepts, cli/mode-tokenize, cli/mode-parse, ...)"
+  notes: ''
+- id: A-006
+  title: Compiler written in C++
+  source: AB.pdf, Project Task A, Technical requirements, bullet 1
+  classification: implementation-constraint
+  statement: The compiler itself must be written in C++.
+  formalization: contracts.md#A-002
+  interface: src/*.cpp, src/*.hpp
+  verification: build
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (build/cpp-sources)"
+  notes: ''
+- id: A-007
+  title: Error locations
+  source: AB.pdf Task B; CD.pdf Task C; E.pdf Task E
+  classification: required
+  statement: Lexical errors report the first invalid character; parser errors report the first offending token or EOF; Sema errors report the first terminal of the erroneous construct.
+  formalization: lexer.md#L-013; contracts.md#A-005; sema.md#S-018
+  interface: src/Lexer.cpp; src/Parser.cpp; src/Sema.cpp
+  verification: lexer, parser, sema
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (cli/parse-rejects, lexer/invalid-character, sema/location-binary-operator, sema/location-if-keyword, ...)"
+  notes: ''
+- id: A-008
+  title: ISO-8859-1 input encoding
+  source: AB.pdf, Project Task B, paragraph 2
+  classification: required
+  statement: Interpret input bytes as ISO-8859-1.
+  formalization: lexer.md#L-001
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/latin1-strings-and-comments)"
+  notes: ''
+- id: A-009
+  title: No preprocessor
+  source: AB.pdf, Project Task B, paragraph 1
+  classification: required
+  statement: Tokenize tokens, not preprocessing-tokens; no preprocessing directives, header names, or macro replacement.
+  formalization: lexer.md#L-001
+  interface: src/Lexer.cpp
+  verification: lexer, parser
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (lexer/hash-is-a-punctuator, lexer/no-preprocessor-header-name)"
+  notes: ''
+- id: A-010
+  title: Translation phases
+  source: AB.pdf, Project Task B, paragraph 2
+  classification: required
+  statement: Perform phase 3 tokenization and comment removal; do not perform phase 1 trigraph replacement, phase 2 line splicing, phase 4 preprocessing, or phase 6 string concatenation.
+  formalization: lexer.md#L-001; ambiguities.md#I-001
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/no-trigraph-replacement, lexer/no-line-splicing, lexer/no-adjacent-string-concatenation)"
+  notes: ''
+- id: A-011
+  title: Valid C outside C4 may be rejected
+  source: AB.pdf, Project Task A, Technical requirements, bullet 4
+  classification: may-reject
+  statement: A program valid in C but outside the C4 subset may be rejected with an error or implemented correctly.
+  formalization: contracts.md#A-001
+  interface: src/Parser.cpp; src/Sema.cpp
+  verification: parser, sema
+  status: verified
+  evidence: "run_conformance.py: 30 case(s), 0 failed, 0 skipped (lexer/latin1-identifier, parser/empty-parameter-list, parser/initializer, parser/multiple-declarators, ...)"
+  notes: ''
+- id: A-012
+  title: Invalid C must be rejected
+  source: AB.pdf, Project Task A, Technical requirements, bullet 4
+  classification: must-reject
+  statement: A program that is not part of the full C language must be rejected.
+  formalization: contracts.md#A-001
+  interface: src/Lexer.cpp; src/Parser.cpp; src/Sema.cpp
+  verification: lexer, parser, sema
+  status: partial
+  evidence: "run_conformance.py: 172 case(s), 0 failed, 0 skipped (parser/empty-translation-unit, parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace, ...); corpus-scoped, not a universal proof"
+  notes: ''
+- id: A-013
+  title: Task E exemptions
+  source: E.pdf, Project Task E, bullets 5-10
+  classification: exempted
+  statement: Struct assignment, struct parameters/returns, anonymous members, __func__, and expression evaluation need not be supported.
+  formalization: sema.md#S-019; ambiguities.md#I-013
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/incomplete-parameter, sema/incomplete-return-type, sema/exempt-struct-assignment, sema/exempt-struct-parameter, ...)"
+  notes: ''
+- id: L-001
+  title: Token classes
+  source: AB.pdf Task B; C11 6.4p1
+  classification: required
+  statement: Emit keyword, identifier, constant, string-literal, and punctuator tokens only.
+  formalization: lexer.md#L-004
+  interface: src/TokenKinds.def
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/assignment-example, lexer/keywords, lexer/identifiers)"
+  notes: ''
+- id: L-002
+  title: Maximal munch
+  source: AB.pdf Task B; C11 6.4p4
+  classification: required
+  statement: At each position take the longest token admitted by the token grammar.
+  formalization: 'lexer.md#L-010, #L-011'
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/identifiers, lexer/punctuators, lexer/maximal-munch)"
+  notes: ''
+- id: L-003
+  title: Keywords
+  source: C11 6.4.1; AB.pdf Task B
+  classification: required
+  statement: Recognize the complete C11 keyword set as keyword tokens.
+  formalization: lexer.md#L-005
+  interface: src/KeyWords.def
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/keywords)"
+  notes: ''
+- id: L-004
+  title: Identifiers
+  source: C11 6.4.2.1; AB.pdf Task B
+  classification: required
+  statement: Recognize ASCII identifiers; universal-character-names are omitted; extended characters are optional/outside C4.
+  formalization: lexer.md#L-006; ambiguities.md#I-006
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/assignment-example, lexer/identifiers, lexer/latin1-identifier)"
+  notes: ''
+- id: L-005
+  title: Integer constants
+  source: AB.pdf Task B; C11 6.4.4.1
+  classification: required
+  statement: Accept 0 and decimal constants without leading zero; reject octal constants other than 0, hexadecimal constants, suffixes, and floating constants.
+  formalization: lexer.md#L-007; ambiguities.md#I-005
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (lexer/decimal-constants, lexer/leading-zero-octal, lexer/leading-zero-nine, lexer/hexadecimal-constant, ...)"
+  notes: ''
+- id: L-006
+  title: Character constants
+  source: AB.pdf Task B; C11 6.4.4.4
+  classification: required
+  statement: Accept exactly one c-char between single quotes; reject empty, multi-character, and non-simple escape forms.
+  formalization: lexer.md#L-008
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/character-constants, lexer/empty-character-constant, lexer/multi-character-constant)"
+  notes: ''
+- id: L-007
+  title: String literals
+  source: AB.pdf Task B; C11 6.4.5
+  classification: required
+  statement: Accept double-quoted strings without encoding prefix; reject newline before the closing quote and non-simple escapes; do not concatenate adjacent strings.
+  formalization: lexer.md#L-009; ambiguities.md#I-021
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (lexer/string-literals, lexer/latin1-strings-and-comments, lexer/no-adjacent-string-concatenation, lexer/unterminated-string, ...)"
+  notes: ''
+- id: L-008
+  title: Escape sequences and UCNs
+  source: AB.pdf Task B
+  classification: required
+  statement: Only simple escape sequences are admitted; octal, hexadecimal, and universal-character-name escapes are rejected.
+  formalization: 'lexer.md#L-008, #L-009'
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (lexer/character-constants, lexer/string-literals, lexer/octal-escape-in-character, lexer/hex-escape-in-character, ...)"
+  notes: ''
+- id: L-009
+  title: Punctuators and digraphs
+  source: C11 6.4.6; AB.pdf Task B; CD.pdf Task D
+  classification: required
+  statement: Recognize the full punctuator set including digraphs; preserve digraph spelling in --tokenize; canonicalize for parsing/printing.
+  formalization: lexer.md#L-010; ambiguities.md#I-022
+  interface: src/Lexer.cpp; src/Token.cpp
+  verification: lexer, parser, printer
+  status: verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (lexer/punctuators, lexer/digraph-spellings, lexer/maximal-munch, lexer/hash-is-a-punctuator, ...)"
+  notes: ''
+- id: L-010
+  title: Whitespace and comments
+  source: C11 6.4; AB.pdf Task B
+  classification: required
+  statement: Whitespace and /* */ and // comments are ignored; unterminated block comments are lexical errors.
+  formalization: lexer.md#L-003; ambiguities.md#I-003
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (lexer/whitespace-and-comments, lexer/comments-do-not-nest, lexer/unterminated-block-comment)"
+  notes: ''
+- id: L-011
+  title: Source positions
+  source: AB.pdf Task B
+  classification: required
+  statement: Report 1-based line and column; CRLF, CR, and LF each start a new line once; tab advances one column.
+  formalization: lexer.md#L-002; ambiguities.md#I-002
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/positions-tabs-and-newlines)"
+  notes: ''
+- id: L-012
+  title: --tokenize output
+  source: AB.pdf Task B
+  classification: required
+  statement: 'Print <filename>:<line>:<column>: <kind> <spelling> one token per line; exact spelling; no EOF token.'
+  formalization: 'lexer.md#L-012, #L-015'
+  interface: src/Token.cpp; src/Compiler.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (cli/mode-tokenize, lexer/assignment-example, lexer/empty-file)"
+  notes: ''
+- id: L-013
+  title: Lexical error locations
+  source: AB.pdf Task B
+  classification: required
+  statement: Reject lexical errors with the location of the first character that makes the input invalid.
+  formalization: 'lexer.md#L-013; ambiguities.md#I-003, #I-004'
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 15 case(s), 0 failed, 0 skipped (lexer/invalid-character, lexer/leading-zero-octal, lexer/leading-zero-nine, lexer/hexadecimal-constant, ...)"
+  notes: ''
+- id: L-014
+  title: Linear lexer running time
+  source: AB.pdf Task B
+  classification: required
+  statement: Lexer running time proportional to input size.
+  formalization: lexer.md#L-014
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: partial
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/linear-time); corpus-scoped, not a universal proof"
+  notes: ''
+- id: L-015
+  title: EOF token internal
+  source: AB.pdf Task B hint
+  classification: required
+  statement: End the token stream with a not-printed end-of-file token.
+  formalization: lexer.md#L-012
+  interface: src/Lexer.cpp
+  verification: lexer
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (lexer/empty-file)"
+  notes: ''
+- id: C-001
+  title: Expression subset
+  source: CD.pdf, Project Task C, expression bullet
+  classification: required
+  statement: 'Parse identifier, constant, string-literal, parenthesized expression, [], call, ., ->, sizeof, unary & * - !, binary * + - < == != && || ?: and =, with C precedence and associativity.'
+  formalization: grammar.ebnf; contracts.md
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (parser/declarations, parser/expressions, parser/struct-member-chain, parser/function-pointer-call, ...)"
+  notes: ''
+- id: C-002
+  title: Other expressions only chain productions
+  source: CD.pdf, Project Task C
+  classification: required
+  statement: For all other C11 expression forms use only the chain production A -> B; do not parse casts, /, %, shifts, >, <=, >=, bitwise operators, comma, ++/--, compound assignment, etc.
+  formalization: grammar.ebnf
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 8 case(s), 0 failed, 0 skipped (parser/cast-expression, parser/division, parser/less-equal, parser/shift, ...)"
+  notes: ''
+- id: C-003
+  title: Declaration restrictions
+  source: CD.pdf, Project Task C, declaration bullet
+  classification: required
+  statement: At most one init-declarator without initializer; declaration-specifiers/specifier-qualifier-list are type-specifier only; type-specifier is void, char, int, or struct; struct has no qualifiers or bit-fields.
+  formalization: grammar.ebnf; sema.md#S-003
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (parser/declarations, parser/forward-pointer, parser/tentative-definitions, parser/block-function-declaration, ...)"
+  notes: ''
+- id: C-004
+  title: Declarators
+  source: CD.pdf, Project Task C
+  classification: required
+  statement: Declarator/direct-declarator use pointer without qualifiers, identifier, parenthesized declarator, and function declarator with parameter-type-list; no array declarators, no ellipses, no old-style identifier list.
+  formalization: grammar.ebnf; sema.md#S-005
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-pointer-call, parser/block-function-declaration, parser/prototype-scope, ...)"
+  notes: ''
+- id: C-005
+  title: Statements
+  source: CD.pdf, Project Task C, statement bullet
+  classification: required
+  statement: Support identifier labels, compound, expression and null statements, if/if-else, while, and all jump statements; exclude switch, case/default, for, and do.
+  formalization: grammar.ebnf
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 9 case(s), 0 failed, 0 skipped (parser/statements, parser/break-and-continue, parser/dangling-else, parser/null-statements-and-labels, ...)"
+  notes: ''
+- id: C-006
+  title: External definitions
+  source: CD.pdf, Project Task C, external-definition bullet
+  classification: required
+  statement: Handle external definitions fully except declaration-list in function-definition.
+  formalization: grammar.ebnf
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions)"
+  notes: ''
+- id: C-007
+  title: --parse mode
+  source: CD.pdf, Project Task C
+  classification: required
+  statement: c4 --parse FILE parses and semantically analyzes; no output on success; exit 0/1 as A-003/A-004.
+  formalization: contracts.md#A-004
+  interface: src/Compiler.cpp
+  verification: parser, sema
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (cli/parse-accepts, cli/mode-parse)"
+  notes: ''
+- id: C-008
+  title: Reject non-derivable token sequences
+  source: CD.pdf, Project Task C
+  classification: required
+  statement: Reject every token sequence that is not a word of the restricted grammar.
+  formalization: grammar.ebnf
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 181 case(s), 0 failed, 0 skipped (parser/empty-translation-unit, parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace, ...)"
+  notes: ''
+- id: C-009
+  title: Accept restricted grammar
+  source: CD.pdf, Project Task C
+  classification: required
+  statement: Accept every correct program according to the restricted grammar.
+  formalization: grammar.ebnf
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 19 case(s), 0 failed, 0 skipped (parser/declarations, parser/function-definitions, parser/expressions, parser/statements, ...)"
+  notes: ''
+- id: C-010
+  title: Parser error locations
+  source: CD.pdf, Project Task C
+  classification: required
+  statement: Report the start of the first token that makes the sequence not a word; for a missing token at end, report the EOF position.
+  formalization: contracts.md#A-005
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (parser/missing-semicolon, parser/missing-expression, parser/missing-close-brace)"
+  notes: ''
+- id: C-011
+  title: Dangling else
+  source: CD.pdf, Project Task C remark; C11 6.8.4p3
+  classification: required
+  statement: Resolve the selection-statement ambiguity by binding else to the nearest unmatched if.
+  formalization: grammar.ebnf; sema.md#S-016
+  interface: src/Parser.cpp
+  verification: parser
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (parser/dangling-else)"
+  notes: ''
+- id: C-012
+  title: Grammar adjustment freedom
+  source: CD.pdf, Project Task C remarks
+  classification: out-of-scope
+  statement: Adjust the grammar for LL parsing and/or use precedence climbing; this is an implementation freedom, not an observable requirement.
+  formalization: contracts.md
+  interface: src/Parser.cpp
+  verification: parser
+  status: not-applicable
+  evidence: "out of scope: "
+  notes: ''
+- id: C-013
+  title: Delayed syntactic checks
+  source: CD.pdf, Project Task C remark
+  classification: out-of-scope
+  statement: Syntactic checks may be delayed to semantic analysis; only the combined --parse acceptance/rejection is observable.
+  formalization: contracts.md
+  interface: src/Parser.cpp; src/Sema.cpp
+  verification: parser, sema
+  status: not-applicable
+  evidence: "out of scope: "
+  notes: ''
+- id: D-001
+  title: --print-ast mode
+  source: CD.pdf, Project Task D
+  classification: required
+  statement: c4 --print-ast FILE prints the pretty-printed program to stdout and has the same acceptance/rejection behavior as --parse.
+  formalization: contracts.md#D-001
+  interface: src/Printer.cpp; src/Compiler.cpp
+  verification: printer
+  status: verified
+  evidence: "run_conformance.py: 43 case(s), 0 failed, 0 skipped (cli/mode-print, printer/reference-file, printer/rejection-behaviour, printer/arith, ...)"
+  notes: ''
+- id: D-002
+  title: Reference output
+  source: CD.pdf, Project Task D
+  classification: required
+  statement: c4 --print-ast on the reference example emits a char-exact copy of the reference file.
+  formalization: contracts.md#D-002
+  interface: src/Printer.cpp
+  verification: printer
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (printer/reference-file)"
+  notes: ''
+- id: D-003
+  title: Original order
+  source: CD.pdf, Project Task D guidelines
+  classification: required
+  statement: Print everything in the original order of the source file.
+  formalization: contracts.md#D-003
+  interface: src/Printer.cpp
+  verification: printer
+  status: verified
+  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...)"
+  notes: ''
+- id: D-004
+  title: Tabs and line wrapping
+  source: CD.pdf, Project Task D guidelines
+  classification: required
+  statement: Use one tab per indentation level; do not use spaces for indentation; do not wrap long lines.
+  formalization: contracts.md#D-003
+  interface: src/Printer.cpp
+  verification: printer
+  status: verified
+  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...)"
+  notes: ''
+- id: D-005
+  title: Full parenthesization
+  source: CD.pdf, Project Task D guidelines
+  classification: required
+  statement: Fully parenthesize each subexpression and subdeclarator except single-token atoms; discard original parentheses.
+  formalization: contracts.md#D-003
+  interface: src/Printer.cpp
+  verification: printer
+  status: verified
+  evidence: "run_conformance.py: 43 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/declarator-parenthesization, printer/no-reassociation, printer/arith, ...)"
+  notes: ''
+- id: D-006
+  title: No digraphs
+  source: CD.pdf, Project Task D guidelines
+  classification: required
+  statement: Print regular punctuators, not digraphs.
+  formalization: contracts.md#D-003
+  interface: src/Printer.cpp
+  verification: printer
+  status: verified
+  evidence: "run_conformance.py: 41 case(s), 0 failed, 0 skipped (printer/digraph-canonicalization, printer/arith, printer/chars, printer/conditional_mixed, ...)"
+  notes: ''
+- id: D-007
+  title: No reassociation
+  source: CD.pdf, Project Task D guidelines
+  classification: required
+  statement: Do not re-associate subexpressions; preserve the parse tree's grouping.
+  formalization: contracts.md#D-003
+  interface: src/Printer.cpp
+  verification: printer
+  status: verified
+  evidence: "run_conformance.py: 42 case(s), 0 failed, 0 skipped (printer/expression-parenthesization, printer/no-reassociation, printer/arith, printer/chars, ...)"
+  notes: ''
+- id: D-008
+  title: Structural round trip
+  source: CD.pdf, Project Task D
+  classification: required
+  statement: Printing is stable under parse-print-parse-print, and the printed output is accepted by --parse.
+  formalization: contracts.md#D-003
+  interface: src/Printer.cpp; src/Parser.cpp
+  verification: printer
+  status: partial
+  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (printer/arith, printer/chars, printer/conditional_mixed, printer/control, ...); corpus-scoped, not a universal proof"
+  notes: ''
+- id: S-001
+  title: Scopes
+  source: C11 6.2.1; E.pdf Task E
+  classification: required
+  statement: File, block, function-prototype, and function (label) scopes; declarations become visible at the specified points.
+  formalization: sema.md#S-001
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/file-var-visible, sema/block-shadow, sema/outer-restored, sema/use-before-declaration, ...)"
+  notes: ''
+- id: S-002
+  title: Namespaces
+  source: C11 6.2.3; E.pdf Task E
+  classification: required
+  statement: Separate label, tag, member, and ordinary identifier namespaces.
+  formalization: sema.md#S-001
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/tag-vs-ordinary, sema/label-vs-ordinary, sema/member-vs-ordinary)"
+  notes: ''
+- id: S-003
+  title: Shadowing
+  source: C11 6.2.1p4; E.pdf Task E
+  classification: required
+  statement: An inner declaration hides an outer declaration in the same namespace; lookup after the inner scope restores the outer binding.
+  formalization: sema.md#S-001
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/block-shadow, sema/outer-restored)"
+  notes: ''
+- id: S-004
+  title: Linkage
+  source: C11 6.2.2; E.pdf Task E
+  classification: required
+  statement: File-scope objects and functions have external linkage; block-scope functions refer to the external function; block-scope objects have no linkage.
+  formalization: sema.md#S-002
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (sema/block-function-declaration)"
+  notes: ''
+- id: S-005
+  title: Redeclarations and compatibility
+  source: C11 6.7p3-p4, 6.2.7; E.pdf Task E
+  classification: required
+  statement: Declarations of the same external entity must have compatible (equal) types; block-scope objects may not be redeclared in the same scope.
+  formalization: sema.md#S-003; ambiguities.md#I-019
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/compatible-function-redecl, sema/incompatible-function-redecl, sema/incompatible-object-redecl, sema/block-redeclaration)"
+  notes: ''
+- id: S-006
+  title: Tentative definitions
+  source: C11 6.9.2; E.pdf Task E
+  classification: required
+  statement: File-scope object declarations without initializer are tentative definitions; compatible repetitions coalesce; incomplete tentative definitions are rejected at end of TU.
+  formalization: sema.md#S-003; ambiguities.md#I-014
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/tentative-coalesce, sema/tentative-incomplete)"
+  notes: ''
+- id: S-007
+  title: Tag identity
+  source: C11 6.7.2.3; E.pdf Task E
+  classification: required
+  statement: Same tag in same scope denotes one type; different scopes or tags denote distinct types; untagged declarations are distinct.
+  formalization: sema.md#S-004
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, sema/distinct-tag-pointer, ...)"
+  notes: ''
+- id: S-008
+  title: Struct completeness
+  source: C11 6.7.2.1, 6.7.2.3; E.pdf Task E
+  classification: required
+  statement: Forward declarations are incomplete; definitions complete once; members require complete object types; self-reference only through pointers; duplicate members rejected.
+  formalization: sema.md#S-004
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 9 case(s), 0 failed, 0 skipped (sema/tentative-incomplete, sema/tag-shadow, sema/same-tag-redefinition, sema/forward-then-definition, ...)"
+  notes: ''
+- id: S-009
+  title: Declarator-derived types
+  source: C11 6.7.6, 6.7.7; CD.pdf Task C
+  classification: required
+  statement: Derive pointer, function, parenthesized, and abstract declarator types; reject function/array return types; adjust function parameters to pointers.
+  formalization: sema.md#S-005
+  interface: src/Sema.cpp; src/Type.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/function-returning-pointer, sema/pointer-to-function, sema/function-returning-function, sema/parenthesized-declarator, ...)"
+  notes: ''
+- id: S-010
+  title: Parameter rules
+  source: C11 6.7.6.3, 6.9.1; E.pdf Task E
+  classification: required
+  statement: Parameters in definitions need identifiers and complete adjusted types; (void) is the only no-parameter form; parameter scope rules apply.
+  formalization: 'sema.md#S-005, #S-001'
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/parameter-function-adjusted, sema/definition-param-name-required, sema/void-only-parameter, sema/incomplete-parameter)"
+  notes: ''
+- id: S-011
+  title: Type categories
+  source: C11 6.2.5; E.pdf Task E
+  classification: required
+  statement: void, char, int, pointer, function, struct, and string-literal array types; scalar/arithmetic/object/complete predicates.
+  formalization: 'sema.md#S-006, #S-007'
+  interface: src/Type.cpp; src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sema/char-to-int, sema/int-to-char, sema/string-decay, sema/function-decay, ...)"
+  notes: ''
+- id: S-012
+  title: Type compatibility equals equality
+  source: E.pdf Task E
+  classification: required
+  statement: Two types are compatible iff they are equal under structural equality and struct identity.
+  formalization: 'sema.md#S-006, #S-007'
+  interface: src/Type.cpp; src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/type-equality-function, sema/type-equality-pointer, sema/type-inequality-pointer, sema/type-equality-function-pointer)"
+  notes: ''
+- id: S-013
+  title: Value categories and conversions
+  source: C11 6.3.1, 6.3.2; E.pdf Task E
+  classification: required
+  statement: Lvalue, function designator, and void categories; lvalue conversion; array/function decay; integer promotions; usual arithmetic conversions.
+  formalization: sema.md#S-008
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/char-to-int, sema/int-to-char, sema/pointer-to-int, sema/int-to-pointer, ...)"
+  notes: ''
+- id: S-014
+  title: Null pointer constant
+  source: E.pdf Task E; C11 6.3.2.3
+  classification: required
+  statement: Only literal 0 is a null pointer constant in the required domain.
+  formalization: sema.md#S-009; ambiguities.md#I-012
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/int-to-pointer, sema/null-literal, sema/null-parenthesized, sema/return-null-pointer)"
+  notes: ''
+- id: S-015
+  title: Primary expressions
+  source: C11 6.5.1; E.pdf Task E
+  classification: required
+  statement: Identifiers resolve in the ordinary namespace; constants have int type; string literals have char[N] type; parentheses preserve type/category.
+  formalization: sema.md#S-010
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/undeclared-identifier, sema/parenthesized-lvalue)"
+  notes: ''
+- id: S-016
+  title: Postfix expressions
+  source: C11 6.5.2; E.pdf Task E
+  classification: required
+  statement: Subscript requires pointer-to-complete + integer; calls require function/pointer and compatible arguments; . and -> require struct and member.
+  formalization: sema.md#S-011
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sema/subscript-pointer, sema/subscript-integer, sema/call-arity, sema/call-argument-type, ...)"
+  notes: ''
+- id: S-017
+  title: Unary expressions
+  source: C11 6.5.3; E.pdf Task E
+  classification: required
+  statement: '& requires function designator or lvalue object; * requires pointer; - requires arithmetic; ! requires scalar; sizeof rejects function/incomplete types and yields int.'
+  formalization: sema.md#S-012
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/address-of-rvalue, sema/deref-nonpointer, sema/negate-pointer, sema/not-struct, ...)"
+  notes: ''
+- id: S-018
+  title: Binary operators
+  source: C11 6.5.5, 6.5.6, 6.5.8, 6.5.9, 6.5.13, 6.5.14; E.pdf Task E
+  classification: required
+  statement: '* + - < == != && || constraints, conversions, and result types.'
+  formalization: sema.md#S-013
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/pointer-plus-int, sema/pointer-plus-pointer, sema/multiply-pointer, sema/compare-pointer-int, ...)"
+  notes: ''
+- id: S-019
+  title: Conditional expression
+  source: C11 6.5.15; E.pdf Task E
+  classification: required
+  statement: Scalar condition; compatible arm types; pointer/null/void rules; result type; result not lvalue.
+  formalization: sema.md#S-014
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/conditional-int, sema/conditional-pointer-null, sema/conditional-pointer-int, sema/conditional-void, ...)"
+  notes: ''
+- id: S-020
+  title: Assignment
+  source: C11 6.5.16; E.pdf Task E
+  classification: required
+  statement: Left operand modifiable lvalue; right assignable; result type left; struct assignment exempted.
+  formalization: sema.md#S-015
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/pointer-to-int, sema/int-to-pointer, sema/assign-to-rvalue, sema/assign-to-expression, ...)"
+  notes: ''
+- id: S-021
+  title: Statements and control flow
+  source: C11 6.8; E.pdf Task E
+  classification: required
+  statement: Compound scopes; expression/null statements; scalar if/while conditions; dangling else; jump statements.
+  formalization: sema.md#S-016
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/struct-not-scalar, sema/if-pointer-condition, sema/while-pointer-condition, sema/while-struct-condition)"
+  notes: ''
+- id: S-022
+  title: Labels and goto
+  source: C11 6.8.1, 6.8.6.1; E.pdf Task E
+  classification: required
+  statement: Labels have function scope and a separate namespace; duplicate labels rejected; goto target must exist in the function.
+  formalization: sema.md#S-016
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/label-function-scope, sema/goto-missing-label, sema/duplicate-label)"
+  notes: ''
+- id: S-023
+  title: break and continue
+  source: C11 6.8.6.2-p3; E.pdf Task E
+  classification: required
+  statement: break and continue may appear only in a loop.
+  formalization: sema.md#S-016
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/break-outside-loop, sema/continue-outside-loop, sema/break-inside-loop, sema/continue-inside-loop)"
+  notes: ''
+- id: S-024
+  title: return
+  source: C11 6.8.6.4; E.pdf Task E
+  classification: required
+  statement: return with expression only in non-void functions and assignable to the return type; return; only in void functions.
+  formalization: sema.md#S-016
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/return-value-in-void, sema/bare-return-in-nonvoid, sema/bare-return-in-void, sema/return-null-pointer, ...)"
+  notes: ''
+- id: S-025
+  title: Function definitions
+  source: C11 6.9.1; E.pdf Task E
+  classification: required
+  statement: Declarator must declare a function; return type void or complete object; parameter identifiers/complete types; body scope.
+  formalization: sema.md#S-017
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/definition-not-a-function, sema/incomplete-return-type)"
+  notes: ''
+- id: S-026
+  title: Function calls
+  source: C11 6.5.2.2; E.pdf Task E
+  classification: required
+  statement: Callee function/pointer to function returning void or complete object; arity and argument assignability; recursion permitted.
+  formalization: sema.md#S-017
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 4 case(s), 0 failed, 0 skipped (sema/call-arity, sema/call-argument-type, sema/call-nonfunction, sema/call-recursive)"
+  notes: ''
+- id: S-027
+  title: Struct members
+  source: C11 6.5.2.3, 6.7.2.1; E.pdf Task E
+  classification: required
+  statement: Member access requires struct/pointer-to-struct and existing member; result lvalue rules; member namespace.
+  formalization: 'sema.md#S-011, #S-004'
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 5 case(s), 0 failed, 0 skipped (sema/member-missing, sema/arrow-on-struct, sema/member-lvalue, sema/arrow-member-lvalue, ...)"
+  notes: ''
+- id: S-028
+  title: Sema error locations
+  source: E.pdf Task E
+  classification: required
+  statement: Use the first terminal of the erroneous construct; operator errors at the operator, if/while condition errors at the keyword.
+  formalization: 'sema.md#S-018; ambiguities.md#I-017, #I-018'
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sema/location-binary-operator, sema/location-if-keyword, sema/location-assignment)"
+  notes: ''
+- id: S-029
+  title: Exemptions
+  source: E.pdf Task E, bullets 5-10
+  classification: exempted
+  statement: Struct assignment, struct parameters/returns, anonymous members, __func__, and expression evaluation need not be supported.
+  formalization: sema.md#S-019
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 7 case(s), 0 failed, 0 skipped (sema/incomplete-parameter, sema/incomplete-return-type, sema/exempt-struct-assignment, sema/exempt-struct-parameter, ...)"
+  notes: ''
+- id: S-030
+  title: No expression evaluation
+  source: E.pdf Task E
+  classification: required
+  statement: Sema does not need to evaluate expression values.
+  formalization: sema.md#S-019
+  interface: src/Sema.cpp
+  verification: sema
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sema/no-evaluation, sema/no-overflow-evaluation)"
+  notes: ''
+- id: F-001
+  title: Systematic IR construction
+  source: F.pdf, Project Task F
+  classification: required
+  statement: Construct LLVM IR systematically from the AST for --compile and the default mode.
+  formalization: contracts.md#F-001
+  interface: src/CodeGen.cpp
+  verification: codegen
+  status: verified
+  evidence: "run_conformance.py: 41 case(s), 0 failed, 0 skipped (cli/mode-compile, codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], ...)"
+  notes: ''
+- id: F-002
+  title: char/int LLVM types
+  source: F.pdf, Project Task F
+  classification: required
+  statement: Represent char as LLVM i8 and int as i32.
+  formalization: contracts.md#F-001
+  interface: src/CodeGen.cpp; src/Type.cpp
+  verification: codegen
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (codegen/i8-i32-and-datalayout)"
+  notes: ''
+- id: F-003
+  title: DataLayout sizes
+  source: F.pdf, Project Task F
+  classification: required
+  statement: Use LLVM DataLayout to compute sizes where needed.
+  formalization: contracts.md#F-001
+  interface: src/Type.cpp; src/CodeGen.cpp
+  verification: codegen
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (codegen/i8-i32-and-datalayout)"
+  notes: ''
+- id: F-004
+  title: Output file naming
+  source: F.pdf, Project Task F
+  classification: required
+  statement: For input foo/bar.c write bar.ll in the current directory.
+  formalization: contracts.md#F-001
+  interface: src/Compiler.cpp
+  verification: codegen
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/default-and-naming)"
+  notes: ''
+- id: F-005
+  title: Human-readable IR
+  source: F.pdf, Project Task F
+  classification: required
+  statement: Write human-readable LLVM IR text to the output file.
+  formalization: contracts.md#F-001
+  interface: src/Compiler.cpp
+  verification: codegen
+  status: verified
+  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...)"
+  notes: ''
+- id: F-006
+  title: Default compile mode
+  source: F.pdf, Project Task F
+  classification: required
+  statement: No explicit mode is equivalent to --compile.
+  formalization: contracts.md#A-004
+  interface: src/main.cpp
+  verification: cli, codegen
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (cli/default-and-naming, cli/default-equals-compile, codegen/default-equals-compile)"
+  notes: ''
+- id: F-007
+  title: IR well-formedness
+  source: F.pdf Task F; LLVM verifier
+  classification: required
+  statement: The emitted module passes LLVM's verifier and llvm-as.
+  formalization: contracts.md#F-001
+  interface: src/Compiler.cpp
+  verification: codegen
+  status: verified
+  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...)"
+  notes: ''
+- id: F-008
+  title: Differential execution
+  source: F.pdf Task F; A-001
+  classification: required
+  statement: For defined C4 programs, c4-compiled executables and C reference executables produce the same observable result.
+  formalization: contracts.md#F-002
+  interface: src/CodeGen.cpp
+  verification: codegen
+  status: partial
+  evidence: "run_conformance.py: 40 case(s), 0 failed, 0 skipped (codegen/arith[compile], codegen/arith[optimize], codegen/chars[compile], codegen/chars[optimize], ...); corpus-scoped, not a universal proof"
+  notes: ''
+- id: F-009
+  title: LLVM 15 environment deviation
+  source: F.pdf, Project Task F
+  classification: out-of-scope
+  statement: The assignment names LLVM 15.0; this repository uses LLVM 23.1.5. Compatibility with LLVM 15 is not claimed.
+  formalization: ambiguities.md#I-020
+  interface: CMakeLists.txt
+  verification: codegen
+  status: not-applicable
+  evidence: "out of scope: "
+  notes: ''
+- id: G-001
+  title: --optimize mode
+  source: G.pdf, Project Task G
+  classification: required
+  statement: --optimize performs the same operation as --compile and additionally performs SCCP.
+  formalization: contracts.md#G-001
+  interface: src/Compiler.cpp
+  verification: sccp
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (cli/mode-optimize)"
+  notes: ''
+- id: G-002
+  title: SCCP analysis
+  source: G.pdf, Project Task G
+  classification: required
+  statement: Perform the SCCP analysis (Wegman-Zadeck) on the mem2reg SSA form.
+  formalization: contracts.md#G-001
+  interface: src/SCCP.cpp
+  verification: sccp
+  status: verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...)"
+  notes: ''
+- id: G-003
+  title: Constant substitution
+  source: G.pdf, Project Task G
+  classification: required
+  statement: If applicable, substitute instructions with constants.
+  formalization: contracts.md#G-002
+  interface: src/SCCP.cpp
+  verification: sccp
+  status: verified
+  evidence: "run_conformance.py: 6 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/phi-constant-fold, sccp/compare-fold, sccp/select-fold, ...)"
+  notes: ''
+- id: G-004
+  title: Branch simplification
+  source: G.pdf, Project Task G
+  classification: required
+  statement: If applicable, substitute conditional branches with unconditional ones.
+  formalization: contracts.md#G-002
+  interface: src/SCCP.cpp
+  verification: sccp
+  status: verified
+  evidence: "run_conformance.py: 3 case(s), 0 failed, 0 skipped (sccp/branch-simplification, sccp/phi-constant-fold, sccp/select-fold)"
+  notes: ''
+- id: G-005
+  title: Dead instruction elimination
+  source: G.pdf, Project Task G
+  classification: required
+  statement: If applicable, remove dead instructions.
+  formalization: contracts.md#G-002
+  interface: src/SCCP.cpp
+  verification: sccp
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sccp/dead-instruction-elimination, sccp/dead-after-return)"
+  notes: ''
+- id: G-006
+  title: Unreachable block elimination
+  source: G.pdf, Project Task G
+  classification: required
+  statement: If applicable, remove unreachable blocks.
+  formalization: contracts.md#G-002
+  interface: src/SCCP.cpp
+  verification: sccp
+  status: verified
+  evidence: "run_conformance.py: 2 case(s), 0 failed, 0 skipped (sccp/unreachable-block-elimination, sccp/dead-after-return)"
+  notes: ''
+- id: G-007
+  title: Only mem2reg allowed
+  source: G.pdf, Project Task G
+  classification: required
+  statement: Use LLVM mem2reg and no other LLVM passes.
+  formalization: contracts.md#G-001
+  interface: src/Optimizer.cpp; src/Compiler.cpp
+  verification: sccp
+  status: verified
+  evidence: "run_conformance.py: 1 case(s), 0 failed, 0 skipped (sccp/only-mem2reg)"
+  notes: ''
+- id: G-008
+  title: Post-SCCP IR validity
+  source: G.pdf Task G; LLVM verifier
+  classification: required
+  statement: The optimized module passes LLVM's verifier.
+  formalization: contracts.md#G-002
+  interface: src/Compiler.cpp; src/SCCP.cpp
+  verification: sccp
+  status: verified
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...)"
+  notes: ''
+- id: G-009
+  title: Behavior preservation on defined programs
+  source: G.pdf Task G; A-001
+  classification: required
+  statement: For defined programs, --optimize preserves observable behavior relative to --compile.
+  formalization: contracts.md#G-002
+  interface: src/SCCP.cpp
+  verification: sccp, codegen
+  status: partial
+  evidence: "run_conformance.py: 11 case(s), 0 failed, 0 skipped (sccp/constant-substitution, sccp/branch-simplification, sccp/dead-instruction-elimination, sccp/unreachable-block-elimination, ...); corpus-scoped, not a universal proof"
+  notes: ''
+- id: G-010
+  title: Pre/post IR capture
+  source: G.pdf Task G; contracts.md#G-003
+  classification: out-of-scope
+  statement: Produce pre-SCCP (post-mem2reg) and post-SCCP IR pairs for verification.
+  formalization: contracts.md#G-003; ambiguities.md#I-026
+  interface: verification/conformance/run_conformance.py --suite sccp
+  verification: sccp
+  status: not-applicable
+  evidence: "out of scope: Harness verification aid, not an assignment requirement; the harness reconstructs the post-mem2reg input with opt -passes=mem2reg and compares it with the post-SCCP output."
+  notes: Harness verification aid, not an assignment requirement; the harness reconstructs the post-mem2reg input with opt -passes=mem2reg and compares it with the post-SCCP output.

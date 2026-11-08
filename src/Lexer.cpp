@@ -218,11 +218,12 @@ TokenKind Lexer::lexCharacterConstant() {
   if (peek() == '\'')
     fail(here(), "empty character constant");
   if (peek() == '\\') {
+    SourceLoc escape = here();
     consume();
     if (eof() || peek() == '\n' || peek() == '\r')
       fail(start, "missing terminating ' character");
     if (!isSimpleEscape(peek()))
-      fail(here(), "invalid escape sequence");
+      fail(escape, "invalid escape sequence");
     consume();
   } else {
     if (peek() == 0)
@@ -249,11 +250,12 @@ TokenKind Lexer::lexStringLiteral() {
     if (c == '\n' || c == '\r')
       fail(start, "missing terminating \" character");
     if (c == '\\') {
+      SourceLoc escape = here();
       consume();
       if (eof() || peek() == '\n' || peek() == '\r')
         fail(start, "missing terminating \" character");
       if (!isSimpleEscape(peek()))
-        fail(here(), "invalid escape sequence");
+        fail(escape, "invalid escape sequence");
       consume();
       continue;
     }
