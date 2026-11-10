@@ -275,6 +275,6 @@ they differ, the fixture records the difference and verifies only the
 transformations that are structurally identifiable in the actual post-SCCP
 IR.
 
-**Evidence:** C4 runs \`runMem2Reg\` immediately before \`SCCP\`; the
+**Evidence:** C4 runs \`run_mem2_reg\` immediately before \`SCCP\`; the
 assignment permits \`mem2reg\` and no other LLVM passes.  This is a harness
 limitation, not an assignment requirement.

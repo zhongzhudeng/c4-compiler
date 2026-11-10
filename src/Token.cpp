@@ -1,40 +1,40 @@
 #include "Token.hpp"
 
-const char *tokenKindName(TokenKind kind) {
-  switch (kind) {
-#define KIND_ACTION(KD, STR)                                                   \
-  case KD:                                                                     \
-    return STR;
+const char* token_kind_name(TokenKind kind) {
+    switch (kind) {
+#define KIND_ACTION(KD, STR)                                                                       \
+    case KD:                                                                                       \
+        return STR;
 #include "TokenKinds.def"
-  }
-  return "unknown";
+    }
+    return "unknown";
 }
 
-TokenKind canonicalTokenKind(TokenKind kind) {
-  switch (kind) {
-  case TK_LESSCOLON:
-    return TK_LSQUARE;
-  case TK_COLONGREATER:
-    return TK_RSQUARE;
-  case TK_LESSPERCENT:
-    return TK_LBRACE;
-  case TK_PERCENTGREATER:
-    return TK_RBRACE;
-  case TK_PERCENTCOLON:
-    return TK_HASH;
-  case TK_PERCENTCOLONPERCENTCOLON:
-    return TK_HASHHASH;
-  default:
-    return kind;
-  }
+TokenKind canonical_token_kind(TokenKind kind) {
+    switch (kind) {
+        case TkLesscolon:
+            return TkLsquare;
+        case TkColongreater:
+            return TkRsquare;
+        case TkLesspercent:
+            return TkLbrace;
+        case TkPercentgreater:
+            return TkRbrace;
+        case TkPercentcolon:
+            return TkHash;
+        case TkPercentcolonpercentcolon:
+            return TkHashhash;
+        default:
+            return kind;
+    }
 }
 
-std::ostream &operator<<(std::ostream &stream, const Token &tok) {
-  if (tok.FileName)
-    stream << tok.FileName.str();
-  stream << ':' << tok.Loc.line << ':' << tok.Loc.column << ": "
-         << tokenKindName(tok.Kind) << ' ';
-  if (tok.Text)
-    stream << tok.Text.str();
-  return stream;
+std::ostream& operator<<(std::ostream& stream, const Token& tok) {
+    if (tok.file_name)
+        stream << tok.file_name.str();
+    stream << ':' << tok.loc.line << ':' << tok.loc.column << ": " << token_kind_name(tok.kind)
+           << ' ';
+    if (tok.text)
+        stream << tok.text.str();
+    return stream;
 }

@@ -37,7 +37,7 @@ source bytes
   mem2reg is the only LLVM pass used.
 
 The driver is phase-oriented rather than a mutable compiler object:
-tokenizeFile/tokenizeString return a TokenizedSource that owns the token stream
+tokenize_file/tokenize_string return a TokenizedSource that owns the token stream
 and its symbol interner; parse returns a ParsedProgram that owns the AST and
 symbols; analyze returns an AnalyzedProgram that owns the semantic model and
 borrows the type context and layout; compile modes construct a
@@ -119,6 +119,15 @@ make test runs:
 
 The e2e test is only registered when Python 3 and clang are available at
 configure time.
+
+## Code style
+
+C++ code follows a Rust-inspired style: `snake_case` for functions, methods,
+variables, parameters, and public fields; `PascalCase` for types and enum
+constants; `SCREAMING_SNAKE_CASE` for constants and macros. Private data
+members keep a trailing underscore. `.clang-format` enforces 4-space
+indentation, 100-column lines, and attached braces; `.clang-tidy` enforces the
+naming rules.
 
 ## Repository layout
 

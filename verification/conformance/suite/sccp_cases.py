@@ -212,7 +212,7 @@ def _source_scan(ctx: Context, checks: Checks):
     for registered in passes:
         checks.check("PromotePass" in registered,
                      "unexpected LLVM pass registered: %s" % registered)
-    checks.check("runMem2Reg" in compiler,
+    checks.check("run_mem2_reg" in compiler,
                  "Compiler.cpp does not run mem2reg")
     checks.check("SCCP sccp" in compiler,
                  "Compiler.cpp does not run the custom SCCP pass")

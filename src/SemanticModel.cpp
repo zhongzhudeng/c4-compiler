@@ -1,78 +1,76 @@
 #include "SemanticModel.hpp"
 
-SemanticModel::SemanticModel(const AST &ast)
-    : exprs_(ast.exprCount()), decls_(ast.declCount()),
-      typeSpecs_(ast.typeSpecCount()), labels_(ast.labelCount()),
-      gotoTargets_(ast.stmtCount()) {
-  fileScope_ = addScope(ScopeKind::File, ScopeId{});
+SemanticModel::SemanticModel(const AST& ast)
+    : exprs_(ast.expr_count()), decls_(ast.decl_count()), type_specs_(ast.type_spec_count()),
+      labels_(ast.label_count()), goto_targets_(ast.stmt_count()) {
+    file_scope_ = add_scope(ScopeKind::File, ScopeId{});
 }
 
-EntityId SemanticModel::addEntity(EntityKind kind, Symbol name,
-                                  const Type *type, Linkage linkage,
-                                  SourceLoc loc) {
-  Entity entity;
-  entity.kind = kind;
-  entity.name = name;
-  entity.type = type;
-  entity.linkage = linkage;
-  entity.loc = loc;
-  entities_.push_back(std::move(entity));
-  return EntityId(static_cast<uint32_t>(entities_.size() - 1));
+EntityId SemanticModel::add_entity(EntityKind kind, Symbol name, const Type* type, Linkage linkage,
+                                   SourceLoc loc) {
+    Entity entity;
+    entity.kind = kind;
+    entity.name = name;
+    entity.type = type;
+    entity.linkage = linkage;
+    entity.loc = loc;
+    entities_.push_back(std::move(entity));
+    return EntityId(static_cast<uint32_t>(entities_.size() - 1));
 }
 
-ScopeId SemanticModel::addScope(ScopeKind kind, ScopeId parent) {
-  Scope scope;
-  scope.kind = kind;
-  scope.parent = parent;
-  scopes_.push_back(std::move(scope));
-  return ScopeId(static_cast<uint32_t>(scopes_.size() - 1));
+ScopeId SemanticModel::add_scope(ScopeKind kind, ScopeId parent) {
+    Scope scope;
+    scope.kind = kind;
+    scope.parent = parent;
+    scopes_.push_back(std::move(scope));
+    return ScopeId(static_cast<uint32_t>(scopes_.size() - 1));
 }
 
-EntityId SemanticModel::binding(ScopeId scopeId, Symbol name) const {
-  const Scope &current = scopes_.at(scopeId.index);
-  auto it = current.ordinary.find(name);
-  return it == current.ordinary.end() ? EntityId{} : it->second;
+EntityId SemanticModel::binding(ScopeId scope_id, Symbol name) const {
+    const Scope& current = scopes_.at(scope_id.index);
+    auto it = current.ordinary.find(name);
+    return it == current.ordinary.end() ? EntityId{} : it->second;
 }
 
-EntityId SemanticModel::lookup(ScopeId scopeId, Symbol name) const {
-  for (ScopeId id = scopeId; id.valid(); id = scopes_.at(id.index).parent) {
-    EntityId entity = binding(id, name);
-    if (entity.valid())
-      return entity;
-  }
-  return EntityId{};
+EntityId SemanticModel::lookup(ScopeId scope_id, Symbol name) const {
+    for (ScopeId id = scope_id; id.valid(); id = scopes_.at(id.index).parent) {
+        EntityId entity = binding(id, name);
+        if (entity.valid())
+            return entity;
+    }
+    return EntityId{};
 }
 
-bool SemanticModel::bind(ScopeId scopeId, Symbol name, EntityId entity) {
-  return scopes_.at(scopeId.index).ordinary.emplace(name, entity).second;
+bool SemanticModel::bind(ScopeId scope_id, Symbol name, EntityId entity) {
+    return scopes_.at(scope_id.index).ordinary.emplace(name, entity).second;
 }
 
-StructDecl *SemanticModel::bindingTag(ScopeId scopeId, Symbol name) const {
-  const Scope &current = scopes_.at(scopeId.index);
-  auto it = current.tags.find(name);
-  return it == current.tags.end() ? nullptr : it->second;
+StructDecl* SemanticModel::binding_tag(ScopeId scope_id, Symbol name) const {
+    const Scope& current = scopes_.at(scope_id.index);
+    auto it = current.tags.find(name);
+    return it == current.tags.end() ? nullptr : it->second;
 }
 
-StructDecl *SemanticModel::lookupTag(ScopeId scopeId, Symbol name) const {
-  for (ScopeId id = scopeId; id.valid(); id = scopes_.at(id.index).parent) {
-    if (StructDecl *record = bindingTag(id, name))
-      return record;
-  }
-  return nullptr;
+StructDecl* SemanticModel::lookup_tag(ScopeId scope_id, Symbol name) const {
+    for (ScopeId id = scope_id; id.valid(); id = scopes_.at(id.index).parent) {
+        if (StructDecl* record = binding_tag(id, name))
+            return record;
+    }
+    return nullptr;
 }
 
-bool SemanticModel::bindTag(ScopeId scopeId, Symbol name, StructDecl *record) {
-  return scopes_.at(scopeId.index).tags.emplace(name, record).second;
+bool SemanticModel::bind_tag(ScopeId scope_id, Symbol name, StructDecl* record) {
+    return scopes_.at(scope_id.index).tags.emplace(name, record).second;
 }
 
-LabelId SemanticModel::lookupLabel(ScopeId scopeId, Symbol name) const {
-  // Labels have function scope, not lexical parent scope: only the function
-  // scope that owns them is searched.
-  const Scope &scope = scopes_.at(scopeId.index);
-  auto it = scope.labels.find(name);
-  return it == scope.labels.end() ? LabelId{} : it->second;
+LabelId SemanticModel::lookup_label(ScopeId scope_id, Symbol name) const {
+    // Labels have function scope, not lexical parent scope: only the function
+    // scope that owns them is searched.
+    const Scope& scope = scopes_.at(scope_id.index);
+    auto it = scope.labels.find(name);
+    return it == scope.labels.end() ? LabelId{} : it->second;
 }
 
-bool SemanticModel::bindLabel(ScopeId scopeId, Symbol name, LabelId label) {
-  return scopes_.at(scopeId.index).labels.emplace(name, label).second;
+bool SemanticModel::bind_label(ScopeId scope_id, Symbol name, LabelId label) {
+    return scopes_.at(scope_id.index).labels.emplace(name, label).second;
 }

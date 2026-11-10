@@ -7,27 +7,27 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 
-void runMem2Reg(llvm::Module &module) {
-  llvm::PassBuilder passBuilder;
+void run_mem2_reg(llvm::Module& module) {
+    llvm::PassBuilder pass_builder;
 
-  llvm::LoopAnalysisManager loopAnalyses;
-  llvm::FunctionAnalysisManager functionAnalyses;
-  llvm::CGSCCAnalysisManager cgsccAnalyses;
-  llvm::ModuleAnalysisManager moduleAnalyses;
+    llvm::LoopAnalysisManager loop_analyses;
+    llvm::FunctionAnalysisManager function_analyses;
+    llvm::CGSCCAnalysisManager cgscc_analyses;
+    llvm::ModuleAnalysisManager module_analyses;
 
-  passBuilder.registerModuleAnalyses(moduleAnalyses);
-  passBuilder.registerCGSCCAnalyses(cgsccAnalyses);
-  passBuilder.registerFunctionAnalyses(functionAnalyses);
-  passBuilder.registerLoopAnalyses(loopAnalyses);
-  passBuilder.crossRegisterProxies(loopAnalyses, functionAnalyses, cgsccAnalyses,
-                                   moduleAnalyses);
+    pass_builder.registerModuleAnalyses(module_analyses);
+    pass_builder.registerCGSCCAnalyses(cgscc_analyses);
+    pass_builder.registerFunctionAnalyses(function_analyses);
+    pass_builder.registerLoopAnalyses(loop_analyses);
+    pass_builder.crossRegisterProxies(loop_analyses, function_analyses, cgscc_analyses,
+                                      module_analyses);
 
-  llvm::FunctionPassManager functionPasses;
-  functionPasses.addPass(llvm::PromotePass());
+    llvm::FunctionPassManager function_passes;
+    function_passes.addPass(llvm::PromotePass());
 
-  for (llvm::Function &function : module) {
-    if (function.isDeclaration())
-      continue;
-    functionPasses.run(function, functionAnalyses);
-  }
+    for (llvm::Function& function : module) {
+        if (function.isDeclaration())
+            continue;
+        function_passes.run(function, function_analyses);
+    }
 }

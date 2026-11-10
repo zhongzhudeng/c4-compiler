@@ -23,28 +23,28 @@
 /// afterwards, so there is no function state to reset between definitions.
 class CodeGen {
 public:
-  CodeGen(const AST &ast, const SemanticModel &model, TypeContext &types,
-          TypeLayout &layout, llvm::LLVMContext &context, llvm::Module &module);
+    CodeGen(const AST& ast, const SemanticModel& model, TypeContext& types, TypeLayout& layout,
+            llvm::LLVMContext& context, llvm::Module& module);
 
-  /// Generates IR for the whole translation unit and verifies the result.
-  void emit();
+    /// Generates IR for the whole translation unit and verifies the result.
+    void emit();
 
 private:
-  class FunctionEmitter;
+    class FunctionEmitter;
 
-  const AST &ast_;
-  const SemanticModel &model_;
-  TypeContext &types_;
-  TypeLayout &layout_;
-  llvm::LLVMContext &context_;
-  llvm::Module &module_;
+    const AST& ast_;
+    const SemanticModel& model_;
+    TypeContext& types_;
+    TypeLayout& layout_;
+    llvm::LLVMContext& context_;
+    llvm::Module& module_;
 
-  std::unordered_map<uint32_t, llvm::GlobalVariable *> globals_; // EntityId
-  std::unordered_map<uint32_t, llvm::Function *> functions_;     // EntityId
-  unsigned stringCounter_ = 0;
+    std::unordered_map<uint32_t, llvm::GlobalVariable*> globals_; // EntityId
+    std::unordered_map<uint32_t, llvm::Function*> functions_;     // EntityId
+    unsigned string_counter_ = 0;
 
-  void createExternalEntities();
-  llvm::Function *functionFor(EntityId id);
-  llvm::GlobalVariable *globalFor(EntityId id);
-  llvm::GlobalVariable *stringLiteral(const ExprInfo &info);
+    void create_external_entities();
+    llvm::Function* function_for(EntityId id);
+    llvm::GlobalVariable* global_for(EntityId id);
+    llvm::GlobalVariable* string_literal(const ExprInfo& info);
 };

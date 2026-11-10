@@ -19,100 +19,102 @@
 namespace sccp {
 
 struct Unknown {
-  bool operator==(const Unknown &) const = default;
+    bool operator==(const Unknown&) const = default;
 };
 
 struct Overdefined {
-  bool operator==(const Overdefined &) const = default;
+    bool operator==(const Overdefined&) const = default;
 };
 
 /// A constant lattice state.  The constructor asserts that the payload is
 /// non-null, so a Constant alternative always carries a usable constant.
 class Constant {
 public:
-  explicit Constant(llvm::ConstantInt *value) : value_(value) {
-    assert(value_ && "Constant lattice state requires a constant");
-  }
+    explicit Constant(llvm::ConstantInt* value) : value_(value) {
+        assert(value_ && "Constant lattice state requires a constant");
+    }
 
-  llvm::ConstantInt *value() const { return value_; }
+    llvm::ConstantInt* value() const {
+        return value_;
+    }
 
-  /// Constants are compared by bit width and value, not by pointer identity.
-  bool operator==(const Constant &other) const {
-    if (value_ == other.value_)
-      return true;
-    return value_->getBitWidth() == other.value_->getBitWidth() &&
-           value_->getValue() == other.value_->getValue();
-  }
+    /// Constants are compared by bit width and value, not by pointer identity.
+    bool operator==(const Constant& other) const {
+        if (value_ == other.value_)
+            return true;
+        return value_->getBitWidth() == other.value_->getBitWidth() &&
+               value_->getValue() == other.value_->getValue();
+    }
 
 private:
-  llvm::ConstantInt *value_;
+    llvm::ConstantInt* value_;
 };
 
 using LatticeValue = std::variant<Unknown, Constant, Overdefined>;
 
-inline bool isUnknown(const LatticeValue &state) {
-  return std::holds_alternative<Unknown>(state);
+inline bool is_unknown(const LatticeValue& state) {
+    return std::holds_alternative<Unknown>(state);
 }
 
-inline bool isConstant(const LatticeValue &state) {
-  return std::holds_alternative<Constant>(state);
+inline bool is_constant(const LatticeValue& state) {
+    return std::holds_alternative<Constant>(state);
 }
 
-inline bool isOverdefined(const LatticeValue &state) {
-  return std::holds_alternative<Overdefined>(state);
+inline bool is_overdefined(const LatticeValue& state) {
+    return std::holds_alternative<Overdefined>(state);
 }
 
-inline llvm::ConstantInt *constantValue(const LatticeValue &state) {
-  return std::get<Constant>(state).value();
+inline llvm::ConstantInt* constant_value(const LatticeValue& state) {
+    return std::get<Constant>(state).value();
 }
 
 /// Least upper bound.  Unknown is the identity, Overdefined dominates, equal
 /// constants stay constant, and distinct constants join to Overdefined.
-inline LatticeValue join(const LatticeValue &left, const LatticeValue &right) {
-  if (isUnknown(left))
-    return right;
-  if (isUnknown(right))
-    return left;
-  if (isOverdefined(left) || isOverdefined(right))
+inline LatticeValue join(const LatticeValue& left, const LatticeValue& right) {
+    if (is_unknown(left))
+        return right;
+    if (is_unknown(right))
+        return left;
+    if (is_overdefined(left) || is_overdefined(right))
+        return Overdefined{};
+    if (left == right)
+        return left;
     return Overdefined{};
-  if (left == right)
-    return left;
-  return Overdefined{};
 }
 
 /// Moves the current state to join(current, next) and reports whether it
 /// advanced.  Because the update is a join, an analysis state can never move
 /// down the lattice, so every fixed-point iteration is monotone.
-inline bool advance(LatticeValue &current, const LatticeValue &next) {
-  LatticeValue joined = join(current, next);
-  if (joined == current)
-    return false;
-  current = std::move(joined);
-  return true;
+inline bool advance(LatticeValue& current, const LatticeValue& next) {
+    LatticeValue joined = join(current, next);
+    if (joined == current)
+        return false;
+    current = std::move(joined);
+    return true;
 }
 
 /// The lattice result of an instruction-specific constant fold.  A null fold
 /// means the operation is unsupported or undefined for these constants, so the
 /// conservative result is Overdefined.
-inline LatticeValue constantOrOverdefined(llvm::ConstantInt *value) {
-  return value ? LatticeValue(Constant(value)) : LatticeValue(Overdefined{});
+inline LatticeValue constant_or_overdefined(llvm::ConstantInt* value) {
+    return value ? LatticeValue(Constant(value)) : LatticeValue(Overdefined{});
 }
 
 /// State for an operation that folds only when every operand is a known
 /// constant.  Overdefined dominates Unknown; nullopt means every operand is a
 /// Constant and instruction-specific folding can run.
-inline std::optional<LatticeValue> propagatedState(
-    std::initializer_list<const LatticeValue *> operands) {
-  bool unknown = false;
-  for (const LatticeValue *operand : operands) {
-    if (isOverdefined(*operand))
-      return LatticeValue(Overdefined{});
-    if (isUnknown(*operand))
-      unknown = true;
-  }
-  if (unknown)
-    return LatticeValue(Unknown{});
-  return std::nullopt;
+inline std::optional<LatticeValue>
+propagated_state(std::initializer_list<const LatticeValue*> operands) {
+    bool unknown = false;
+    for (const LatticeValue* operand : operands) {
+        if (is_overdefined(*operand))
+            return LatticeValue(Overdefined{});
+        if (is_unknown(*operand))
+            unknown = true;
+    }
+    if (unknown)
+        return LatticeValue(Unknown{});
+    return std::nullopt;
 }
 
 } // namespace sccp
@@ -128,10 +130,10 @@ inline std::optional<LatticeValue> propagatedState(
 /// removed, and trivially dead instructions are deleted.
 class SCCP {
 public:
-  explicit SCCP(llvm::Module &module) : module_(module) {}
+    explicit SCCP(llvm::Module& module) : module_(module) {}
 
-  void run();
+    void run();
 
 private:
-  llvm::Module &module_;
+    llvm::Module& module_;
 };

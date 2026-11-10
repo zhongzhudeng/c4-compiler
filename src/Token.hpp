@@ -16,24 +16,24 @@ enum TokenKind {
 
 #undef KIND_ACTION
 
-const char *tokenKindName(TokenKind kind);
+const char* token_kind_name(TokenKind kind);
 
 /// Digraphs are lexed and spelled exactly as written, but the parser and
 /// printer treat them as their primary punctuator.
-TokenKind canonicalTokenKind(TokenKind kind);
+TokenKind canonical_token_kind(TokenKind kind);
 
-/// One lexed token.  Text and FileName are interned Symbols, so copying a
+/// One lexed token.  text and file_name are interned Symbols, so copying a
 /// token does not copy spelling bytes.  Tokens are only produced by the lexer;
 /// there is no empty-token state.
 struct Token {
-  TokenKind Kind;
-  Symbol Text;
-  SourceLoc Loc;
-  // Interned; the token stream does not own a copy of the filename.
-  Symbol FileName;
+    TokenKind kind;
+    Symbol text;
+    SourceLoc loc;
+    // Interned; the token stream does not own a copy of the filename.
+    Symbol file_name;
 
-  Token(SourceLoc loc, TokenKind kind, Symbol text, Symbol filename)
-      : Kind(kind), Text(text), Loc(loc), FileName(filename) {}
+    Token(SourceLoc loc, TokenKind kind, Symbol text, Symbol filename)
+        : kind(kind), text(text), loc(loc), file_name(filename) {}
 };
 
-std::ostream &operator<<(std::ostream &stream, const Token &tok);
+std::ostream& operator<<(std::ostream& stream, const Token& tok);

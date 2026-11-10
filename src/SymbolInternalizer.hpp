@@ -16,42 +16,52 @@
 /// preserves the identity and contents of all Symbols it produced.
 class Symbol {
 public:
-  Symbol() = default;
+    Symbol() = default;
 
-  explicit operator bool() const { return text_ != nullptr; }
-  bool empty() const { return text_ == nullptr || text_->empty(); }
+    explicit operator bool() const {
+        return text_ != nullptr;
+    }
+    bool empty() const {
+        return text_ == nullptr || text_->empty();
+    }
 
-  const std::string &str() const {
-    assert(text_ && "dereferencing a null Symbol");
-    return *text_;
-  }
-  const std::string &operator*() const { return str(); }
-  const std::string *operator->() const { return &str(); }
+    const std::string& str() const {
+        assert(text_ && "dereferencing a null Symbol");
+        return *text_;
+    }
+    const std::string& operator*() const {
+        return str();
+    }
+    const std::string* operator->() const {
+        return &str();
+    }
 
-  bool operator==(const Symbol &other) const = default;
+    bool operator==(const Symbol& other) const = default;
 
-  friend bool operator==(const Symbol &symbol, std::nullptr_t) {
-    return !symbol;
-  }
-  friend bool operator==(std::nullptr_t, const Symbol &symbol) {
-    return !symbol;
-  }
+    friend bool operator==(const Symbol& symbol, std::nullptr_t) {
+        return !symbol;
+    }
+    friend bool operator==(std::nullptr_t, const Symbol& symbol) {
+        return !symbol;
+    }
 
-  size_t hash() const noexcept {
-    return std::hash<const std::string *>{}(text_);
-  }
+    size_t hash() const noexcept {
+        return std::hash<const std::string*>{}(text_);
+    }
 
 private:
-  friend class SymbolInternalizer;
+    friend class SymbolInternalizer;
 
-  explicit Symbol(const std::string *text) : text_(text) {}
+    explicit Symbol(const std::string* text) : text_(text) {}
 
-  const std::string *text_ = nullptr;
+    const std::string* text_ = nullptr;
 };
 
 namespace std {
 template <> struct hash<Symbol> {
-  size_t operator()(Symbol symbol) const noexcept { return symbol.hash(); }
+    size_t operator()(Symbol symbol) const noexcept {
+        return symbol.hash();
+    }
 };
 } // namespace std
 
@@ -62,12 +72,12 @@ template <> struct hash<Symbol> {
 /// changing those addresses.
 class SymbolInternalizer {
 public:
-  SymbolInternalizer(size_t prealloc_size = 512) : StringSet(prealloc_size) {}
+    SymbolInternalizer(size_t prealloc_size = 512) : string_set_(prealloc_size) {}
 
-  /// Internalize the given spelling.  The string is copied and does not need
-  /// to be preserved by the caller.
-  Symbol internalize(std::string_view str);
+    /// Internalize the given spelling.  The string is copied and does not need
+    /// to be preserved by the caller.
+    Symbol internalize(std::string_view str);
 
 private:
-  std::unordered_set<std::string> StringSet;
+    std::unordered_set<std::string> string_set_;
 };

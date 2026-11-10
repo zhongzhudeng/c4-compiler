@@ -13,40 +13,38 @@
 /// intermediate text and depends only on the AST.
 class Printer {
 public:
-  Printer(const AST &ast, std::ostream &out);
+    Printer(const AST& ast, std::ostream& out);
 
-  void print();
+    void print();
 
 private:
-  const AST &ast_;
-  std::ostream &out_;
+    const AST& ast_;
+    std::ostream& out_;
 
-  void indent(int level);
+    void indent(int level);
 
-  void printDecl(DeclId id, int level);
-  void printStmt(StmtId id, int level);
-  void printTypeSpec(TypeSpecId id, int level);
-  void printFlatTypeSpec(TypeSpecId id);
-  void printFlatField(DeclId id);
-  void printParameter(DeclId id);
-  void printParameterList(const FunctionDeclarator &function);
-  void printExpr(ExprId id);
-  void printDeclarator(DeclaratorId id);
+    void print_decl(DeclId id, int level);
+    void print_stmt(StmtId id, int level);
+    void print_type_spec(TypeSpecId id, int level);
+    void print_flat_type_spec(TypeSpecId id);
+    void print_flat_field(DeclId id);
+    void print_parameter(DeclId id);
+    void print_parameter_list(const FunctionDeclarator& function);
+    void print_expr(ExprId id);
+    void print_declarator(DeclaratorId id);
 
-  void printTypeAndDeclarator(TypeSpecId spec, DeclaratorId declarator,
-                              int level);
-  void printFlatTypeAndDeclarator(TypeSpecId spec, DeclaratorId declarator);
+    void print_type_and_declarator(TypeSpecId spec, DeclaratorId declarator, int level);
+    void print_flat_type_and_declarator(TypeSpecId spec, DeclaratorId declarator);
 
-  bool isEmptyDeclarator(DeclaratorId id) const;
-  bool isBarePointerDeclarator(DeclaratorId id) const;
+    bool is_empty_declarator(DeclaratorId id) const;
+    bool is_bare_pointer_declarator(DeclaratorId id) const;
 
-  void printCompound(StmtId id, int level, bool leadingIndent,
-                     bool trailingNewline);
-  void printCompoundBody(StmtId id, int level);
-  void printCompoundInline(StmtId id, int level);
-  void printControlledBody(StmtId id, int level);
-  void printIf(StmtId id, int level, bool leadingIndent);
+    void print_compound(StmtId id, int level, bool leading_indent, bool trailing_newline);
+    void print_compound_body(StmtId id, int level);
+    void print_compound_inline(StmtId id, int level);
+    void print_controlled_body(StmtId id, int level);
+    void print_if(StmtId id, int level, bool leading_indent);
 
-  static const char *binaryOperator(BinaryExpr::Op op);
-  static const char *unaryOperator(UnaryExpr::Op op);
+    static const char* binary_operator(BinaryExpr::Op op);
+    static const char* unary_operator(UnaryExpr::Op op);
 };

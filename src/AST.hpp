@@ -21,15 +21,23 @@
 // ---------------------------------------------------------------------------
 
 template <typename Tag> struct NodeId {
-  static constexpr uint32_t Invalid = 0xFFFFFFFFu;
-  uint32_t index = Invalid;
+    static constexpr uint32_t INVALID = 0xFFFFFFFFu;
+    uint32_t index = INVALID;
 
-  NodeId() = default;
-  explicit NodeId(uint32_t value) : index(value) {}
-  bool valid() const { return index != Invalid; }
-  explicit operator bool() const { return valid(); }
-  bool operator==(NodeId other) const { return index == other.index; }
-  bool operator!=(NodeId other) const { return !(*this == other); }
+    NodeId() = default;
+    explicit NodeId(uint32_t value) : index(value) {}
+    bool valid() const {
+        return index != INVALID;
+    }
+    explicit operator bool() const {
+        return valid();
+    }
+    bool operator==(NodeId other) const {
+        return index == other.index;
+    }
+    bool operator!=(NodeId other) const {
+        return !(*this == other);
+    }
 };
 
 struct ExprTag {};
@@ -52,91 +60,80 @@ using LabelId = NodeId<LabelTag>;
 // ---------------------------------------------------------------------------
 
 struct IdentifierExpr {
-  Symbol name;
+    Symbol name;
 };
 
 struct ConstantExpr {
-  Symbol spelling;
+    Symbol spelling;
 };
 
 struct StringLiteralExpr {
-  Symbol spelling;
+    Symbol spelling;
 };
 
 struct UnaryExpr {
-  enum class Op { Plus, Minus, Not, Deref, Addr };
-  Op op = Op::Plus;
-  ExprId operand;
+    enum class Op { Plus, Minus, Not, Deref, Addr };
+    Op op = Op::Plus;
+    ExprId operand;
 };
 
 struct BinaryExpr {
-  enum class Op {
-    Mul,
-    Add,
-    Sub,
-    Less,
-    Equal,
-    NotEqual,
-    LogicalAnd,
-    LogicalOr
-  };
-  Op op = Op::Add;
-  ExprId lhs;
-  ExprId rhs;
+    enum class Op { Mul, Add, Sub, Less, Equal, NotEqual, LogicalAnd, LogicalOr };
+    Op op = Op::Add;
+    ExprId lhs;
+    ExprId rhs;
 };
 
 struct AssignExpr {
-  ExprId lhs;
-  ExprId rhs;
+    ExprId lhs;
+    ExprId rhs;
 };
 
 struct ConditionalExpr {
-  ExprId cond;
-  ExprId thenExpr;
-  ExprId elseExpr;
+    ExprId cond;
+    ExprId then_expr;
+    ExprId else_expr;
 };
 
 struct CallExpr {
-  ExprId callee;
-  std::vector<ExprId> args;
+    ExprId callee;
+    std::vector<ExprId> args;
 };
 
 struct SubscriptExpr {
-  ExprId base;
-  ExprId index;
+    ExprId base;
+    ExprId index;
 };
 
 struct MemberExpr {
-  ExprId base;
-  Symbol member;
-  bool arrow = false;
+    ExprId base;
+    Symbol member;
+    bool arrow = false;
 };
 
 struct SizeofExpr {
-  // sizeof unary-expression or sizeof(type-name).  The variant makes the two
-  // syntactic forms mutually exclusive: an expression form cannot carry a
-  // type-name payload, and a type-name form cannot carry an operand.  The
-  // expression alternative always holds a valid ExprId; the type-name form's
-  // declarator is invalid for an abstract type name.
-  struct TypeName {
-    TypeSpecId spec;
-    DeclaratorId declarator; // invalid for an abstract type name
-  };
+    // sizeof unary-expression or sizeof(type-name).  The variant makes the two
+    // syntactic forms mutually exclusive: an expression form cannot carry a
+    // type-name payload, and a type-name form cannot carry an operand.  The
+    // expression alternative always holds a valid ExprId; the type-name form's
+    // declarator is invalid for an abstract type name.
+    struct TypeName {
+        TypeSpecId spec;
+        DeclaratorId declarator; // invalid for an abstract type name
+    };
 
-  std::variant<ExprId, TypeName> target;
+    std::variant<ExprId, TypeName> target;
 };
 
-using ExprNode = std::variant<IdentifierExpr, ConstantExpr, StringLiteralExpr,
-                              UnaryExpr, BinaryExpr, AssignExpr,
-                              ConditionalExpr, CallExpr, SubscriptExpr,
-                              MemberExpr, SizeofExpr>;
+using ExprNode =
+    std::variant<IdentifierExpr, ConstantExpr, StringLiteralExpr, UnaryExpr, BinaryExpr, AssignExpr,
+                 ConditionalExpr, CallExpr, SubscriptExpr, MemberExpr, SizeofExpr>;
 
 struct Expr {
-  SourceLoc loc;
-  ExprNode node;
+    SourceLoc loc;
+    ExprNode node;
 
-  Expr(SourceLoc location, ExprNode n)
-      : loc(location), node(std::move(n)) {}
+    Expr(SourceLoc location, ExprNode n) : loc(location), node(std::move(n)) {}
 };
 
 // ---------------------------------------------------------------------------
@@ -144,54 +141,52 @@ struct Expr {
 // ---------------------------------------------------------------------------
 
 struct CompoundStmt {
-  std::vector<StmtId> items;
+    std::vector<StmtId> items;
 };
 
 struct DeclStmt {
-  DeclId decl;
+    DeclId decl;
 };
 
 struct ExprStmt {
-  ExprId expr; // invalid for an empty statement
+    ExprId expr; // invalid for an empty statement
 };
 
 struct IfStmt {
-  ExprId cond;
-  StmtId thenStmt;
-  StmtId elseStmt; // invalid when absent
+    ExprId cond;
+    StmtId then_stmt;
+    StmtId else_stmt; // invalid when absent
 };
 
 struct WhileStmt {
-  ExprId cond;
-  StmtId body;
+    ExprId cond;
+    StmtId body;
 };
 
 struct ReturnStmt {
-  ExprId expr; // invalid for return;
+    ExprId expr; // invalid for return;
 };
 
 struct BreakStmt {};
 struct ContinueStmt {};
 
 struct GotoStmt {
-  Symbol name;
+    Symbol name;
 };
 
 struct LabelStmt {
-  LabelId label;
-  StmtId stmt;
+    LabelId label;
+    StmtId stmt;
 };
 
-using StmtNode = std::variant<CompoundStmt, DeclStmt, ExprStmt, IfStmt,
-                              WhileStmt, ReturnStmt, BreakStmt, ContinueStmt,
-                              GotoStmt, LabelStmt>;
+using StmtNode = std::variant<CompoundStmt, DeclStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt,
+                              BreakStmt, ContinueStmt, GotoStmt, LabelStmt>;
 
 struct Stmt {
-  SourceLoc loc;
-  StmtNode node;
+    SourceLoc loc;
+    StmtNode node;
 
-  Stmt(SourceLoc location, StmtNode n)
-      : loc(location), node(std::move(n)) {}
+    Stmt(SourceLoc location, StmtNode n) : loc(location), node(std::move(n)) {}
 };
 
 // ---------------------------------------------------------------------------
@@ -199,47 +194,45 @@ struct Stmt {
 // ---------------------------------------------------------------------------
 
 struct NameDeclarator {
-  Symbol name;
+    Symbol name;
 };
 
 struct PointerDeclarator {
-  DeclaratorId inner; // invalid for an abstract "*"
+    DeclaratorId inner; // invalid for an abstract "*"
 };
 
 struct FunctionDeclarator {
-  DeclaratorId inner; // invalid for an abstract function type
-  std::vector<DeclId> params;
-  bool explicitVoid = false; // printed as (void) rather than ()
+    DeclaratorId inner; // invalid for an abstract function type
+    std::vector<DeclId> params;
+    bool explicit_void = false; // printed as (void) rather than ()
 };
 
-using DeclaratorNode =
-    std::variant<NameDeclarator, PointerDeclarator, FunctionDeclarator>;
+using DeclaratorNode = std::variant<NameDeclarator, PointerDeclarator, FunctionDeclarator>;
 
 struct Declarator {
-  SourceLoc loc;
-  DeclaratorNode node;
+    SourceLoc loc;
+    DeclaratorNode node;
 
-  Declarator(SourceLoc location, DeclaratorNode n)
-      : loc(location), node(std::move(n)) {}
+    Declarator(SourceLoc location, DeclaratorNode n) : loc(location), node(std::move(n)) {}
 };
 
 struct TypeSpec {
-  struct Void {};
-  struct Char {};
-  struct Int {};
+    struct Void {};
+    struct Char {};
+    struct Int {};
 
-  struct Struct {
-    Symbol tag;          // struct tag; may be null
-    std::vector<DeclId> fields;    // field declarations
-    bool hasBraces = false;        // syntactically contains { ... }
-  };
+    struct Struct {
+        Symbol tag;                 // struct tag; may be null
+        std::vector<DeclId> fields; // field declarations
+        bool has_braces = false;    // syntactically contains { ... }
+    };
 
-  using Node = std::variant<Void, Char, Int, Struct>;
+    using Node = std::variant<Void, Char, Int, Struct>;
 
-  SourceLoc loc;
-  Node node;
+    SourceLoc loc;
+    Node node;
 
-  TypeSpec(SourceLoc location, Node n) : loc(location), node(std::move(n)) {}
+    TypeSpec(SourceLoc location, Node n) : loc(location), node(std::move(n)) {}
 };
 
 // ---------------------------------------------------------------------------
@@ -247,47 +240,46 @@ struct TypeSpec {
 // ---------------------------------------------------------------------------
 
 struct VarDecl {
-  TypeSpecId spec;
-  DeclaratorId declarator;
+    TypeSpecId spec;
+    DeclaratorId declarator;
 };
 
 struct FunctionDecl {
-  TypeSpecId spec;
-  DeclaratorId declarator;
-  StmtId body; // invalid for a prototype
+    TypeSpecId spec;
+    DeclaratorId declarator;
+    StmtId body; // invalid for a prototype
 };
 
 struct FieldDecl {
-  TypeSpecId spec;
-  DeclaratorId declarator;
+    TypeSpecId spec;
+    DeclaratorId declarator;
 };
 
 struct ParamDecl {
-  TypeSpecId spec;
-  DeclaratorId declarator; // may be invalid for an abstract parameter
+    TypeSpecId spec;
+    DeclaratorId declarator; // may be invalid for an abstract parameter
 };
 
 struct TagDecl {
-  TypeSpecId spec;
+    TypeSpecId spec;
 };
 
-using DeclNode =
-    std::variant<VarDecl, FunctionDecl, FieldDecl, ParamDecl, TagDecl>;
+using DeclNode = std::variant<VarDecl, FunctionDecl, FieldDecl, ParamDecl, TagDecl>;
 
 struct Decl {
-  SourceLoc loc;
-  DeclNode node;
+    SourceLoc loc;
+    DeclNode node;
 
-  Decl(SourceLoc location, DeclNode n) : loc(location), node(std::move(n)) {}
+    Decl(SourceLoc location, DeclNode n) : loc(location), node(std::move(n)) {}
 };
 
 struct LabelDecl {
-  SourceLoc loc;
-  Symbol name;
+    SourceLoc loc;
+    Symbol name;
 };
 
 struct TranslationUnit {
-  std::vector<DeclId> decls;
+    std::vector<DeclId> decls;
 };
 
 // ---------------------------------------------------------------------------
@@ -296,134 +288,148 @@ struct TranslationUnit {
 
 class AST {
 public:
-  template <typename T> ExprId addExpr(SourceLoc loc, T node) {
-    uint32_t index = nextIndex(exprs_.size(), "expression");
-    exprs_.emplace_back(loc, ExprNode(std::move(node)));
-    return ExprId(index);
-  }
+    template <typename T> ExprId add_expr(SourceLoc loc, T node) {
+        uint32_t index = next_index(exprs_.size(), "expression");
+        exprs_.emplace_back(loc, ExprNode(std::move(node)));
+        return ExprId(index);
+    }
 
-  template <typename T> StmtId addStmt(SourceLoc loc, T node) {
-    uint32_t index = nextIndex(stmts_.size(), "statement");
-    stmts_.emplace_back(loc, StmtNode(std::move(node)));
-    return StmtId(index);
-  }
+    template <typename T> StmtId add_stmt(SourceLoc loc, T node) {
+        uint32_t index = next_index(stmts_.size(), "statement");
+        stmts_.emplace_back(loc, StmtNode(std::move(node)));
+        return StmtId(index);
+    }
 
-  template <typename T> DeclId addDecl(SourceLoc loc, T node) {
-    uint32_t index = nextIndex(decls_.size(), "declaration");
-    decls_.emplace_back(loc, DeclNode(std::move(node)));
-    return DeclId(index);
-  }
+    template <typename T> DeclId add_decl(SourceLoc loc, T node) {
+        uint32_t index = next_index(decls_.size(), "declaration");
+        decls_.emplace_back(loc, DeclNode(std::move(node)));
+        return DeclId(index);
+    }
 
-  template <typename T> DeclaratorId addDeclarator(SourceLoc loc, T node) {
-    uint32_t index = nextIndex(declarators_.size(), "declarator");
-    declarators_.emplace_back(loc, DeclaratorNode(std::move(node)));
-    return DeclaratorId(index);
-  }
+    template <typename T> DeclaratorId add_declarator(SourceLoc loc, T node) {
+        uint32_t index = next_index(declarators_.size(), "declarator");
+        declarators_.emplace_back(loc, DeclaratorNode(std::move(node)));
+        return DeclaratorId(index);
+    }
 
-  TypeSpecId addTypeSpec(TypeSpec spec) {
-    uint32_t index = nextIndex(typeSpecs_.size(), "type specifier");
-    typeSpecs_.push_back(std::move(spec));
-    return TypeSpecId(index);
-  }
+    TypeSpecId add_type_spec(TypeSpec spec) {
+        uint32_t index = next_index(type_specs_.size(), "type specifier");
+        type_specs_.push_back(std::move(spec));
+        return TypeSpecId(index);
+    }
 
-  LabelId addLabel(SourceLoc loc, Symbol name) {
-    uint32_t index = nextIndex(labels_.size(), "label");
-    labels_.push_back(LabelDecl{loc, name});
-    return LabelId(index);
-  }
+    LabelId add_label(SourceLoc loc, Symbol name) {
+        uint32_t index = next_index(labels_.size(), "label");
+        labels_.push_back(LabelDecl{loc, name});
+        return LabelId(index);
+    }
 
-  Expr &expr(ExprId id) {
-    checkId(id, exprs_.size(), "expression");
-    return exprs_[id.index];
-  }
-  const Expr &expr(ExprId id) const {
-    checkId(id, exprs_.size(), "expression");
-    return exprs_[id.index];
-  }
+    Expr& expr(ExprId id) {
+        check_id(id, exprs_.size(), "expression");
+        return exprs_[id.index];
+    }
+    const Expr& expr(ExprId id) const {
+        check_id(id, exprs_.size(), "expression");
+        return exprs_[id.index];
+    }
 
-  Stmt &stmt(StmtId id) {
-    checkId(id, stmts_.size(), "statement");
-    return stmts_[id.index];
-  }
-  const Stmt &stmt(StmtId id) const {
-    checkId(id, stmts_.size(), "statement");
-    return stmts_[id.index];
-  }
+    Stmt& stmt(StmtId id) {
+        check_id(id, stmts_.size(), "statement");
+        return stmts_[id.index];
+    }
+    const Stmt& stmt(StmtId id) const {
+        check_id(id, stmts_.size(), "statement");
+        return stmts_[id.index];
+    }
 
-  Decl &decl(DeclId id) {
-    checkId(id, decls_.size(), "declaration");
-    return decls_[id.index];
-  }
-  const Decl &decl(DeclId id) const {
-    checkId(id, decls_.size(), "declaration");
-    return decls_[id.index];
-  }
+    Decl& decl(DeclId id) {
+        check_id(id, decls_.size(), "declaration");
+        return decls_[id.index];
+    }
+    const Decl& decl(DeclId id) const {
+        check_id(id, decls_.size(), "declaration");
+        return decls_[id.index];
+    }
 
-  Declarator &declarator(DeclaratorId id) {
-    checkId(id, declarators_.size(), "declarator");
-    return declarators_[id.index];
-  }
-  const Declarator &declarator(DeclaratorId id) const {
-    checkId(id, declarators_.size(), "declarator");
-    return declarators_[id.index];
-  }
+    Declarator& declarator(DeclaratorId id) {
+        check_id(id, declarators_.size(), "declarator");
+        return declarators_[id.index];
+    }
+    const Declarator& declarator(DeclaratorId id) const {
+        check_id(id, declarators_.size(), "declarator");
+        return declarators_[id.index];
+    }
 
-  TypeSpec &typeSpec(TypeSpecId id) {
-    checkId(id, typeSpecs_.size(), "type specifier");
-    return typeSpecs_[id.index];
-  }
-  const TypeSpec &typeSpec(TypeSpecId id) const {
-    checkId(id, typeSpecs_.size(), "type specifier");
-    return typeSpecs_[id.index];
-  }
+    TypeSpec& type_spec(TypeSpecId id) {
+        check_id(id, type_specs_.size(), "type specifier");
+        return type_specs_[id.index];
+    }
+    const TypeSpec& type_spec(TypeSpecId id) const {
+        check_id(id, type_specs_.size(), "type specifier");
+        return type_specs_[id.index];
+    }
 
-  LabelDecl &label(LabelId id) {
-    checkId(id, labels_.size(), "label");
-    return labels_[id.index];
-  }
-  const LabelDecl &label(LabelId id) const {
-    checkId(id, labels_.size(), "label");
-    return labels_[id.index];
-  }
+    LabelDecl& label(LabelId id) {
+        check_id(id, labels_.size(), "label");
+        return labels_[id.index];
+    }
+    const LabelDecl& label(LabelId id) const {
+        check_id(id, labels_.size(), "label");
+        return labels_[id.index];
+    }
 
-  size_t exprCount() const { return exprs_.size(); }
-  size_t stmtCount() const { return stmts_.size(); }
-  size_t declCount() const { return decls_.size(); }
-  size_t declaratorCount() const { return declarators_.size(); }
-  size_t typeSpecCount() const { return typeSpecs_.size(); }
-  size_t labelCount() const { return labels_.size(); }
+    size_t expr_count() const {
+        return exprs_.size();
+    }
+    size_t stmt_count() const {
+        return stmts_.size();
+    }
+    size_t decl_count() const {
+        return decls_.size();
+    }
+    size_t declarator_count() const {
+        return declarators_.size();
+    }
+    size_t type_spec_count() const {
+        return type_specs_.size();
+    }
+    size_t label_count() const {
+        return labels_.size();
+    }
 
-  TranslationUnit &translationUnit() { return tu_; }
-  const TranslationUnit &translationUnit() const { return tu_; }
+    TranslationUnit& translation_unit() {
+        return tu_;
+    }
+    const TranslationUnit& translation_unit() const {
+        return tu_;
+    }
 
 private:
-  template <typename Id> static void checkId(Id id, size_t size,
-                                             const char *kind) {
-    if (!id.valid() || static_cast<size_t>(id.index) >= size)
-      throw std::out_of_range(std::string("invalid AST ") + kind +
-                              " node id");
-  }
+    template <typename Id> static void check_id(Id id, size_t size, const char* kind) {
+        if (!id.valid() || static_cast<size_t>(id.index) >= size)
+            throw std::out_of_range(std::string("invalid AST ") + kind + " node id");
+    }
 
-  static uint32_t nextIndex(size_t size, const char *kind) {
-    if (size >= static_cast<size_t>(NodeId<ExprTag>::Invalid))
-      throw std::length_error(std::string("too many AST ") + kind + " nodes");
-    return static_cast<uint32_t>(size);
-  }
+    static uint32_t next_index(size_t size, const char* kind) {
+        if (size >= static_cast<size_t>(NodeId<ExprTag>::INVALID))
+            throw std::length_error(std::string("too many AST ") + kind + " nodes");
+        return static_cast<uint32_t>(size);
+    }
 
-  std::vector<Expr> exprs_;
-  std::vector<Stmt> stmts_;
-  std::vector<Decl> decls_;
-  std::vector<Declarator> declarators_;
-  std::vector<TypeSpec> typeSpecs_;
-  std::vector<LabelDecl> labels_;
-  TranslationUnit tu_;
+    std::vector<Expr> exprs_;
+    std::vector<Stmt> stmts_;
+    std::vector<Decl> decls_;
+    std::vector<Declarator> declarators_;
+    std::vector<TypeSpec> type_specs_;
+    std::vector<LabelDecl> labels_;
+    TranslationUnit tu_;
 };
 
 // Syntactic declarator queries used by the parser and semantic analysis.
 enum class DeclaratorShape { Object, Pointer, Function };
-DeclaratorShape declaratorShape(const AST &ast, DeclaratorId id,
-                                DeclaratorShape base = DeclaratorShape::Object);
-bool declaratorHasName(const AST &ast, DeclaratorId id);
-Symbol declaratorName(const AST &ast, DeclaratorId id);
-SourceLoc declaratorNameLoc(const AST &ast, DeclaratorId id);
-bool declaratorProducesFunction(const AST &ast, DeclaratorId id);
+DeclaratorShape declarator_shape(const AST& ast, DeclaratorId id,
+                                 DeclaratorShape base = DeclaratorShape::Object);
+bool declarator_has_name(const AST& ast, DeclaratorId id);
+Symbol declarator_name(const AST& ast, DeclaratorId id);
+SourceLoc declarator_name_loc(const AST& ast, DeclaratorId id);
+bool declarator_produces_function(const AST& ast, DeclaratorId id);

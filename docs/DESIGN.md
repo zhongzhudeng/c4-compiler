@@ -95,12 +95,12 @@ Source files:
 The orchestration layer is a sequence of value-returning phase functions rather
 than a mutable Compiler object:
 
-    TokenizedSource tokenizeFile/tokenizeString(...)
+    TokenizedSource tokenize_file/tokenize_string(...)
     ParsedProgram   parse(TokenizedSource)
     AnalyzedProgram analyze(ParsedProgram, TypeContext&, TypeLayout&)
-    llvm::Module    generateModule(const AnalyzedProgram&, TargetEnvironment&, name)
-    void            optimizeModule(llvm::Module&)
-    void            writeModule(const llvm::Module&, path, sourceFilename)
+    llvm::Module    generate_module(const AnalyzedProgram&, TargetEnvironment&, name)
+    void            optimize_module(llvm::Module&)
+    void            write_module(const llvm::Module&, path, source_filename)
     int             run(filename, CompileMode)
 
 Each result owns exactly the state its stage produced and nothing later stages
@@ -123,19 +123,19 @@ do not need:
   the established fallback layout), and builds the TypeLayout over the same
   context and layout.  It is constructed only for --compile/--optimize, so
   frontend-only modes never register targets or create a TargetMachine.
-- generateModule creates the llvm::Module in the TargetEnvironment's context,
+- generate_module creates the llvm::Module in the TargetEnvironment's context,
   sets its triple and data layout from the same environment, and lowers the
   AnalyzedProgram.  Sema and CodeGen therefore cannot observe different layout
   semantics.
 
 run() composes the stages for each mode:
 
-    --tokenize   tokenizeFile -> print tokens (internal EOF skipped)
-    --parse      tokenizeFile -> parse -> analyze
-    --print-ast  tokenizeFile -> parse -> analyze -> Printer
-    --compile    tokenizeFile -> parse -> TargetEnvironment -> analyze
-                 -> generateModule -> writeModule
-    --optimize   same, then optimizeModule before writeModule
+    --tokenize   tokenize_file -> print tokens (internal EOF skipped)
+    --parse      tokenize_file -> parse -> analyze
+    --print-ast  tokenize_file -> parse -> analyze -> Printer
+    --compile    tokenize_file -> parse -> TargetEnvironment -> analyze
+                 -> generate_module -> write_module
+    --optimize   same, then optimize_module before write_module
     default      CompileMode::Compile
 
 Frontend-only modes build a local FrontendEnvironment (LLVMContext,
@@ -149,7 +149,7 @@ phase unwind without returning a partially analyzed stage result.
 ### AST ownership and node relationships
 
 - One AST object owns all nodes by value in std::vectors: exprs_, stmts_,
-  decls_, declarators_, typeSpecs_, labels_.
+  decls_, declarators_, type_specs_, labels_.
 - Nodes refer to each other only through typed IDs: ExprId, StmtId, DeclId,
   DeclaratorId, TypeSpecId, LabelId, each a 32-bit index with an invalid
   sentinel.
@@ -280,9 +280,9 @@ produces the end-of-input token explicitly, and --tokenize skips it.
 
 Lexer(filename, source, SymbolInternalizer&) has one output, tokenize(), which
 returns the complete token vector including the internal EOF token.  File
-loading is not a lexer concern: Compiler::tokenizeFile reads the bytes in
+loading is not a lexer concern: Compiler::tokenize_file reads the bytes in
 binary mode and reports "cannot open input file" at 1:1, then delegates to
-tokenizeString, so both entry points use the same scanner.  The former
+tokenize_string, so both entry points use the same scanner.  The former
 callback-based streaming interface was removed because no mode consumed tokens
 incrementally.
 
@@ -326,8 +326,8 @@ rejected (explicitly permitted by task E); anonymous structs are supported.
 
 Printer(const AST&, std::ostream&) renders directly to the caller's stream and
 depends only on the AST; the former SemanticModel constructor argument was
-unused and is gone.  print() walks the file-scope declarations; printDecl,
-printStmt, printExpr, and printDeclarator recurse with an explicit indentation
+unused and is gone.  print() walks the file-scope declarations; print_decl,
+print_stmt, print_expr, and print_declarator recurse with an explicit indentation
 level, so there is no intermediate text and no second traversal to reconstruct
 strings.  The printer owns no output and keeps no mutable state beyond its two
 references.

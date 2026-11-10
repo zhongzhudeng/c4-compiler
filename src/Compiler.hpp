@@ -30,8 +30,8 @@ class TargetEnvironment;
 
 /// Lexes a file or an in-memory source string.  The result owns the token
 /// stream and the SymbolInternalizer its tokens point at.
-TokenizedSource tokenizeFile(std::string filename);
-TokenizedSource tokenizeString(std::string filename, std::string source);
+TokenizedSource tokenize_file(std::string filename);
+TokenizedSource tokenize_string(std::string filename, std::string source);
 
 /// Parses a completed token stream.  The result owns the AST and the symbols
 /// its names point at; the token stream itself is discarded.
@@ -40,27 +40,25 @@ ParsedProgram parse(TokenizedSource source);
 /// Runs semantic analysis over a completed AST.  The result owns the semantic
 /// model and the parsed program; types and layout are borrowed and must outlive
 /// it.
-AnalyzedProgram analyze(ParsedProgram program, TypeContext &types,
-                        TypeLayout &layout);
+AnalyzedProgram analyze(ParsedProgram program, TypeContext& types, TypeLayout& layout);
 
 /// Lowers an analyzed program into a verified LLVM module.  The module uses the
 /// target's LLVMContext, so it is consistent with the TypeLayout that Sema and
 /// CodeGen share.
-std::unique_ptr<llvm::Module> generateModule(const AnalyzedProgram &program,
-                                             TargetEnvironment &target,
-                                             std::string moduleName);
+std::unique_ptr<llvm::Module> generate_module(const AnalyzedProgram& program,
+                                              TargetEnvironment& target, std::string module_name);
 
 /// mem2reg followed by the project's SCCP, then an LLVM verifier check.
-void optimizeModule(llvm::Module &module);
+void optimize_module(llvm::Module& module);
 
 /// Prints the module as textual IR.  An unwritable path is reported through
 /// the source diagnostic channel (exit code 1), matching the CLI contract.
-void writeModule(const llvm::Module &module, const std::string &outputPath,
-                 const std::string &sourceFilename);
+void write_module(const llvm::Module& module, const std::string& output_path,
+                  const std::string& source_filename);
 
 /// Executes one CLI invocation.  Source errors throw CompileError; internal
 /// failures throw std::exception.  main.cpp maps those to exit codes 1 and 2.
-int run(const std::string &filename, CompileMode mode);
+int run(const std::string& filename, CompileMode mode);
 
 /// The tokens of one lexed source together with the symbols they reference.
 /// A Symbol is valid only while the interner that produced it is alive, so the
@@ -68,25 +66,27 @@ int run(const std::string &filename, CompileMode mode);
 /// later phases.
 class TokenizedSource {
 public:
-  TokenizedSource(TokenizedSource &&) noexcept = default;
-  TokenizedSource(const TokenizedSource &) = delete;
-  TokenizedSource &operator=(const TokenizedSource &) = delete;
+    TokenizedSource(TokenizedSource&&) noexcept = default;
+    TokenizedSource(const TokenizedSource&) = delete;
+    TokenizedSource& operator=(const TokenizedSource&) = delete;
 
-  const std::string &filename() const { return filename_; }
-  const std::vector<Token> &tokens() const { return tokens_; }
+    const std::string& filename() const {
+        return filename_;
+    }
+    const std::vector<Token>& tokens() const {
+        return tokens_;
+    }
 
 private:
-  friend TokenizedSource tokenizeFile(std::string filename);
-  friend TokenizedSource tokenizeString(std::string filename,
-                                        std::string source);
-  friend ParsedProgram parse(TokenizedSource source);
+    friend TokenizedSource tokenize_file(std::string filename);
+    friend TokenizedSource tokenize_string(std::string filename, std::string source);
+    friend ParsedProgram parse(TokenizedSource source);
 
-  explicit TokenizedSource(std::string filename)
-      : filename_(std::move(filename)) {}
+    explicit TokenizedSource(std::string filename) : filename_(std::move(filename)) {}
 
-  std::string filename_;
-  SymbolInternalizer symbols_;
-  std::vector<Token> tokens_;
+    std::string filename_;
+    SymbolInternalizer symbols_;
+    std::vector<Token> tokens_;
 };
 
 /// A completed AST and the symbols its names point at.  Tokens are gone: the
@@ -94,23 +94,26 @@ private:
 /// analysis and code generation.
 class ParsedProgram {
 public:
-  ParsedProgram(ParsedProgram &&) noexcept = default;
-  ParsedProgram(const ParsedProgram &) = delete;
-  ParsedProgram &operator=(const ParsedProgram &) = delete;
+    ParsedProgram(ParsedProgram&&) noexcept = default;
+    ParsedProgram(const ParsedProgram&) = delete;
+    ParsedProgram& operator=(const ParsedProgram&) = delete;
 
-  const std::string &filename() const { return filename_; }
-  const AST &ast() const { return ast_; }
+    const std::string& filename() const {
+        return filename_;
+    }
+    const AST& ast() const {
+        return ast_;
+    }
 
 private:
-  friend ParsedProgram parse(TokenizedSource source);
+    friend ParsedProgram parse(TokenizedSource source);
 
-  ParsedProgram(std::string filename, SymbolInternalizer symbols, AST ast)
-      : filename_(std::move(filename)), symbols_(std::move(symbols)),
-        ast_(std::move(ast)) {}
+    ParsedProgram(std::string filename, SymbolInternalizer symbols, AST ast)
+        : filename_(std::move(filename)), symbols_(std::move(symbols)), ast_(std::move(ast)) {}
 
-  std::string filename_;
-  SymbolInternalizer symbols_;
-  AST ast_;
+    std::string filename_;
+    SymbolInternalizer symbols_;
+    AST ast_;
 };
 
 /// A parsed program with completed semantic analysis.  The model refers to AST
@@ -119,28 +122,36 @@ private:
 /// them first, which guarantees they outlive this object.
 class AnalyzedProgram {
 public:
-  AnalyzedProgram(AnalyzedProgram &&) noexcept = default;
-  AnalyzedProgram(const AnalyzedProgram &) = delete;
-  AnalyzedProgram &operator=(const AnalyzedProgram &) = delete;
+    AnalyzedProgram(AnalyzedProgram&&) noexcept = default;
+    AnalyzedProgram(const AnalyzedProgram&) = delete;
+    AnalyzedProgram& operator=(const AnalyzedProgram&) = delete;
 
-  const std::string &filename() const { return program_.filename(); }
-  const AST &ast() const { return program_.ast(); }
-  const SemanticModel &model() const { return model_; }
-  TypeContext &types() const { return types_; }
-  TypeLayout &layout() const { return layout_; }
+    const std::string& filename() const {
+        return program_.filename();
+    }
+    const AST& ast() const {
+        return program_.ast();
+    }
+    const SemanticModel& model() const {
+        return model_;
+    }
+    TypeContext& types() const {
+        return types_;
+    }
+    TypeLayout& layout() const {
+        return layout_;
+    }
 
 private:
-  friend AnalyzedProgram analyze(ParsedProgram program, TypeContext &types,
-                                 TypeLayout &layout);
+    friend AnalyzedProgram analyze(ParsedProgram program, TypeContext& types, TypeLayout& layout);
 
-  AnalyzedProgram(ParsedProgram program, TypeContext &types, TypeLayout &layout)
-      : program_(std::move(program)), model_(program_.ast()), types_(types),
-        layout_(layout) {}
+    AnalyzedProgram(ParsedProgram program, TypeContext& types, TypeLayout& layout)
+        : program_(std::move(program)), model_(program_.ast()), types_(types), layout_(layout) {}
 
-  ParsedProgram program_;
-  SemanticModel model_;
-  TypeContext &types_;
-  TypeLayout &layout_;
+    ParsedProgram program_;
+    SemanticModel model_;
+    TypeContext& types_;
+    TypeLayout& layout_;
 };
 
 /// The LLVM resources required for target-specific IR generation.  Constructing
@@ -151,19 +162,27 @@ private:
 /// layouts.  Frontend-only modes never construct this object.
 class TargetEnvironment {
 public:
-  TargetEnvironment();
-  TargetEnvironment(const TargetEnvironment &) = delete;
-  TargetEnvironment(TargetEnvironment &&) = delete;
-  TargetEnvironment &operator=(const TargetEnvironment &) = delete;
+    TargetEnvironment();
+    TargetEnvironment(const TargetEnvironment&) = delete;
+    TargetEnvironment(TargetEnvironment&&) = delete;
+    TargetEnvironment& operator=(const TargetEnvironment&) = delete;
 
-  llvm::LLVMContext &context() { return context_; }
-  const llvm::DataLayout &dataLayout() const { return dataLayout_; }
-  TypeLayout &layout() { return layout_; }
-  const std::string &triple() const { return triple_; }
+    llvm::LLVMContext& context() {
+        return context_;
+    }
+    const llvm::DataLayout& data_layout() const {
+        return data_layout_;
+    }
+    TypeLayout& layout() {
+        return layout_;
+    }
+    const std::string& triple() const {
+        return triple_;
+    }
 
 private:
-  llvm::LLVMContext context_;
-  std::string triple_;
-  llvm::DataLayout dataLayout_;
-  TypeLayout layout_;
+    llvm::LLVMContext context_;
+    std::string triple_;
+    llvm::DataLayout data_layout_;
+    TypeLayout layout_;
 };
