@@ -306,8 +306,8 @@ void collect_declarator_params(const AST& ast, DeclaratorId id, std::vector<Decl
         return;
     }
     if (auto* function = std::get_if<FunctionDeclarator>(&declarator.node)) {
-        for (DeclId param : function->params)
-            out.push_back(param);
+        if (auto* params = std::get_if<FunctionDeclarator::ParameterList>(&function->parameters))
+            out.insert(out.end(), params->begin(), params->end());
         collect_declarator_params(ast, function->inner, out);
     }
 }
@@ -497,7 +497,7 @@ int main(void) { struct P *q; return 0; }
     auto* param_decl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
     REQUIRE(param_decl != nullptr);
     const TypeSpec& spec = ast.type_spec(param_decl->spec);
-    auto* structure = std::get_if<TypeSpec::Struct>(&spec.node);
+    auto* structure = std::get_if<TypeSpec::StructDefinition>(&spec.node);
     REQUIRE(structure != nullptr);
     REQUIRE(structure->tag != nullptr);
     StructDecl* prototype_tag = model.type_spec(param_decl->spec).record;
@@ -549,7 +549,7 @@ int f(struct S { int x; } *p) {
     auto* param_decl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
     REQUIRE(param_decl != nullptr);
     const TypeSpec& spec = ast.type_spec(param_decl->spec);
-    auto* structure = std::get_if<TypeSpec::Struct>(&spec.node);
+    auto* structure = std::get_if<TypeSpec::StructDefinition>(&spec.node);
     REQUIRE(structure != nullptr);
     REQUIRE(structure->tag != nullptr);
     StructDecl* tag = model.type_spec(param_decl->spec).record;
@@ -608,7 +608,7 @@ int (*f(struct S *p))(int) {
     auto* param_decl = std::get_if<ParamDecl>(&ast.decl(parameter).node);
     REQUIRE(param_decl != nullptr);
     const TypeSpec& spec = ast.type_spec(param_decl->spec);
-    auto* structure = std::get_if<TypeSpec::Struct>(&spec.node);
+    auto* structure = std::get_if<TypeSpec::StructReference>(&spec.node);
     REQUIRE(structure != nullptr);
     REQUIRE(structure->tag != nullptr);
     StructDecl* tag = model.type_spec(param_decl->spec).record;
@@ -793,4 +793,80 @@ TEST_CASE("sema binds labels in the function scope", "[sema][architecture]") {
     CHECK(model.lookup_label(model.file_scope(), label.name) == LabelId{});
     CHECK(model.goto_target(body->items[0]) == label_stmt->label);
     CHECK(model.label(label_stmt->label).defined);
+}
+
+TEST_CASE("sema treats only literal zero as a null pointer constant", "[sema][s009]") {
+    auto assignment_rhs = [](const TestCompiler& compiler) -> ExprId {
+        const AST& ast = compiler.ast();
+        REQUIRE(ast.translation_unit().decls.size() == 1);
+        const auto* function =
+            std::get_if<FunctionDecl>(&ast.decl(ast.translation_unit().decls[0]).node);
+        REQUIRE(function != nullptr);
+        const auto* body = std::get_if<CompoundStmt>(&ast.stmt(function->body).node);
+        REQUIRE(body != nullptr);
+        REQUIRE(body->items.size() >= 2);
+        const auto* statement = std::get_if<ExprStmt>(&ast.stmt(body->items[1]).node);
+        REQUIRE(statement != nullptr);
+        const auto* assignment = std::get_if<AssignExpr>(&ast.expr(statement->expr).node);
+        REQUIRE(assignment != nullptr);
+        return assignment->rhs;
+    };
+
+    {
+        TestCompiler compiler;
+        std::string error;
+        INFO(error);
+        REQUIRE(compiler.analyze("int main(void) { int *p; p = 0; return 0; }", &error));
+        const ExprInfo& info = compiler.model().expr(assignment_rhs(compiler));
+        REQUIRE(info.constant() != nullptr);
+        CHECK(info.constant()->value == 0);
+        CHECK(info.is_null_pointer_constant());
+    }
+
+    {
+        // (0) preserves the value but is not a null pointer constant.
+        TestCompiler compiler;
+        std::string error;
+        INFO(error);
+        REQUIRE(compiler.analyze("int main(void) { int x; x = (0); return x; }", &error));
+        ExprId rhs = assignment_rhs(compiler);
+        const ExprInfo& info = compiler.model().expr(rhs);
+        REQUIRE(info.constant() != nullptr);
+        CHECK(info.constant()->value == 0);
+        CHECK_FALSE(info.is_null_pointer_constant());
+        const auto* paren = std::get_if<ParenExpr>(&compiler.ast().expr(rhs).node);
+        REQUIRE(paren != nullptr);
+        CHECK(compiler.model().expr(paren->inner).is_null_pointer_constant());
+    }
+
+    {
+        // Constant folding to zero must not create a null pointer constant.
+        TestCompiler compiler;
+        std::string error;
+        INFO(error);
+        REQUIRE(compiler.analyze("int main(void) { int x; x = 0 + 0; return x; }", &error));
+        const ExprInfo& info = compiler.model().expr(assignment_rhs(compiler));
+        REQUIRE(info.constant() != nullptr);
+        CHECK(info.constant()->value == 0);
+        CHECK_FALSE(info.is_null_pointer_constant());
+    }
+
+    {
+        TestCompiler compiler;
+        std::string error;
+        INFO(error);
+        REQUIRE(compiler.analyze("int main(void) { int x; x = -0; return x; }", &error));
+        const ExprInfo& info = compiler.model().expr(assignment_rhs(compiler));
+        REQUIRE(info.constant() != nullptr);
+        CHECK(info.constant()->value == 0);
+        CHECK_FALSE(info.is_null_pointer_constant());
+    }
+
+    require_valid("int main(void) { int *p; return p == 0; }");
+    require_valid("int main(void) { int *p; int c; p = c ? p : 0; return 0; }");
+    require_invalid("int main(void) { int *p; p = (0); return 0; }");
+    require_invalid("int main(void) { int *p; p = 0 + 0; return 0; }");
+    require_invalid("int main(void) { int *p; p = -0; return 0; }");
+    require_invalid("int main(void) { int *p; return p == (0); }");
+    require_invalid("int main(void) { int *p; int c; p = c ? p : (0); return 0; }");
 }

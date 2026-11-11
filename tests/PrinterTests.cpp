@@ -169,3 +169,15 @@ TEST_CASE("printer output is idempotent", "[printer]") {
     REQUIRE(compiler.print(first, &second));
     REQUIRE(second == first);
 }
+
+TEST_CASE("printer omits redundant parentheses", "[printer]") {
+    TestCompiler compiler;
+    std::string output;
+    REQUIRE(compiler.print("int main(void) { int x; x = (1); return (x + (2)); }", &output));
+    REQUIRE(output == "int (main(void))\n"
+                      "{\n"
+                      "\tint x;\n"
+                      "\t(x = 1);\n"
+                      "\treturn (x + 2);\n"
+                      "}\n");
+}

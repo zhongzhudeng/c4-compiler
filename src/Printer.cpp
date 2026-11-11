@@ -107,14 +107,17 @@ void Printer::print_declarator(DeclaratorId id) {
 }
 
 void Printer::print_parameter_list(const FunctionDeclarator& function) {
-    if (function.explicit_void) {
+    if (std::holds_alternative<FunctionDeclarator::VoidParameters>(function.parameters)) {
         out_ << "void";
         return;
     }
-    for (size_t i = 0; i < function.params.size(); ++i) {
+    auto* parameters = std::get_if<FunctionDeclarator::ParameterList>(&function.parameters);
+    if (!parameters)
+        return; // ()
+    for (size_t i = 0; i < parameters->size(); ++i) {
         if (i)
             out_ << ", ";
-        print_parameter(function.params[i]);
+        print_parameter((*parameters)[i]);
     }
 }
 
@@ -140,18 +143,23 @@ void Printer::print_flat_type_spec(TypeSpecId id) {
         return;
     }
 
-    const TypeSpec::Struct& structure = std::get<TypeSpec::Struct>(spec.node);
-    out_ << "struct";
-    if (structure.tag)
-        out_ << ' ' << *structure.tag;
-    if (structure.has_braces) {
-        out_ << " {";
-        for (DeclId field : structure.fields) {
-            out_ << ' ';
-            print_flat_field(field);
-        }
-        out_ << " }";
+    if (auto* reference = std::get_if<TypeSpec::StructReference>(&spec.node)) {
+        out_ << "struct";
+        if (reference->tag)
+            out_ << ' ' << *reference->tag;
+        return;
     }
+
+    const TypeSpec::StructDefinition& definition = std::get<TypeSpec::StructDefinition>(spec.node);
+    out_ << "struct";
+    if (definition.tag)
+        out_ << ' ' << *definition.tag;
+    out_ << " {";
+    for (DeclId field : definition.fields) {
+        out_ << ' ';
+        print_flat_field(field);
+    }
+    out_ << " }";
 }
 
 void Printer::print_flat_field(DeclId id) {
@@ -196,6 +204,13 @@ void Printer::print_expr(ExprId id) {
     if (auto* string = std::get_if<StringLiteralExpr>(&expr.node)) {
         if (string->spelling)
             out_ << *string->spelling;
+        return;
+    }
+
+    // Parentheses are semantically transparent and the pretty-printer is fully
+    // parenthesized by construction, so they are not printed.
+    if (auto* paren = std::get_if<ParenExpr>(&expr.node)) {
+        print_expr(paren->inner);
         return;
     }
 
@@ -299,19 +314,24 @@ void Printer::print_type_spec(TypeSpecId id, int level) {
         return;
     }
 
-    const TypeSpec::Struct& structure = std::get<TypeSpec::Struct>(spec.node);
-    out_ << "struct";
-    if (structure.tag)
-        out_ << ' ' << *structure.tag;
-    if (structure.has_braces) {
-        out_ << '\n';
-        indent(level);
-        out_ << "{\n";
-        for (DeclId field : structure.fields)
-            print_decl(field, level + 1);
-        indent(level);
-        out_ << "}";
+    if (auto* reference = std::get_if<TypeSpec::StructReference>(&spec.node)) {
+        out_ << "struct";
+        if (reference->tag)
+            out_ << ' ' << *reference->tag;
+        return;
     }
+
+    const TypeSpec::StructDefinition& definition = std::get<TypeSpec::StructDefinition>(spec.node);
+    out_ << "struct";
+    if (definition.tag)
+        out_ << ' ' << *definition.tag;
+    out_ << '\n';
+    indent(level);
+    out_ << "{\n";
+    for (DeclId field : definition.fields)
+        print_decl(field, level + 1);
+    indent(level);
+    out_ << "}";
 }
 
 void Printer::print_decl(DeclId id, int level) {

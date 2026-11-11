@@ -93,24 +93,26 @@ TypeSpecId Parser::parse_type_spec() {
     if (accept(TkInt))
         return ast_.add_type_spec(TypeSpec{start, TypeSpec::Int{}});
     if (accept(TkStruct)) {
-        TypeSpec::Struct spec;
+        Symbol tag;
         if (check(TkIdentifier)) {
-            spec.tag = current().text;
+            tag = current().text;
             advance();
         }
         if (accept(TkLbrace)) {
-            spec.has_braces = true;
+            TypeSpec::StructDefinition definition;
+            definition.tag = tag;
             while (!check(TkRbrace)) {
                 if (at_end())
                     error(loc(), "expected '}' in struct declaration");
                 std::vector<DeclId> fields = parse_field_declaration();
-                spec.fields.insert(spec.fields.end(), fields.begin(), fields.end());
+                definition.fields.insert(definition.fields.end(), fields.begin(), fields.end());
             }
             expect(TkRbrace, "'}'");
-        } else if (!spec.tag) {
-            error(loc(), "expected struct tag or declaration");
+            return ast_.add_type_spec(TypeSpec{start, std::move(definition)});
         }
-        return ast_.add_type_spec(TypeSpec{start, std::move(spec)});
+        if (!tag)
+            error(loc(), "expected struct tag or declaration");
+        return ast_.add_type_spec(TypeSpec{start, TypeSpec::StructReference{tag}});
     }
     error(start, "expected type specifier");
 }
@@ -134,10 +136,8 @@ DeclaratorId Parser::parse_declarator(bool allow_name, bool allow_empty) {
     } else if (check(TkLparen)) {
         if (is_parameter_list_ahead()) {
             SourceLoc lparen = loc();
-            bool explicit_void = false;
-            std::vector<DeclId> params = parse_parameter_list(lparen, explicit_void);
             direct = ast_.add_declarator(
-                lparen, FunctionDeclarator{DeclaratorId{}, std::move(params), explicit_void});
+                lparen, FunctionDeclarator{DeclaratorId{}, parse_parameter_list()});
             have_direct = true;
         } else {
             advance(); // '('
@@ -151,10 +151,7 @@ DeclaratorId Parser::parse_declarator(bool allow_name, bool allow_empty) {
 
     while (check(TkLparen)) {
         SourceLoc lparen = loc();
-        bool explicit_void = false;
-        std::vector<DeclId> params = parse_parameter_list(lparen, explicit_void);
-        direct = ast_.add_declarator(lparen,
-                                     FunctionDeclarator{direct, std::move(params), explicit_void});
+        direct = ast_.add_declarator(lparen, FunctionDeclarator{direct, parse_parameter_list()});
         have_direct = true;
     }
 
@@ -166,18 +163,16 @@ DeclaratorId Parser::parse_declarator(bool allow_name, bool allow_empty) {
     return direct;
 }
 
-std::vector<DeclId> Parser::parse_parameter_list(SourceLoc lparen, bool& explicit_void) {
-    (void)lparen;
+FunctionDeclarator::Parameters Parser::parse_parameter_list() {
     expect(TkLparen, "'('");
-    std::vector<DeclId> params;
     if (accept(TkRparen))
-        return params;
+        return FunctionDeclarator::NoParameters{};
     if (check(TkVoid) && peek_kind(1) == TkRparen) {
         advance(); // void
         advance(); // )
-        explicit_void = true;
-        return params;
+        return FunctionDeclarator::VoidParameters{};
     }
+    FunctionDeclarator::ParameterList params;
     do {
         params.push_back(parse_parameter_declaration());
     } while (accept(TkComma));
@@ -214,7 +209,7 @@ DeclId Parser::parse_external_declaration() {
 
     if (!is_declarator_start()) {
         const TypeSpec& ts = ast_.type_spec(spec);
-        if (std::holds_alternative<TypeSpec::Struct>(ts.node)) {
+        if (is_struct_type_spec(ts)) {
             expect(TkSemicolon, "';' after struct declaration");
             return ast_.add_decl(start, TagDecl{spec});
         }
@@ -244,7 +239,7 @@ DeclId Parser::parse_local_declaration() {
 
     if (!is_declarator_start()) {
         const TypeSpec& ts = ast_.type_spec(spec);
-        if (std::holds_alternative<TypeSpec::Struct>(ts.node)) {
+        if (is_struct_type_spec(ts)) {
             expect(TkSemicolon, "';' after struct declaration");
             return ast_.add_decl(start, TagDecl{spec});
         }
@@ -374,48 +369,39 @@ ExprId Parser::parse_conditional() {
     return cond;
 }
 
-int Parser::binary_precedence(TokenKind kind, BinaryExpr::Op& op) {
+std::optional<Parser::BinaryOperator> Parser::binary_precedence(TokenKind kind) {
     switch (canonical_token_kind(kind)) {
         case TkPipepipe:
-            op = BinaryExpr::Op::LogicalOr;
-            return 1;
+            return BinaryOperator{BinaryExpr::Op::LogicalOr, 1};
         case TkAmpamp:
-            op = BinaryExpr::Op::LogicalAnd;
-            return 2;
+            return BinaryOperator{BinaryExpr::Op::LogicalAnd, 2};
         case TkEqualequal:
-            op = BinaryExpr::Op::Equal;
-            return 3;
+            return BinaryOperator{BinaryExpr::Op::Equal, 3};
         case TkExclaimequal:
-            op = BinaryExpr::Op::NotEqual;
-            return 3;
+            return BinaryOperator{BinaryExpr::Op::NotEqual, 3};
         case TkLess:
-            op = BinaryExpr::Op::Less;
-            return 4;
+            return BinaryOperator{BinaryExpr::Op::Less, 4};
         case TkPlus:
-            op = BinaryExpr::Op::Add;
-            return 5;
+            return BinaryOperator{BinaryExpr::Op::Add, 5};
         case TkMinus:
-            op = BinaryExpr::Op::Sub;
-            return 5;
+            return BinaryOperator{BinaryExpr::Op::Sub, 5};
         case TkStar:
-            op = BinaryExpr::Op::Mul;
-            return 6;
+            return BinaryOperator{BinaryExpr::Op::Mul, 6};
         default:
-            return 0;
+            return std::nullopt;
     }
 }
 
 ExprId Parser::parse_binary(int min_precedence) {
     ExprId lhs = parse_unary();
     for (;;) {
-        BinaryExpr::Op op;
-        int precedence = binary_precedence(current().kind, op);
-        if (precedence == 0 || precedence < min_precedence)
+        std::optional<BinaryOperator> binary = binary_precedence(current().kind);
+        if (!binary || binary->precedence < min_precedence)
             break;
         SourceLoc op_loc = loc();
         advance();
-        ExprId rhs = parse_binary(precedence + 1);
-        lhs = ast_.add_expr(op_loc, BinaryExpr{op, lhs, rhs});
+        ExprId rhs = parse_binary(binary->precedence + 1);
+        lhs = ast_.add_expr(op_loc, BinaryExpr{binary->op, lhs, rhs});
     }
     return lhs;
 }
@@ -520,16 +506,19 @@ ExprId Parser::parse_primary() {
         return ast_.add_expr(start, StringLiteralExpr{spelling});
     }
     if (check(TkLparen)) {
+        SourceLoc lparen = loc();
         advance();
-        ExprId expr = parse_expression();
+        ExprId inner = parse_expression();
         expect(TkRparen, "')'");
-        return expr; // parentheses are not represented in the AST
+        return ast_.add_expr(lparen, ParenExpr{inner});
     }
     error(start, "expected expression");
 }
 
 bool Parser::is_assignment_lhs(ExprId id) const {
     const Expr& expr = ast_.expr(id);
+    if (auto* paren = std::get_if<ParenExpr>(&expr.node))
+        return is_assignment_lhs(paren->inner);
     return !std::holds_alternative<BinaryExpr>(expr.node) &&
            !std::holds_alternative<ConditionalExpr>(expr.node) &&
            !std::holds_alternative<AssignExpr>(expr.node);

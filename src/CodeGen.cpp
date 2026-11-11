@@ -54,7 +54,7 @@ void CodeGen::create_external_entities() {
 }
 
 llvm::Function* CodeGen::function_for(EntityId id) {
-    auto it = functions_.find(id.index);
+    auto it = functions_.find(id);
     if (it != functions_.end())
         return it->second;
 
@@ -69,12 +69,12 @@ llvm::Function* CodeGen::function_for(EntityId id) {
     auto* function_type = llvm::cast<llvm::FunctionType>(layout_.llvm_type(entity.type));
     llvm::Function* function = llvm::Function::Create(
         function_type, llvm::GlobalValue::ExternalLinkage, *entity.name, &module_);
-    functions_[id.index] = function;
+    functions_[id] = function;
     return function;
 }
 
 llvm::GlobalVariable* CodeGen::global_for(EntityId id) {
-    auto it = globals_.find(id.index);
+    auto it = globals_.find(id);
     if (it != globals_.end())
         return it->second;
 
@@ -90,12 +90,12 @@ llvm::GlobalVariable* CodeGen::global_for(EntityId id) {
     auto* global = new llvm::GlobalVariable(module_, llvm_type, /*isConstant=*/false,
                                             llvm::GlobalValue::ExternalLinkage,
                                             llvm::Constant::getNullValue(llvm_type), *entity.name);
-    globals_[id.index] = global;
+    globals_[id] = global;
     return global;
 }
 
-llvm::GlobalVariable* CodeGen::string_literal(const ExprInfo& info) {
-    std::string data(info.string_bytes.begin(), info.string_bytes.end());
+llvm::GlobalVariable* CodeGen::string_literal(const std::vector<char>& bytes) {
+    std::string data(bytes.begin(), bytes.end());
     llvm::Constant* initializer =
         llvm::ConstantDataArray::getString(context_, data, /*AddNull=*/true);
     llvm::ArrayType* array_type =
@@ -163,8 +163,8 @@ private:
     const Type* return_type_ = nullptr;
     llvm::IRBuilder<> builder_;
     llvm::IRBuilder<> alloca_builder_;
-    std::unordered_map<uint32_t, llvm::AllocaInst*> locals_; // EntityId
-    std::unordered_map<uint32_t, llvm::BasicBlock*> labels_; // LabelId
+    std::unordered_map<EntityId, llvm::AllocaInst*> locals_;
+    std::unordered_map<LabelId, llvm::BasicBlock*> labels_;
     std::vector<LoopContext> loops_;
 
     void collect_labels(StmtId id);
@@ -251,7 +251,7 @@ void CodeGen::FunctionEmitter::emit() {
         const Entity& param = model_.entity(param_entity_id);
         llvm::AllocaInst* slot = create_alloca(param.type, param.name);
         alloca_builder_.CreateStore(&argument, slot);
-        if (!locals_.emplace(param_entity_id.index, slot).second)
+        if (!locals_.emplace(param_entity_id, slot).second)
             fail("duplicate storage for parameter '" + entity_name(param) + "'");
         argument.setName(param.name ? *param.name : "arg");
         ++index;
@@ -277,9 +277,9 @@ void CodeGen::FunctionEmitter::collect_labels(StmtId id) {
     }
     if (auto* label = std::get_if<LabelStmt>(&stmt.node)) {
         const LabelDecl& decl = ast_.label(label->label);
-        if (labels_.count(label->label.index))
+        if (labels_.count(label->label))
             fail("duplicate label block");
-        labels_[label->label.index] =
+        labels_[label->label] =
             llvm::BasicBlock::Create(context_, decl.name ? *decl.name : "label", function_);
         collect_labels(label->stmt);
         return;
@@ -333,7 +333,7 @@ llvm::Value* CodeGen::FunctionEmitter::address_of_entity(EntityId id) {
 
     // A local object must have been materialized by its declaration.  Falling
     // back to a global here would silently invent a different semantic entity.
-    auto it = locals_.find(id.index);
+    auto it = locals_.find(id);
     if (it == locals_.end())
         fail("no storage for local entity '" + entity_name(entity) + "'");
     return it->second;
@@ -348,7 +348,7 @@ void CodeGen::FunctionEmitter::emit_compound(StmtId id) {
 }
 
 void CodeGen::FunctionEmitter::emit_label(const LabelStmt& label) {
-    auto it = labels_.find(label.label.index);
+    auto it = labels_.find(label.label);
     if (it == labels_.end())
         fail("missing label block");
     llvm::BasicBlock* block = it->second;
@@ -368,9 +368,9 @@ void CodeGen::FunctionEmitter::emit_local_decl(DeclId id) {
     const Entity& entity = model_.entity(entity_id);
     if (entity.kind != EntityKind::Object || entity.linkage != Linkage::None)
         return;
-    if (locals_.count(entity_id.index))
+    if (locals_.count(entity_id))
         fail("duplicate local storage for '" + entity_name(entity) + "'");
-    locals_[entity_id.index] = create_alloca(entity.type, entity.name);
+    locals_[entity_id] = create_alloca(entity.type, entity.name);
 }
 
 void CodeGen::FunctionEmitter::emit_stmt(StmtId id) {
@@ -477,7 +477,7 @@ void CodeGen::FunctionEmitter::emit_stmt(StmtId id) {
         LabelId target = model_.goto_target(id);
         if (!target.valid())
             fail("goto without a resolved target");
-        auto it = labels_.find(target.index);
+        auto it = labels_.find(target);
         if (it == labels_.end())
             fail("missing label block for goto");
         builder_.CreateBr(it->second);
@@ -493,32 +493,41 @@ CodeGen::FunctionEmitter::ExprResult CodeGen::FunctionEmitter::emit_expr(ExprId 
 
     // Sema folds integer constants and sizeof.  Returning before dispatch also
     // guarantees that a sizeof operand is never evaluated.
-    if (info.is_constant) {
+    if (const ConstantValue* constant = info.constant()) {
         if (!Type::is_integer(info.type))
             fail("constant expression with a non-integer type");
         return RValue{llvm::ConstantInt::get(llvm::Type::getInt32Ty(context_),
-                                             static_cast<uint64_t>(info.value)),
+                                             static_cast<uint64_t>(constant->value)),
                       types_.int_type()};
     }
 
+    // Parentheses do not change the value; they only keep (0) from being a
+    // null pointer constant during semantic analysis.
+    if (auto* paren = std::get_if<ParenExpr>(&expr.node))
+        return emit_expr(paren->inner);
+
     if (std::holds_alternative<IdentifierExpr>(expr.node)) {
-        if (!info.entity.valid())
+        const EntityId* entity_id = info.entity();
+        if (!entity_id || !entity_id->valid())
             fail("identifier without a resolved entity");
-        const Entity& entity = model_.entity(info.entity);
+        const Entity& entity = model_.entity(*entity_id);
         if (entity.kind == EntityKind::Function) {
             if (!entity.type || !Type::is_function(entity.type))
                 fail("function entity '" + entity_name(entity) + "' has non-function type");
-            return FunctionDesignator{codegen_.function_for(info.entity), entity.type};
+            return FunctionDesignator{codegen_.function_for(*entity_id), entity.type};
         }
         if (!entity.type || !Type::is_object(entity.type))
             fail("object entity '" + entity_name(entity) + "' has non-object type");
-        return Place{address_of_entity(info.entity), entity.type};
+        return Place{address_of_entity(*entity_id), entity.type};
     }
 
     if (std::holds_alternative<StringLiteralExpr>(expr.node)) {
         if (!Type::is_array(info.type))
             fail("string literal without array type");
-        return Place{codegen_.string_literal(info), info.type};
+        const StringLiteralData* string = info.string_literal();
+        if (!string)
+            fail("string literal without decoded bytes");
+        return Place{codegen_.string_literal(string->bytes), info.type};
     }
 
     if (auto* unary = std::get_if<UnaryExpr>(&expr.node)) {
@@ -614,17 +623,22 @@ CodeGen::FunctionEmitter::ExprResult CodeGen::FunctionEmitter::emit_expr(ExprId 
                 fail("member base is not a struct");
             base = place.address;
         }
-        if (!info.member_record)
+        const MemberRef* member_info = info.member();
+        if (!member_info || !member_info->record)
             fail("member access without a record");
-        llvm::Value* address = builder_.CreateStructGEP(layout_.llvm_struct(info.member_record),
-                                                        base, info.member_index, "member");
+        llvm::Value* address = builder_.CreateStructGEP(layout_.llvm_struct(member_info->record),
+                                                        base, member_info->index, "member");
         return Place{address, info.type};
     }
 
-    if (std::holds_alternative<SizeofExpr>(expr.node))
+    if (std::holds_alternative<SizeofExpr>(expr.node)) {
+        const ConstantValue* constant = info.constant();
+        if (!constant)
+            fail("sizeof without a constant value");
         return RValue{llvm::ConstantInt::get(llvm::Type::getInt32Ty(context_),
-                                             static_cast<uint64_t>(info.value)),
+                                             static_cast<uint64_t>(constant->value)),
                       types_.int_type()};
+    }
 
     fail("unsupported expression in code generation");
 }
@@ -726,7 +740,7 @@ CodeGen::FunctionEmitter::RValue CodeGen::FunctionEmitter::convert(RValue value,
 }
 
 CodeGen::FunctionEmitter::RValue CodeGen::FunctionEmitter::convert_expr(ExprId id, const Type* to) {
-    return convert(emit_value(id), to, model_.expr(id).null_pointer_constant);
+    return convert(emit_value(id), to, model_.expr(id).is_null_pointer_constant());
 }
 
 CodeGen::FunctionEmitter::RValue CodeGen::FunctionEmitter::emit_int(ExprId id) {
@@ -737,7 +751,7 @@ CodeGen::FunctionEmitter::RValue CodeGen::FunctionEmitter::emit_int(ExprId id) {
 }
 
 CodeGen::FunctionEmitter::RValue CodeGen::FunctionEmitter::emit_pointer_value(ExprId id) {
-    if (model_.expr(id).null_pointer_constant) {
+    if (model_.expr(id).is_null_pointer_constant()) {
         const Type* pointer_type = types_.pointer_to(types_.void_type());
         return RValue{llvm::ConstantPointerNull::get(opaque_pointer(context_)), pointer_type};
     }

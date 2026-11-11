@@ -52,3 +52,8 @@ SourceLoc declarator_name_loc(const AST& ast, DeclaratorId id) {
 bool declarator_produces_function(const AST& ast, DeclaratorId id) {
     return declarator_shape(ast, id) == DeclaratorShape::Function;
 }
+
+bool is_struct_type_spec(const TypeSpec& spec) {
+    return std::holds_alternative<TypeSpec::StructReference>(spec.node) ||
+           std::holds_alternative<TypeSpec::StructDefinition>(spec.node);
+}

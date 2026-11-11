@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -54,6 +55,17 @@ using DeclaratorId = NodeId<DeclaratorTag>;
 using TypeSpecId = NodeId<TypeSpecTag>;
 using LabelId = NodeId<LabelTag>;
 
+// Typed IDs are used as keys in semantic and code-generation maps.  Hashing the
+// index keeps those maps keyed by identity instead of an integer cast at every
+// use.
+namespace std {
+template <typename Tag> struct hash<NodeId<Tag>> {
+    size_t operator()(NodeId<Tag> id) const noexcept {
+        return hash<uint32_t>{}(id.index);
+    }
+};
+} // namespace std
+
 // ---------------------------------------------------------------------------
 // Expression nodes.  Payloads only describe syntax; resolved types and
 // declarations are stored in SemanticModel.
@@ -69,6 +81,13 @@ struct ConstantExpr {
 
 struct StringLiteralExpr {
     Symbol spelling;
+};
+
+/// Parentheses are semantically transparent, but they are not syntactically
+/// transparent: only the literal token 0 is a null pointer constant, so (0)
+/// must remain distinguishable from 0 (S-009).
+struct ParenExpr {
+    ExprId inner;
 };
 
 struct UnaryExpr {
@@ -126,8 +145,8 @@ struct SizeofExpr {
 };
 
 using ExprNode =
-    std::variant<IdentifierExpr, ConstantExpr, StringLiteralExpr, UnaryExpr, BinaryExpr, AssignExpr,
-                 ConditionalExpr, CallExpr, SubscriptExpr, MemberExpr, SizeofExpr>;
+    std::variant<IdentifierExpr, ConstantExpr, StringLiteralExpr, ParenExpr, UnaryExpr, BinaryExpr,
+                 AssignExpr, ConditionalExpr, CallExpr, SubscriptExpr, MemberExpr, SizeofExpr>;
 
 struct Expr {
     SourceLoc loc;
@@ -202,9 +221,18 @@ struct PointerDeclarator {
 };
 
 struct FunctionDeclarator {
+    /// "()": no parameter declarations.  C4 accepts this form and treats it as
+    /// a function with no parameters.
+    struct NoParameters {};
+    /// "(void)": the special parameter list that declares no parameters.
+    struct VoidParameters {};
+    /// An explicit parameter-type-list.
+    using ParameterList = std::vector<DeclId>;
+
+    using Parameters = std::variant<NoParameters, VoidParameters, ParameterList>;
+
     DeclaratorId inner; // invalid for an abstract function type
-    std::vector<DeclId> params;
-    bool explicit_void = false; // printed as (void) rather than ()
+    Parameters parameters;
 };
 
 using DeclaratorNode = std::variant<NameDeclarator, PointerDeclarator, FunctionDeclarator>;
@@ -221,13 +249,21 @@ struct TypeSpec {
     struct Char {};
     struct Int {};
 
-    struct Struct {
-        Symbol tag;                 // struct tag; may be null
-        std::vector<DeclId> fields; // field declarations
-        bool has_braces = false;    // syntactically contains { ... }
+    /// "struct tag": a reference to a tag declared elsewhere.  It carries no
+    /// fields, which makes an incomplete reference and a definition impossible
+    /// to confuse.
+    struct StructReference {
+        Symbol tag;
     };
 
-    using Node = std::variant<Void, Char, Int, Struct>;
+    /// "struct tag { ... }" or "struct { ... }": a definition.  The tag is null
+    /// for an untagged definition.
+    struct StructDefinition {
+        Symbol tag;
+        std::vector<DeclId> fields;
+    };
+
+    using Node = std::variant<Void, Char, Int, StructReference, StructDefinition>;
 
     SourceLoc loc;
     Node node;
@@ -433,3 +469,6 @@ bool declarator_has_name(const AST& ast, DeclaratorId id);
 Symbol declarator_name(const AST& ast, DeclaratorId id);
 SourceLoc declarator_name_loc(const AST& ast, DeclaratorId id);
 bool declarator_produces_function(const AST& ast, DeclaratorId id);
+
+/// True for both struct type-specifier forms: a tag reference and a definition.
+bool is_struct_type_spec(const TypeSpec& spec);

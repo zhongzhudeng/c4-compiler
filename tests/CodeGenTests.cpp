@@ -403,3 +403,8 @@ TEST_CASE("codegen promotes nested mixed char and int conditionals", "[codegen]"
     REQUIRE(count_occurrences(ir, "sext i8") == 2);
     REQUIRE(contains(ir, "phi i32"));
 }
+
+TEST_CASE("codegen converts literal zero to a null pointer", "[codegen]") {
+    std::string ir = compile_or_fail("int main(void) { int *p; p = 0; return 0; }");
+    REQUIRE(contains(ir, "store ptr null, ptr %p"));
+}

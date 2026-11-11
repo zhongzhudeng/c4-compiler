@@ -5,6 +5,7 @@
 #include "Token.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <vector>
 
 /// Recursive-descent parser for the restricted C4 grammar.  It performs
@@ -40,7 +41,7 @@ private:
 
     TypeSpecId parse_type_spec();
     DeclaratorId parse_declarator(bool allow_name, bool allow_empty);
-    std::vector<DeclId> parse_parameter_list(SourceLoc lparen, bool& explicit_void);
+    FunctionDeclarator::Parameters parse_parameter_list();
     DeclId parse_parameter_declaration();
     std::vector<DeclId> parse_field_declaration();
 
@@ -58,5 +59,12 @@ private:
     ExprId parse_primary();
 
     bool is_assignment_lhs(ExprId id) const;
-    static int binary_precedence(TokenKind kind, BinaryExpr::Op& op);
+
+    /// A binary operator together with its precedence.  Returning both at once
+    /// keeps the operator and its precedence from drifting apart.
+    struct BinaryOperator {
+        BinaryExpr::Op op;
+        int precedence;
+    };
+    static std::optional<BinaryOperator> binary_precedence(TokenKind kind);
 };

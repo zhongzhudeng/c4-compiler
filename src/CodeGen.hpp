@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 /// Lowers the typed AST to LLVM IR.  All types, declarations, value
 /// categories and constant values come from the SemanticModel; this class only
@@ -39,12 +40,12 @@ private:
     llvm::LLVMContext& context_;
     llvm::Module& module_;
 
-    std::unordered_map<uint32_t, llvm::GlobalVariable*> globals_; // EntityId
-    std::unordered_map<uint32_t, llvm::Function*> functions_;     // EntityId
+    std::unordered_map<EntityId, llvm::GlobalVariable*> globals_;
+    std::unordered_map<EntityId, llvm::Function*> functions_;
     unsigned string_counter_ = 0;
 
     void create_external_entities();
     llvm::Function* function_for(EntityId id);
     llvm::GlobalVariable* global_for(EntityId id);
-    llvm::GlobalVariable* string_literal(const ExprInfo& info);
+    llvm::GlobalVariable* string_literal(const std::vector<char>& bytes);
 };

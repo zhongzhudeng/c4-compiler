@@ -303,82 +303,97 @@ const Type* Sema::resolve_type_spec(TypeSpecId id, bool declare_tag) {
     if (std::holds_alternative<TypeSpec::Int>(spec.node))
         return types_.int_type();
 
-    const TypeSpec::Struct& struct_spec = std::get<TypeSpec::Struct>(spec.node);
-    StructDecl* record = model_.type_spec(id).record;
-    if (record)
-        return types_.struct_type(record);
+    // A type specifier is resolved at most once; every later use of the same
+    // specifier shares the record.
+    StructDecl* resolved = model_.type_spec(id).record;
+    if (resolved)
+        return types_.struct_type(resolved);
 
-    if (struct_spec.has_braces) {
-        if (struct_spec.tag) {
-            record = model_.binding_tag(current_, struct_spec.tag);
-            if (record) {
-                if (record->complete)
-                    diagnostics_.error(spec.loc,
-                                       "redefinition of 'struct " + *struct_spec.tag + "'");
-            } else {
-                record = model_.add_struct(struct_spec.tag, spec.loc, false);
-                model_.bind_tag(current_, struct_spec.tag, record);
-            }
+    if (auto* definition = std::get_if<TypeSpec::StructDefinition>(&spec.node))
+        return resolve_struct_definition(id, *definition, spec.loc);
+
+    auto* reference = std::get_if<TypeSpec::StructReference>(&spec.node);
+    assert(reference && "unknown type specifier");
+    return resolve_struct_reference(id, *reference, spec.loc, declare_tag);
+}
+
+const Type* Sema::resolve_struct_definition(TypeSpecId id,
+                                            const TypeSpec::StructDefinition& definition,
+                                            SourceLoc loc) {
+    StructDecl* record = nullptr;
+    if (definition.tag) {
+        record = model_.binding_tag(current_, definition.tag);
+        if (record) {
+            if (record->complete)
+                diagnostics_.error(loc, "redefinition of 'struct " + *definition.tag + "'");
         } else {
-            record = model_.add_struct(Symbol(), spec.loc, true);
+            record = model_.add_struct(definition.tag, loc, false);
+            model_.bind_tag(current_, definition.tag, record);
         }
-
-        record->loc = spec.loc;
-        record->anonymous = !struct_spec.tag;
-        record->type = types_.struct_type(record);
-        record->fields.clear();
-        model_.type_spec(id).record = record;
-
-        std::unordered_set<Symbol> field_names;
-        for (DeclId field_id : struct_spec.fields) {
-            const Decl& field = ast_.decl(field_id);
-            auto* field_decl = std::get_if<FieldDecl>(&field.node);
-            if (!field_decl)
-                diagnostics_.error(field.loc, "invalid struct member");
-
-            const Type* base = resolve_type_spec(field_decl->spec);
-            DeclResult result = resolve_declarator(field_decl->declarator, base);
-            SourceLoc name_loc = result.name_loc.line ? result.name_loc : field.loc;
-            if (!result.name)
-                diagnostics_.error(name_loc, "struct member requires a name");
-            if (!field_names.insert(result.name).second)
-                diagnostics_.error(name_loc, "duplicate struct member '" + *result.name + "'");
-            validate_field_type(result.type, result.name, name_loc);
-
-            FieldInfo info;
-            info.name = result.name;
-            info.type = result.type;
-            info.decl = field_id;
-            record->fields.push_back(std::move(info));
-        }
-
-        if (record->fields.empty())
-            diagnostics_.error(spec.loc, "struct has no members");
-
-        record->complete = true;
-        for (size_t i = 0; i < record->fields.size(); ++i)
-            record->fields[i].offset = layout_.field_offset(record, unsigned(i));
-        return record->type;
+    } else {
+        record = model_.add_struct(Symbol(), loc, true);
     }
 
-    if (!struct_spec.tag)
-        diagnostics_.error(spec.loc, "expected struct tag or declaration");
+    record->loc = loc;
+    record->anonymous = !definition.tag;
+    record->type = types_.struct_type(record);
+    record->fields.clear();
+    model_.type_spec(id).record = record;
 
+    std::unordered_set<Symbol> field_names;
+    for (DeclId field_id : definition.fields) {
+        const Decl& field = ast_.decl(field_id);
+        auto* field_decl = std::get_if<FieldDecl>(&field.node);
+        if (!field_decl)
+            diagnostics_.error(field.loc, "invalid struct member");
+
+        const Type* base = resolve_type_spec(field_decl->spec);
+        DeclResult result = resolve_declarator(field_decl->declarator, base);
+        SourceLoc name_loc = result.name_loc.line ? result.name_loc : field.loc;
+        if (!result.name)
+            diagnostics_.error(name_loc, "struct member requires a name");
+        if (!field_names.insert(result.name).second)
+            diagnostics_.error(name_loc, "duplicate struct member '" + *result.name + "'");
+        validate_field_type(result.type, result.name, name_loc);
+
+        FieldInfo info;
+        info.name = result.name;
+        info.type = result.type;
+        info.decl = field_id;
+        record->fields.push_back(std::move(info));
+    }
+
+    if (record->fields.empty())
+        diagnostics_.error(loc, "struct has no members");
+
+    record->complete = true;
+    for (size_t i = 0; i < record->fields.size(); ++i)
+        record->fields[i].offset = layout_.field_offset(record, unsigned(i));
+    return record->type;
+}
+
+const Type* Sema::resolve_struct_reference(TypeSpecId id,
+                                           const TypeSpec::StructReference& reference,
+                                           SourceLoc loc, bool declare_tag) {
+    if (!reference.tag)
+        diagnostics_.error(loc, "expected struct tag or declaration");
+
+    StructDecl* record = nullptr;
     if (declare_tag) {
         // A declaration of the form "struct S;" declares the tag in the current
         // scope even when an outer scope already declares a tag with that name.
-        record = model_.binding_tag(current_, struct_spec.tag);
+        record = model_.binding_tag(current_, reference.tag);
         if (!record) {
-            record = model_.add_struct(struct_spec.tag, spec.loc, false);
+            record = model_.add_struct(reference.tag, loc, false);
             record->type = types_.struct_type(record);
-            model_.bind_tag(current_, struct_spec.tag, record);
+            model_.bind_tag(current_, reference.tag, record);
         }
     } else {
-        record = lookup_tag(struct_spec.tag);
+        record = lookup_tag(reference.tag);
         if (!record) {
-            record = model_.add_struct(struct_spec.tag, spec.loc, false);
+            record = model_.add_struct(reference.tag, loc, false);
             record->type = types_.struct_type(record);
-            model_.bind_tag(current_, struct_spec.tag, record);
+            model_.bind_tag(current_, reference.tag, record);
         }
     }
     model_.type_spec(id).record = record;
@@ -402,9 +417,12 @@ Sema::DeclResult Sema::resolve_declarator(DeclaratorId id, const Type* base) {
         // function prototype scope, which ends with the function declarator.  The
         // scope is retained only when this declarator produces the declared
         // function type and the declaration is a definition (adoptFunctionScope).
-        ScopeId prototype_scope = push_scope(ScopeKind::FunctionPrototype);
+        ScopePush prototype_scope_guard(*this, ScopeKind::FunctionPrototype);
+        ScopeId prototype_scope = current_;
         std::vector<const Type*> parameter_types;
-        std::vector<DeclId> parameters = function->params;
+        std::vector<DeclId> parameters;
+        if (auto* list = std::get_if<FunctionDeclarator::ParameterList>(&function->parameters))
+            parameters = *list;
         std::unordered_set<Symbol> parameter_names;
 
         for (DeclId param_id : parameters) {
@@ -442,7 +460,6 @@ Sema::DeclResult Sema::resolve_declarator(DeclaratorId id, const Type* base) {
             inner.function_scope = prototype_scope;
             inner.params = std::move(parameters);
         }
-        pop_scope();
         result = std::move(inner);
     }
 
@@ -561,8 +578,8 @@ void Sema::analyze_top_level(DeclId id) {
 
     if (auto* tag = std::get_if<TagDecl>(&decl.node)) {
         const TypeSpec& spec = ast_.type_spec(tag->spec);
-        const auto* struct_spec = std::get_if<TypeSpec::Struct>(&spec.node);
-        if (struct_spec && struct_spec->has_braces && !struct_spec->tag) {
+        const auto* definition = std::get_if<TypeSpec::StructDefinition>(&spec.node);
+        if (definition && !definition->tag) {
             diagnostics_.error(decl.loc, "declaration does not declare anything");
             return;
         }
@@ -605,8 +622,8 @@ void Sema::analyze_local_decl(DeclId id) {
 
     if (auto* tag = std::get_if<TagDecl>(&decl.node)) {
         const TypeSpec& spec = ast_.type_spec(tag->spec);
-        const auto* struct_spec = std::get_if<TypeSpec::Struct>(&spec.node);
-        if (struct_spec && struct_spec->has_braces && !struct_spec->tag) {
+        const auto* definition = std::get_if<TypeSpec::StructDefinition>(&spec.node);
+        if (definition && !definition->tag) {
             diagnostics_.error(decl.loc, "declaration does not declare anything");
             return;
         }
@@ -639,15 +656,13 @@ void Sema::analyze_function(DeclId id, ScopeId function_scope) {
     // body, and labels belong to it.  Its parent is the scope containing the
     // definition, not any enclosing declarator's prototype scope.
     adopt_function_scope(function_scope, current_);
-    ScopeId saved = current_;
-    current_ = function_scope;
 
     FunctionContext context;
     context.return_type = function_type->result();
     context.scope = function_scope;
-    function_ = &context;
+    FunctionScope scope_guard(*this, function_scope, context);
 
-    analyze_compound(function->body, false);
+    analyze_compound(function->body);
 
     for (const auto& [goto_stmt, label_name] : context.pending_gotos) {
         LabelId target = model_.lookup_label(context.scope, label_name);
@@ -656,24 +671,22 @@ void Sema::analyze_function(DeclId id, ScopeId function_scope) {
                                "use of undeclared label '" + *label_name + "'");
         model_.goto_target(goto_stmt) = target;
     }
-
-    function_ = nullptr;
-    current_ = saved;
 }
 
-void Sema::analyze_compound(StmtId id, bool push) {
+void Sema::analyze_compound(StmtId id) {
     auto* compound = std::get_if<CompoundStmt>(&ast_.stmt(id).node);
     assert(compound && "expected a compound statement");
-    if (push)
-        push_scope(ScopeKind::Block);
     for (StmtId item : compound->items) {
         if (auto* decl_stmt = std::get_if<DeclStmt>(&ast_.stmt(item).node))
             analyze_local_decl(decl_stmt->decl);
         else
             analyze_stmt(item);
     }
-    if (push)
-        pop_scope();
+}
+
+void Sema::analyze_block(StmtId id) {
+    ScopePush scope(*this, ScopeKind::Block);
+    analyze_compound(id);
 }
 
 void Sema::analyze_stmt(StmtId id) {
@@ -681,7 +694,7 @@ void Sema::analyze_stmt(StmtId id) {
     SourceLoc loc = stmt.loc;
 
     if (std::holds_alternative<CompoundStmt>(stmt.node)) {
-        analyze_compound(id, true);
+        analyze_block(id);
         return;
     }
 
@@ -707,9 +720,8 @@ void Sema::analyze_stmt(StmtId id) {
     if (auto* while_stmt = std::get_if<WhileStmt>(&stmt.node)) {
         check_scalar(while_stmt->cond, loc, "'while' condition");
         assert(function_ && "loop outside of a function");
-        ++function_->loop_depth;
+        LoopDepth depth(*function_);
         analyze_stmt(while_stmt->body);
-        --function_->loop_depth;
         return;
     }
 
@@ -776,12 +788,10 @@ const Type* Sema::decayed_type(const ExprInfo& info) {
     return type;
 }
 
-void Sema::set_int_constant(ExprInfo& info, long long value) const {
+void Sema::set_int_constant(ExprInfo& info, long long value, bool null_pointer_constant) const {
     info.type = types_.int_type();
     info.category = ValueCategory::RValue;
-    info.is_constant = true;
-    info.value = wrap_int(value);
-    info.null_pointer_constant = info.value == 0;
+    info.details = ConstantValue{wrap_int(value), null_pointer_constant};
 }
 
 bool Sema::compatible_object_pointers(const Type* a, const Type* b) const {
@@ -831,7 +841,7 @@ bool Sema::assignable(const Type* to, ExprId from) {
         return Type::is_integer(from_type);
 
     if (Type::is_pointer(to)) {
-        if (from_info.null_pointer_constant)
+        if (from_info.is_null_pointer_constant())
             return true;
         if (!Type::is_pointer(from_type))
             return false;
@@ -895,14 +905,17 @@ ExprInfo& Sema::check_expr(ExprId id) {
             diagnostics_.error(loc, "internal error: unresolved declaration '" + *identifier->name +
                                         "'");
         info.type = resolved.type;
-        info.entity = entity;
+        info.details = entity;
         info.category = resolved.kind == EntityKind::Function ? ValueCategory::FunctionDesignator
                                                               : ValueCategory::LValue;
         return info;
     }
 
     if (auto* constant = std::get_if<ConstantExpr>(&expr.node)) {
-        set_int_constant(info, decode_integer_constant(constant->spelling, loc, diagnostics_));
+        // S-009: only the literal token 0 is a null pointer constant.
+        bool null_pointer_constant = *constant->spelling == "0";
+        set_int_constant(info, decode_integer_constant(constant->spelling, loc, diagnostics_),
+                         null_pointer_constant);
         return info;
     }
 
@@ -910,19 +923,31 @@ ExprInfo& Sema::check_expr(ExprId id) {
         std::vector<char> bytes = decode_string_literal(string->spelling, loc, diagnostics_);
         info.type = types_.array_of(types_.char_type(), static_cast<uint64_t>(bytes.size()) + 1);
         info.category = ValueCategory::LValue;
-        info.string_bytes = std::move(bytes);
+        info.details = StringLiteralData{std::move(bytes)};
+        return info;
+    }
+
+    if (auto* paren = std::get_if<ParenExpr>(&expr.node)) {
+        ExprInfo& inner = check_expr(paren->inner);
+        info.type = inner.type;
+        info.category = inner.category;
+        // Parentheses preserve the constant value but not the null-pointer-
+        // constant property: (0) is an ordinary integer constant (S-009).
+        if (const ConstantValue* value = inner.constant())
+            info.details = ConstantValue{value->value, false};
         return info;
     }
 
     if (auto* unary = std::get_if<UnaryExpr>(&expr.node)) {
         ExprInfo& operand = check_expr(unary->operand);
         const Type* type = decayed_type(operand);
+        const ConstantValue* operand_value = operand.constant();
         switch (unary->op) {
             case UnaryExpr::Op::Plus:
                 if (!Type::is_integer(type))
                     diagnostics_.error(loc, "invalid operand to unary '+'");
-                if (operand.is_constant)
-                    set_int_constant(info, operand.value);
+                if (operand_value)
+                    set_int_constant(info, operand_value->value);
                 else {
                     info.type = types_.int_type();
                     info.category = ValueCategory::RValue;
@@ -931,8 +956,8 @@ ExprInfo& Sema::check_expr(ExprId id) {
             case UnaryExpr::Op::Minus:
                 if (!Type::is_integer(type))
                     diagnostics_.error(loc, "invalid operand to unary '-'");
-                if (operand.is_constant)
-                    set_int_constant(info, -operand.value);
+                if (operand_value)
+                    set_int_constant(info, -operand_value->value);
                 else {
                     info.type = types_.int_type();
                     info.category = ValueCategory::RValue;
@@ -941,8 +966,8 @@ ExprInfo& Sema::check_expr(ExprId id) {
             case UnaryExpr::Op::Not:
                 if (!Type::is_scalar(type))
                     diagnostics_.error(loc, "invalid operand to unary '!'");
-                if (operand.is_constant)
-                    set_int_constant(info, operand.value == 0 ? 1 : 0);
+                if (operand_value)
+                    set_int_constant(info, operand_value->value == 0 ? 1 : 0);
                 else {
                     info.type = types_.int_type();
                     info.category = ValueCategory::RValue;
@@ -974,13 +999,15 @@ ExprInfo& Sema::check_expr(ExprId id) {
         ExprInfo& right = check_expr(binary->rhs);
         const Type* left_type = decayed_type(left);
         const Type* right_type = decayed_type(right);
+        const ConstantValue* left_value = left.constant();
+        const ConstantValue* right_value = right.constant();
 
         switch (binary->op) {
             case BinaryExpr::Op::Mul:
                 if (!Type::is_integer(left_type) || !Type::is_integer(right_type))
                     diagnostics_.error(loc, "invalid operands to binary '*'");
-                if (left.is_constant && right.is_constant)
-                    set_int_constant(info, left.value * right.value);
+                if (left_value && right_value)
+                    set_int_constant(info, left_value->value * right_value->value);
                 else {
                     info.type = types_.int_type();
                     info.category = ValueCategory::RValue;
@@ -988,8 +1015,8 @@ ExprInfo& Sema::check_expr(ExprId id) {
                 break;
             case BinaryExpr::Op::Add:
                 if (Type::is_integer(left_type) && Type::is_integer(right_type)) {
-                    if (left.is_constant && right.is_constant)
-                        set_int_constant(info, left.value + right.value);
+                    if (left_value && right_value)
+                        set_int_constant(info, left_value->value + right_value->value);
                     else {
                         info.type = types_.int_type();
                         info.category = ValueCategory::RValue;
@@ -1008,8 +1035,8 @@ ExprInfo& Sema::check_expr(ExprId id) {
                 break;
             case BinaryExpr::Op::Sub:
                 if (Type::is_integer(left_type) && Type::is_integer(right_type)) {
-                    if (left.is_constant && right.is_constant)
-                        set_int_constant(info, left.value - right.value);
+                    if (left_value && right_value)
+                        set_int_constant(info, left_value->value - right_value->value);
                     else {
                         info.type = types_.int_type();
                         info.category = ValueCategory::RValue;
@@ -1032,8 +1059,8 @@ ExprInfo& Sema::check_expr(ExprId id) {
                 break;
             case BinaryExpr::Op::Less:
                 if (Type::is_integer(left_type) && Type::is_integer(right_type)) {
-                    if (left.is_constant && right.is_constant)
-                        set_int_constant(info, left.value < right.value ? 1 : 0);
+                    if (left_value && right_value)
+                        set_int_constant(info, left_value->value < right_value->value ? 1 : 0);
                     else {
                         info.type = types_.int_type();
                         info.category = ValueCategory::RValue;
@@ -1050,8 +1077,9 @@ ExprInfo& Sema::check_expr(ExprId id) {
             case BinaryExpr::Op::NotEqual: {
                 bool equal = binary->op == BinaryExpr::Op::Equal;
                 if (Type::is_integer(left_type) && Type::is_integer(right_type)) {
-                    if (left.is_constant && right.is_constant)
-                        set_int_constant(info, (left.value == right.value) == equal ? 1 : 0);
+                    if (left_value && right_value)
+                        set_int_constant(
+                            info, (left_value->value == right_value->value) == equal ? 1 : 0);
                     else {
                         info.type = types_.int_type();
                         info.category = ValueCategory::RValue;
@@ -1060,10 +1088,10 @@ ExprInfo& Sema::check_expr(ExprId id) {
                            compatible_equality_pointers(left_type, right_type)) {
                     info.type = types_.int_type();
                     info.category = ValueCategory::RValue;
-                } else if (Type::is_pointer(left_type) && right.null_pointer_constant) {
+                } else if (Type::is_pointer(left_type) && right.is_null_pointer_constant()) {
                     info.type = types_.int_type();
                     info.category = ValueCategory::RValue;
-                } else if (left.null_pointer_constant && Type::is_pointer(right_type)) {
+                } else if (left.is_null_pointer_constant() && Type::is_pointer(right_type)) {
                     info.type = types_.int_type();
                     info.category = ValueCategory::RValue;
                 } else {
@@ -1076,12 +1104,12 @@ ExprInfo& Sema::check_expr(ExprId id) {
                 bool is_and = binary->op == BinaryExpr::Op::LogicalAnd;
                 if (!Type::is_scalar(left_type) || !Type::is_scalar(right_type))
                     diagnostics_.error(loc, "invalid operands to logical operator");
-                if (left.is_constant && right.is_constant) {
-                    bool l = left.value != 0;
-                    bool r = right.value != 0;
+                if (left_value && right_value) {
+                    bool l = left_value->value != 0;
+                    bool r = right_value->value != 0;
                     set_int_constant(info, is_and ? (l && r) : (l || r));
-                } else if (left.is_constant) {
-                    bool l = left.value != 0;
+                } else if (left_value) {
+                    bool l = left_value->value != 0;
                     if (is_and && !l)
                         set_int_constant(info, 0);
                     else if (!is_and && l)
@@ -1133,9 +1161,12 @@ ExprInfo& Sema::check_expr(ExprId id) {
         const Type* else_type = decayed_type(else_info);
 
         if (Type::is_integer(then_type) && Type::is_integer(else_type)) {
-            const ExprInfo& cond_info = model_.expr(conditional->cond);
-            if (cond_info.is_constant && then_info.is_constant && else_info.is_constant)
-                set_int_constant(info, cond_info.value != 0 ? then_info.value : else_info.value);
+            const ConstantValue* cond_value = model_.expr(conditional->cond).constant();
+            const ConstantValue* then_value = then_info.constant();
+            const ConstantValue* else_value = else_info.constant();
+            if (cond_value && then_value && else_value)
+                set_int_constant(info,
+                                 cond_value->value != 0 ? then_value->value : else_value->value);
             else {
                 info.type = types_.int_type();
                 info.category = ValueCategory::RValue;
@@ -1153,10 +1184,10 @@ ExprInfo& Sema::check_expr(ExprId id) {
             else
                 info.type = then_type;
             info.category = ValueCategory::RValue;
-        } else if (Type::is_pointer(then_type) && else_info.null_pointer_constant) {
+        } else if (Type::is_pointer(then_type) && else_info.is_null_pointer_constant()) {
             info.type = then_type;
             info.category = ValueCategory::RValue;
-        } else if (then_info.null_pointer_constant && Type::is_pointer(else_type)) {
+        } else if (then_info.is_null_pointer_constant() && Type::is_pointer(else_type)) {
             info.type = else_type;
             info.category = ValueCategory::RValue;
         } else {
@@ -1239,8 +1270,7 @@ ExprInfo& Sema::check_expr(ExprId id) {
             if (record->fields[i].name == member->member) {
                 info.type = record->fields[i].type;
                 info.category = category;
-                info.member_record = record;
-                info.member_index = static_cast<unsigned>(i);
+                info.details = MemberRef{record, static_cast<unsigned>(i)};
                 return info;
             }
         }

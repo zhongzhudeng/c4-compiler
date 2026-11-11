@@ -156,10 +156,18 @@ phase unwind without returning a partially analyzed stage result.
 - Node kinds are std::variant alternatives (ExprNode, StmtNode, DeclNode,
   DeclaratorNode).  The source location lives in the wrapper (Expr, Stmt,
   Decl, Declarator).
-- TypeSpec is a variant of Void/Char/Int/Struct, and SizeofExpr is a variant
-  of an expression operand or a type-name form.  Struct-only tag/field data
-  exists only on TypeSpec::Struct, and neither sizeof form can carry the
+- TypeSpec is a variant of Void/Char/Int/StructReference/StructDefinition, and
+  SizeofExpr is a variant of an expression operand or a type-name form.  A
+  StructReference carries only a tag; a StructDefinition carries the tag
+  (possibly null) and the field declarations, so a reference cannot carry
+  fields and a definition cannot omit them.  Neither sizeof form can carry the
   other form's payload.
+- FunctionDeclarator carries a parameter-clause variant: NoParameters for
+  "()", VoidParameters for "(void)", or an explicit ParameterList.  The three
+  syntactic forms stay distinguishable in the AST.
+- ParenExpr preserves source parentheses.  Sema and CodeGen treat it as
+  transparent; only the null-pointer-constant rule (S-009) distinguishes
+  (0) from 0, and the printer omits the redundant parentheses.
 - No code holds pointers/references into AST vectors across an insertion.
   Parsing finishes before Sema/CodeGen, so later phases obtain short-lived
   references through ast.expr(id) etc.
@@ -196,9 +204,11 @@ entity, while the block binding itself stays local to its scope.
 
 Independent from AST ownership, constructed after parsing and sized from AST
 counts:
-- ExprInfo: type, value category, null-pointer-constant flag, resolved
-  EntityId, member record/index, goto label, constant value, decoded string
-  bytes.
+- ExprInfo: the common type and value category, plus one ExprDetails
+  alternative: ConstantValue (value and null-pointer-constant flag), EntityId,
+  MemberRef (record and field index), StringLiteralData (decoded bytes), or
+  monostate for operators, calls and sizeof.  Exactly one alternative is
+  meaningful for a given expression kind.
 - DeclInfo: EntityId for an ordinary declaration, the ScopeId of the binding
   introduced by that declaration, and StructDecl* for a tag declaration.
 - Entity storage: canonical type, kind, linkage, definition state, first
@@ -299,15 +309,21 @@ token text is interned once per distinct spelling.
 
 ### Parser (task C)
 
-Syntax-only; it discards source parentheses but keeps a fully parenthesizable
-structure.  It implements the restricted C4 grammar: identifiers, constants,
-string literals, (), [], calls, ., ->, sizeof, unary & * - ! +, binary
-* + - < == != && ||, ?:, =, declarations without initializers,
-pointer/parenthesized/function declarators, abstract declarators for sizeof,
-and labeled/compound/expression/if/if-else/while/break/continue/return/goto
-statements.  Local function declarations are allowed; function definitions are
-file-scope only.  Declarations are classified syntactically as
+Syntax-only; source parentheses are kept as ParenExpr so that rules that
+distinguish spelling (S-009) can see them, while the pretty printer still
+emits the fully parenthesized form.  It implements the restricted C4 grammar:
+identifiers, constants, string literals, (), [], calls, ., ->, sizeof, unary
+& * - ! +, binary * + - < == != && ||, ?:, =, declarations without
+initializers, pointer/parenthesized/function declarators, abstract declarators
+for sizeof, and labeled/compound/expression/if/if-else/while/break/continue/
+return/goto statements.  Local function declarations are allowed; function
+definitions are file-scope only.  Declarations are classified syntactically as
 VarDecl/FunctionDecl/TagDecl from declarator shape.
+
+Precedence climbing returns a BinaryOperator{op, precedence} value, and a
+function declarator's parameter clause is parsed as one variant
+(NoParameters/VoidParameters/ParameterList), so a caller never observes one
+half of a decision.
 
 ### Sema (task E)
 
@@ -321,6 +337,12 @@ Declarations bind names into a ScopeId; compatible declarations reuse an
 EntityId; a block-scope function declaration creates a local binding for the
 external entity.  Struct parameters, struct returns and struct assignment are
 rejected (explicitly permitted by task E); anonymous structs are supported.
+
+Only the literal token 0 is a null pointer constant (S-009): constant folding
+and parentheses preserve the value but never the null-pointer property.
+Scope entry, the current function context, and loop depth are managed by
+scoped guards (ScopePush, FunctionScope, LoopDepth), so no analysis path can
+leave a stale scope, function, or loop state behind.
 
 ### Pretty printer (task D)
 
@@ -355,10 +377,10 @@ and function-scoped responsibilities:
   verifies the module after all definitions.
 - CodeGen::FunctionEmitter is a nested class constructed for exactly one
   function definition and destroyed afterwards.  It owns the current
-  llvm::Function, its return type, the IRBuilder and alloca builder, the local
-  EntityId-to-alloca map, label blocks, and loop contexts.  There is no
-  function state on the module-level object and no manual reset between
-  definitions.
+  llvm::Function, its return type, the IRBuilder and alloca builder, the
+  EntityId-keyed local allocas, the LabelId-keyed label blocks, and loop
+  contexts.  There is no function state on the module-level object and no
+  manual reset between definitions.
 
 Expression lowering distinguishes four result categories:
 
@@ -374,7 +396,8 @@ Expression lowering distinguishes four result categories:
 Conversions are explicit: emitValue applies lvalue-to-rvalue conversion,
 array-to-pointer decay, and function-to-pointer decay; load performs a scalar
 load; convert handles integer promotion/truncation, pointer compatibility, and
-null pointer constants using Sema's nullPointerConstant flag; emitDiscarded
+null pointer constants using Sema's ConstantValue::null_pointer_constant flag
+(set only for the literal 0); emitDiscarded
 evaluates an expression statement, applying scalar lvalue conversion without
 requiring a value for arrays or structs.  Sema's value categories and the
 canonical TypeContext types are authoritative; CodeGen only checks LLVM

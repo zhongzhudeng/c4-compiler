@@ -8,6 +8,7 @@
 #include <deque>
 #include <memory>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 /// Value categories are semantic, not syntactic.
@@ -86,27 +87,56 @@ struct Scope {
     std::unordered_map<Symbol, LabelId> labels;
 };
 
+/// The value of an integer constant expression.  null_pointer_constant is set
+/// only for the literal token 0: a parenthesized or folded zero is an ordinary
+/// integer constant (S-009).
+struct ConstantValue {
+    int32_t value = 0;
+    bool null_pointer_constant = false;
+};
+
+/// A resolved member access: the record and the index of the selected field.
+struct MemberRef {
+    StructDecl* record = nullptr;
+    unsigned index = 0;
+};
+
+/// The decoded bytes of a string literal, without the terminating NUL.
+struct StringLiteralData {
+    std::vector<char> bytes;
+};
+
+/// Expression-specific semantic information.  An expression kind carries at
+/// most one of these: a constant has a value, an identifier names an entity, a
+/// member access names a field, and a string literal carries its decoded
+/// bytes.  Operators, calls and sizeof need no extra semantics.
+using ExprDetails =
+    std::variant<std::monostate, ConstantValue, EntityId, MemberRef, StringLiteralData>;
+
 struct ExprInfo {
     const Type* type = nullptr;
     ValueCategory category = ValueCategory::RValue;
-    bool null_pointer_constant = false;
+    ExprDetails details;
 
-    // Constant value for integer/character constants and sizeof.
-    bool is_constant = false;
-    long long value = 0;
-
-    // Resolved identifier.
-    EntityId entity;
-
-    // Resolved member access.
-    StructDecl* member_record = nullptr;
-    unsigned member_index = 0;
-
-    // Resolved goto target.
-    LabelId label;
-
-    // Decoded bytes of a string literal (without the terminating NUL).
-    std::vector<char> string_bytes;
+    const ConstantValue* constant() const {
+        return std::get_if<ConstantValue>(&details);
+    }
+    bool is_constant() const {
+        return constant() != nullptr;
+    }
+    bool is_null_pointer_constant() const {
+        const ConstantValue* value = constant();
+        return value && value->null_pointer_constant;
+    }
+    const EntityId* entity() const {
+        return std::get_if<EntityId>(&details);
+    }
+    const MemberRef* member() const {
+        return std::get_if<MemberRef>(&details);
+    }
+    const StringLiteralData* string_literal() const {
+        return std::get_if<StringLiteralData>(&details);
+    }
 };
 
 /// A declaration's semantic links.  Type, name, linkage and definition state

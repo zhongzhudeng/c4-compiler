@@ -234,12 +234,11 @@ TEST_CASE("sizeof AST distinguishes expression and type-name forms", "[parser][t
     auto* struct_type_name = std::get_if<SizeofExpr::TypeName>(&struct_sizeof->target);
     REQUIRE(struct_type_name != nullptr);
     CHECK_FALSE(struct_type_name->declarator.valid());
-    auto* struct_spec = std::get_if<TypeSpec::Struct>(
+    auto* struct_spec = std::get_if<TypeSpec::StructReference>(
         &struct_compiler.ast().type_spec(struct_type_name->spec).node);
     REQUIRE(struct_spec != nullptr);
     REQUIRE(struct_spec->tag != nullptr);
     CHECK(*struct_spec->tag == "S");
-    CHECK_FALSE(struct_spec->has_braces);
 }
 
 TEST_CASE("printer renders both sizeof forms", "[printer][ast]") {
@@ -272,11 +271,10 @@ TEST_CASE("TypeSpec alternatives encode primitive and struct syntax", "[parser][
             &compiler.ast().decl(compiler.ast().translation_unit().decls[0]).node);
         REQUIRE(tag != nullptr);
         const TypeSpec& spec = compiler.ast().type_spec(tag->spec);
-        auto* structure = std::get_if<TypeSpec::Struct>(&spec.node);
+        auto* structure = std::get_if<TypeSpec::StructDefinition>(&spec.node);
         REQUIRE(structure != nullptr);
         REQUIRE(structure->tag != nullptr);
         CHECK(*structure->tag == "S");
-        CHECK(structure->has_braces);
         CHECK(structure->fields.size() == 1);
     }
 
@@ -287,12 +285,10 @@ TEST_CASE("TypeSpec alternatives encode primitive and struct syntax", "[parser][
             &compiler.ast().decl(compiler.ast().translation_unit().decls[0]).node);
         REQUIRE(tag != nullptr);
         const TypeSpec& spec = compiler.ast().type_spec(tag->spec);
-        auto* structure = std::get_if<TypeSpec::Struct>(&spec.node);
+        auto* structure = std::get_if<TypeSpec::StructReference>(&spec.node);
         REQUIRE(structure != nullptr);
         REQUIRE(structure->tag != nullptr);
         CHECK(*structure->tag == "S");
-        CHECK_FALSE(structure->has_braces);
-        CHECK(structure->fields.empty());
     }
 
     {
@@ -302,10 +298,9 @@ TEST_CASE("TypeSpec alternatives encode primitive and struct syntax", "[parser][
             &compiler.ast().decl(compiler.ast().translation_unit().decls[0]).node);
         REQUIRE(variable != nullptr);
         const TypeSpec& spec = compiler.ast().type_spec(variable->spec);
-        auto* structure = std::get_if<TypeSpec::Struct>(&spec.node);
+        auto* structure = std::get_if<TypeSpec::StructDefinition>(&spec.node);
         REQUIRE(structure != nullptr);
         CHECK(structure->tag == nullptr);
-        CHECK(structure->has_braces);
         CHECK(structure->fields.size() == 1);
     }
 }
